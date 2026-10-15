@@ -204,9 +204,14 @@ def venv_python() -> str:
 def venv_ray_argv(*ray_args: str) -> list[str]:
     if VENV_RAY.is_file():
         return [str(VENV_RAY), *ray_args]
-    raise FileNotFoundError(
-        "Ray is not installed in .venv. Run: python3 scripts/install.py"
-    )
+    py = venv_python()
+    try:
+        import ray  # noqa: F401
+    except ImportError:
+        raise FileNotFoundError(
+            "Ray is not installed in .venv. Run: python3 scripts/install.py"
+        ) from None
+    return [py, "-m", "ray.scripts.scripts", *ray_args]
 
 
 def venv_subprocess_env() -> dict[str, str]:
@@ -295,11 +300,8 @@ def start_ray_head() -> None:
             env=venv_subprocess_env(),
             check=False,
         )
-    except FileNotFoundError:
-        print(
-            "Warning: Ray CLI not found in venv; run: python3 scripts/install.py",
-            file=sys.stderr,
-        )
+    except FileNotFoundError as exc:
+        print(f"Warning: {exc}", file=sys.stderr)
         return
 
     if result.returncode != 0:

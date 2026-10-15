@@ -79,9 +79,11 @@ def ray_client_address(head: str) -> str:
 
 def build_worker_start_code(head_address: str) -> str:
     """Python code passed to launch_workers `code=` to join the Ray cluster."""
+    # Worker engines often lack `ray` on PATH; use the session Python module entrypoint.
     return (
         "import subprocess, sys\n"
-        f"cmd = ['ray', 'start', '--block', '--address={head_address}']\n"
+        "cmd = [sys.executable, '-m', 'ray.scripts.scripts', 'start', "
+        f"'--block', '--address={head_address}']\n"
         "sys.exit(subprocess.call(cmd))\n"
     )
 
