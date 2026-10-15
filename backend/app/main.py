@@ -10,6 +10,7 @@ from app.api.openai_routes import router as openai_router
 from app.api.routes import router
 from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import init_db
+from app.middleware.path_prefix import PathPrefixMiddleware
 from app.static_ui import mount_static_ui
 
 logging.basicConfig(level=logging.INFO)
@@ -43,6 +44,8 @@ def create_app() -> FastAPI:
     # UX is served on CDSW_APP_PORT via app.ui_gateway; optional combined mode for local dev.
     if os.environ.get("PLATFORM_EMBED_UI", "").lower() in ("1", "true", "yes"):
         mount_static_ui(app)
+    # Outermost: strip CAI / proxy path prefix before route matching.
+    app.add_middleware(PathPrefixMiddleware)
     return app
 
 

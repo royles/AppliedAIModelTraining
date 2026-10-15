@@ -49,7 +49,7 @@ python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
 ```
 
 - API (direct, session only): http://127.0.0.1:8000/docs and http://127.0.0.1:8000/api/…
-- **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (proxied by `ui_gateway` to port 8000)
+- **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (served in-process by `ui_gateway`, same routes as port 8000)
 - **UX** binds **`CDSW_APP_PORT`**; **API** binds **`PLATFORM_API_PORT`** (default `8000`) on `127.0.0.1` only
 
 Create an experiment and start a training job from the UI, or via `POST /api/jobs`.

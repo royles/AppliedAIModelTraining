@@ -29,6 +29,17 @@ from app.training.transformer_config import (
 router = APIRouter()
 
 
+@router.get("", include_in_schema=False)
+@router.get("/", include_in_schema=False)
+def api_root() -> dict[str, str]:
+    return {
+        "service": "applied-ai-model-training",
+        "health": "/api/health",
+        "openapi": "/docs",
+        "note": "OpenAPI /docs is on the API port (PLATFORM_API_PORT), not the Application UX port.",
+    }
+
+
 def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     merged = dict(base)
     for key, value in overrides.items():

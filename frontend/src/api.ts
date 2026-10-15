@@ -82,7 +82,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new Error(
       `Expected JSON from ${path} but received HTML or non-JSON. ` +
-        "Open /api/health on this host — it should return JSON when the UI gateway is proxying to the API.",
+        "Check that start.py is running app.ui_gateway on the Application port and open /api/health in the browser.",
     );
   }
 }
