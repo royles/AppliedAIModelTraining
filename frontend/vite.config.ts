@@ -5,6 +5,8 @@ import react from "@vitejs/plugin-react";
 const uiPort = Number(process.env.PLATFORM_UI_PORT || process.env.PORT || 5173);
 
 export default defineConfig({
+  // Relative asset URLs so JS/CSS load under CAI Application path prefixes.
+  base: "./",
   build: {
     outDir: "dist",
     emptyOutDir: true,

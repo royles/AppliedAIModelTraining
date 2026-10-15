@@ -33,7 +33,7 @@ from common import (
     run_vite_dev_foreground,
     start_ray_head,
     start_ui_gateway_background,
-    ui_health_url,
+    ui_api_health_url,
     venv_python,
     wait_for_urls,
 )
@@ -110,10 +110,14 @@ def main() -> int:
 
     start_ui_gateway_background(ux_port, backend_port)
     if wait_for_urls(
-        [api_health_url(backend_port), ui_health_url(ux_port)],
+        [api_health_url(backend_port), ui_api_health_url(ux_port)],
         attempts=60,
     ):
-        print(f"UX: {ui_health_url(ux_port)}  API: http://{BIND_HOST}:{backend_port}/docs")
+        print(
+            f"UX: http://{BIND_HOST}:{ux_port}/  "
+            f"(API via /api → {BIND_HOST}:{backend_port})  "
+            f"Direct API docs: http://{BIND_HOST}:{backend_port}/docs"
+        )
         return 0
     print(f"Timed out; see {log_file('api')} and {log_file('ui')}", file=sys.stderr)
     return 1

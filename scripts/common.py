@@ -46,6 +46,15 @@ def ui_health_url(port: str | int) -> str:
     return f"http://{BIND_HOST}:{port}/"
 
 
+def ui_api_health_url(port: str | int) -> str:
+    """Health via the UX gateway (proves /api is proxied, not just static HTML)."""
+    return f"http://{BIND_HOST}:{port}/api/health"
+
+
+def ux_gateway_ready(port: str | int) -> bool:
+    return http_ok(ui_api_health_url(port))
+
+
 def resolve_ux_port() -> str:
     """CAI: CDSW_APP_PORT from the environment (read once at startup). Local: PLATFORM_UI_PORT."""
     if is_cai_session():
@@ -340,24 +349,23 @@ def _ui_gateway_env(api: str | int) -> dict[str, str]:
 def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
     """Bind UX exactly once on CDSW_APP_PORT (127.0.0.1 only)."""
     ui_s = str(ui)
-    health = ui_health_url(ui_s)
-    if http_ok(health):
+    if ux_gateway_ready(ui_s):
         print(
-            f"UX already listening on {BIND_HOST}:{ui_s} (CDSW_APP_PORT); "
+            f"UX gateway already serving /api on {BIND_HOST}:{ui_s} (CDSW_APP_PORT); "
             "not starting a second listener."
         )
         return hold_forever()
     if _port_is_open(int(ui_s)):
-        if is_cai_session() and http_ok(api_health_url(api)):
-            print(
-                f"Port {ui_s} (CDSW_APP_PORT) is already in use; "
-                f"API is healthy on {BIND_HOST}:{api} — not rebinding UX."
-            )
-            return hold_forever()
         print(
-            f"Port {ui_s} (CDSW_APP_PORT) is already in use by another process.",
+            f"Port {ui_s} (CDSW_APP_PORT) is in use but /api/health is not proxied. "
+            f"Stop the other listener or restart the session, then run start.py again.",
             file=sys.stderr,
         )
+        if http_ok(api_health_url(api)):
+            print(
+                f"API is up on {BIND_HOST}:{api}; the Application port must run app.ui_gateway.",
+                file=sys.stderr,
+            )
         return 1
 
     py = venv_python()
@@ -382,11 +390,14 @@ def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
 
 def start_ui_gateway_background(ui: str | int, api: str | int) -> None:
     ui_s = str(ui)
-    if http_ok(ui_health_url(ui_s)):
-        print(f"UX already responding on {BIND_HOST}:{ui_s}")
+    if ux_gateway_ready(ui_s):
+        print(f"UX gateway already serving /api on {BIND_HOST}:{ui_s}")
         return
     if _port_is_open(int(ui_s)):
-        print(f"Port {ui_s} already in use; not starting UX.", file=sys.stderr)
+        print(
+            f"Port {ui_s} in use without /api proxy; not starting UX.",
+            file=sys.stderr,
+        )
         return
     py = venv_python()
     print(f"Starting UX on {BIND_HOST}:{ui_s} ...")
@@ -447,7 +458,7 @@ def run_vite_dev_foreground(port: str) -> int:
     npm = shutil.which("npm")
     if not npm:
         raise RuntimeError("npm is required for --dev-ui (Vite dev server)")
-    if http_ok(ui_health_url(port)) or _port_is_open(int(port)):
+    if http_ok(ui_api_health_url(port)) or _port_is_open(int(port)):
         print(f"Port {port} already in use; not starting Vite.", file=sys.stderr)
         return 1
     env = venv_subprocess_env()

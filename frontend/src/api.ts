@@ -62,16 +62,29 @@ export type Health = {
   details: Record<string, unknown>;
 };
 
+/** Resolve API paths against the current page URL (works behind CAI path prefixes). */
+export function resolveApiUrl(path: string): string {
+  const relative = path.startsWith("/") ? path.slice(1) : path;
+  return new URL(relative, window.location.href).toString();
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(resolveApiUrl(path), {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(text || res.statusText);
   }
-  return res.json() as Promise<T>;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Expected JSON from ${path} but received HTML or non-JSON. ` +
+        "Open /api/health on this host — it should return JSON when the UI gateway is proxying to the API.",
+    );
+  }
 }
 
 export const api = {
