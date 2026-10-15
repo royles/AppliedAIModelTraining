@@ -42,8 +42,12 @@ def create_ui_app() -> FastAPI:
     return app
 
 
+def _api_upstream() -> str:
+    return os.environ.get("PLATFORM_API_UPSTREAM", "http://127.0.0.1:8000").rstrip("/")
+
+
 async def _proxy(request: Request, path: str) -> Response:
-    url = f"{API_UPSTREAM}{path}"
+    url = f"{_api_upstream()}{path}"
     if request.url.query:
         url = f"{url}?{request.url.query}"
     body = await request.body()

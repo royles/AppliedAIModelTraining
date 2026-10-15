@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Cloudera AI / CDSW Application routes require binding to CDSW_APP_PORT.
-const uiPort = Number(process.env.CDSW_APP_PORT || process.env.PORT || 5173);
+// Use PLATFORM_UI_PORT for dev; CAI production uses built assets + ui_gateway (CDSW_APP_PORT).
+const uiPort = Number(process.env.PLATFORM_UI_PORT || process.env.PORT || 5173);
 
 export default defineConfig({
   build: {
@@ -11,7 +11,7 @@ export default defineConfig({
   },
   plugins: [react()],
   server: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: uiPort,
     strictPort: true,
     proxy: {
@@ -26,7 +26,7 @@ export default defineConfig({
     },
   },
   preview: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: uiPort,
     strictPort: true,
   },

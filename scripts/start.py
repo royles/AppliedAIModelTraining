@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Start the platform (split ports):
+Start the platform (split ports, 127.0.0.1 only):
 
-- **UX** on CDSW_APP_PORT (CAI Application) — static React + proxy to API
-- **API** on PLATFORM_API_PORT (default 8000) — FastAPI, Ray training, SQLite
+- **UX** — single bind on CDSW_APP_PORT (CAI) or PLATFORM_UI_PORT (local)
+- **API** — PLATFORM_API_PORT (default 8000)
 
-No npm at runtime when using frontend/dist.
+CDSW_APP_PORT is read once from the environment and only used for the UX gateway.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (
+    BIND_HOST,
     REPO_ROOT,
     api_health_url,
     api_port,
@@ -27,11 +28,12 @@ from common import (
     frontend_dist_ready,
     is_cai_session,
     log_file,
+    resolve_ux_port,
     run_ui_gateway_foreground,
     run_vite_dev_foreground,
     start_ray_head,
     start_ui_gateway_background,
-    ui_port,
+    ui_health_url,
     venv_python,
     wait_for_urls,
 )
@@ -44,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dev-ui",
         action="store_true",
-        help="Vite dev server on CDSW_APP_PORT (npm) + API on PLATFORM_API_PORT",
+        help="Vite dev server on UX port (npm) + API on PLATFORM_API_PORT",
     )
     return parser.parse_args()
 
@@ -53,12 +55,12 @@ def main() -> int:
     args = parse_args()
     cd_repo()
 
-    if is_cai_session() and not os.environ.get("CDSW_APP_PORT"):
-        print("CDSW_APP_PORT must be set for the CAI Application UX.", file=sys.stderr)
+    try:
+        ux_port = resolve_ux_port()
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
         return 1
 
-    os.environ.setdefault("CDSW_APP_PORT", ui_port())
-    ux_port = ui_port()
     backend_port = api_port()
 
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
@@ -74,7 +76,7 @@ def main() -> int:
         start_ray_head()
 
     if args.dev_ui:
-        print(f"=== Dev UI: Vite :{ux_port}, API :{backend_port} ===")
+        print(f"=== Dev UI: {BIND_HOST}:{ux_port}, API {BIND_HOST}:{backend_port} ===")
         ensure_api_running(backend_port)
         if not wait_for_urls([api_health_url(backend_port)], attempts=60):
             print(f"API not ready; see {log_file('api')}", file=sys.stderr)
@@ -86,14 +88,12 @@ def main() -> int:
             return 1
 
     if not frontend_dist_ready():
-        print(
-            "frontend/dist is missing. Run: python3 scripts/install.py",
-            file=sys.stderr,
-        )
+        print("frontend/dist is missing. Run: python3 scripts/install.py", file=sys.stderr)
         return 1
 
     print(
-        f"=== Starting API :{backend_port} + UX :{ux_port} (CDSW_APP_PORT) ==="
+        f"=== API {BIND_HOST}:{backend_port} + UX {BIND_HOST}:{ux_port} "
+        f"(CDSW_APP_PORT={ux_port if is_cai_session() else 'n/a'}) ==="
     )
     ensure_api_running(backend_port)
     if not wait_for_urls([api_health_url(backend_port)], attempts=60):
@@ -103,20 +103,17 @@ def main() -> int:
     if is_cai_session():
         ip = cai_session_ip()
         print(f"CAI session IP: {ip}")
-        print(f"Open the Application URL → UX on CDSW_APP_PORT={ux_port}")
-        print(f"API (internal): http://127.0.0.1:{backend_port}")
-        print(
-            f"Smoke test: API_BASE=http://127.0.0.1:{backend_port} "
-            f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}"
-        )
+        print(f"Application route → UX on CDSW_APP_PORT={ux_port} ({BIND_HOST})")
+        print(f"Smoke test: API_BASE=http://{BIND_HOST}:{backend_port} "
+              f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}")
         return run_ui_gateway_foreground(ux_port, backend_port)
 
     start_ui_gateway_background(ux_port, backend_port)
     if wait_for_urls(
-        [api_health_url(backend_port), f"http://127.0.0.1:{ux_port}/"],
+        [api_health_url(backend_port), ui_health_url(ux_port)],
         attempts=60,
     ):
-        print(f"UX: http://127.0.0.1:{ux_port}/  API: http://127.0.0.1:{backend_port}/docs")
+        print(f"UX: {ui_health_url(ux_port)}  API: http://{BIND_HOST}:{backend_port}/docs")
         return 0
     print(f"Timed out; see {log_file('api')} and {log_file('ui')}", file=sys.stderr)
     return 1

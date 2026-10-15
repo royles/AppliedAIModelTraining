@@ -13,6 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+BIND_HOST = "127.0.0.1"
 TMUX_CONF = "/exec-daemon/tmux.portal.conf"
 VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
 VENV_RAY = REPO_ROOT / ".venv" / "bin" / "ray"
@@ -37,9 +38,42 @@ def is_cai_session() -> bool:
 
 
 def api_health_url(port: str | int | None = None) -> str:
-    if port is None:
-        port = os.environ.get("CDSW_APP_PORT") if is_cai_session() else "8000"
-    return f"http://127.0.0.1:{port}/api/health"
+    p = port if port is not None else api_port()
+    return f"http://{BIND_HOST}:{p}/api/health"
+
+
+def ui_health_url(port: str | int) -> str:
+    return f"http://{BIND_HOST}:{port}/"
+
+
+def resolve_ux_port() -> str:
+    """CAI: CDSW_APP_PORT from the environment (read once at startup). Local: PLATFORM_UI_PORT."""
+    if is_cai_session():
+        port = os.environ.get("CDSW_APP_PORT")
+        if not port:
+            raise RuntimeError("CDSW_APP_PORT must be set in a CAI session.")
+        return port
+    return os.environ.get("PLATFORM_UI_PORT", "5173")
+
+
+def _port_is_open(port: int) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((BIND_HOST, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
+def hold_forever() -> int:
+    """Keep the Application process alive without binding CDSW_APP_PORT again."""
+    print("Process will stay running (Ctrl+C to stop).", flush=True)
+    try:
+        while True:
+            time.sleep(86400)
+    except KeyboardInterrupt:
+        return 0
 
 
 def run(
@@ -146,10 +180,6 @@ def wait_for_urls(urls: Sequence[str], attempts: int = 90, delay: float = 1.0) -
             return True
         time.sleep(delay)
     return False
-
-
-def ui_port() -> str:
-    return os.environ.get("CDSW_APP_PORT", "5173")
 
 
 def api_port() -> str:
@@ -301,14 +331,38 @@ def _api_upstream(api: str | int) -> str:
     return f"http://127.0.0.1:{api}"
 
 
-def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
-    """UX on CDSW_APP_PORT; proxies /api and /v1 to the API backend."""
-    py = venv_python()
+def _ui_gateway_env(api: str | int) -> dict[str, str]:
     env = venv_subprocess_env()
     env["PLATFORM_API_UPSTREAM"] = _api_upstream(api)
-    env["CDSW_APP_PORT"] = str(ui)
+    return env
+
+
+def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
+    """Bind UX exactly once on CDSW_APP_PORT (127.0.0.1 only)."""
+    ui_s = str(ui)
+    health = ui_health_url(ui_s)
+    if http_ok(health):
+        print(
+            f"UX already listening on {BIND_HOST}:{ui_s} (CDSW_APP_PORT); "
+            "not starting a second listener."
+        )
+        return hold_forever()
+    if _port_is_open(int(ui_s)):
+        if is_cai_session() and http_ok(api_health_url(api)):
+            print(
+                f"Port {ui_s} (CDSW_APP_PORT) is already in use; "
+                f"API is healthy on {BIND_HOST}:{api} — not rebinding UX."
+            )
+            return hold_forever()
+        print(
+            f"Port {ui_s} (CDSW_APP_PORT) is already in use by another process.",
+            file=sys.stderr,
+        )
+        return 1
+
+    py = venv_python()
     print(
-        f"Starting UX on 0.0.0.0:{ui} (CDSW_APP_PORT; API backend :{api}) ..."
+        f"Starting UX on {BIND_HOST}:{ui_s} (CDSW_APP_PORT; API on {BIND_HOST}:{api}) ..."
     )
     return subprocess.call(
         [
@@ -317,25 +371,25 @@ def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
             "uvicorn",
             "app.ui_gateway:app",
             "--host",
-            "0.0.0.0",
+            BIND_HOST,
             "--port",
-            str(ui),
+            ui_s,
         ],
         cwd=str(REPO_ROOT / "backend"),
-        env=env,
+        env=_ui_gateway_env(api),
     )
 
 
 def start_ui_gateway_background(ui: str | int, api: str | int) -> None:
-    ui_url = f"http://127.0.0.1:{ui}/"
-    if http_ok(ui_url):
-        print(f"UX already responding on CDSW_APP_PORT={ui}")
+    ui_s = str(ui)
+    if http_ok(ui_health_url(ui_s)):
+        print(f"UX already responding on {BIND_HOST}:{ui_s}")
+        return
+    if _port_is_open(int(ui_s)):
+        print(f"Port {ui_s} already in use; not starting UX.", file=sys.stderr)
         return
     py = venv_python()
-    env = venv_subprocess_env()
-    env["PLATFORM_API_UPSTREAM"] = _api_upstream(api)
-    env["CDSW_APP_PORT"] = str(ui)
-    print(f"Starting UX on CDSW_APP_PORT={ui} ...")
+    print(f"Starting UX on {BIND_HOST}:{ui_s} ...")
     clear_stale_pid("ui")
     start_background_process(
         "ui",
@@ -346,11 +400,11 @@ def start_ui_gateway_background(ui: str | int, api: str | int) -> None:
             "uvicorn",
             "app.ui_gateway:app",
             "--host",
-            "0.0.0.0",
+            BIND_HOST,
             "--port",
-            str(ui),
+            ui_s,
         ],
-        env=env,
+        env=_ui_gateway_env(api),
     )
 
 
@@ -365,7 +419,7 @@ def ensure_api_running(port: str | int | None = None) -> None:
     if tmux_available():
         if not tmux_has_session("api"):
             api_cmd = (
-                f'"{py}" -m uvicorn app.main:app --host 0.0.0.0 --port {port} '
+                f'"{py}" -m uvicorn app.main:app --host {BIND_HOST} --port {port} '
                 f"2>&1 | tee {log_file('api')}"
             )
             tmux_new_session("api", REPO_ROOT / "backend", api_cmd)
@@ -380,7 +434,7 @@ def ensure_api_running(port: str | int | None = None) -> None:
             "uvicorn",
             "app.main:app",
             "--host",
-            "0.0.0.0",
+            BIND_HOST,
             "--port",
             str(port),
         ],
@@ -389,13 +443,16 @@ def ensure_api_running(port: str | int | None = None) -> None:
 
 
 def run_vite_dev_foreground(port: str) -> int:
-    """Optional hot-reload dev server (requires npm)."""
+    """Optional hot-reload dev server (requires npm). Binds CDSW_APP_PORT once."""
     npm = shutil.which("npm")
     if not npm:
         raise RuntimeError("npm is required for --dev-ui (Vite dev server)")
+    if http_ok(ui_health_url(port)) or _port_is_open(int(port)):
+        print(f"Port {port} already in use; not starting Vite.", file=sys.stderr)
+        return 1
     env = venv_subprocess_env()
-    env["CDSW_APP_PORT"] = port
-    print(f"Starting Vite dev server on CDSW_APP_PORT={port} ...")
+    env["PLATFORM_UI_PORT"] = port
+    print(f"Starting Vite dev server on {BIND_HOST}:{port} ...")
     return subprocess.call(
         [npm, "run", "dev"],
         cwd=str(REPO_ROOT / "frontend"),
