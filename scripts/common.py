@@ -97,7 +97,39 @@ def venv_python() -> str:
     return sys.executable
 
 
+def venv_subprocess_env() -> dict[str, str]:
+    """
+    Environment for pip/python inside the project virtualenv.
+
+    Cloudera AI / CDSW often sets PIP_USER=1 globally; that breaks `pip install`
+    inside an active virtualenv.
+    """
+    merged = os.environ.copy()
+    merged["PIP_USER"] = "0"
+    merged["PYTHONNOUSERSITE"] = "1"
+    for key in ("PYTHONUSERBASE", "PIP_USER_SITE"):
+        merged.pop(key, None)
+    venv = REPO_ROOT / ".venv"
+    if venv.is_dir():
+        merged["VIRTUAL_ENV"] = str(venv)
+        bin_dir = venv / "bin"
+        merged["PATH"] = f"{bin_dir}{os.pathsep}{merged.get('PATH', '')}"
+    return merged
+
+
+def pip_install(pip_args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    py = venv_python()
+    return run(
+        [py, "-m", "pip", "install", *pip_args],
+        env=venv_subprocess_env(),
+        check=check,
+    )
+
+
 def ensure_python_venv() -> None:
+    if VENV_PYTHON.is_file():
+        return
+
     probe = REPO_ROOT / ".tmp_venv_probe"
     try:
         run([sys.executable, "-m", "venv", str(probe)], check=True)
@@ -110,5 +142,5 @@ def ensure_python_venv() -> None:
     finally:
         shutil.rmtree(probe, ignore_errors=True)
 
-    if not VENV_PYTHON.parent.is_dir():
+    if not VENV_PYTHON.is_file():
         run([sys.executable, "-m", "venv", str(REPO_ROOT / ".venv")], check=True)

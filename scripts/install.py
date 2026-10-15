@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import REPO_ROOT, VENV_PIP, cd_repo, ensure_python_venv, run
+from common import REPO_ROOT, cd_repo, ensure_python_venv, pip_install, run
 
 
 def main() -> int:
@@ -18,8 +19,16 @@ def main() -> int:
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
 
     ensure_python_venv()
-    run([str(VENV_PIP), "install", "--upgrade", "pip"])
-    run([str(VENV_PIP), "install", "-r", "backend/requirements.txt"])
+
+    try:
+        pip_install(["--upgrade", "pip"])
+    except subprocess.CalledProcessError:
+        print(
+            "Warning: could not upgrade pip (common on CDSW); continuing.",
+            file=sys.stderr,
+        )
+
+    pip_install(["-r", "backend/requirements.txt"])
 
     if not shutil.which("npm"):
         print("npm is required for the React UI.", file=sys.stderr)
