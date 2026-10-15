@@ -33,13 +33,9 @@ def build_frontend() -> bool:
     return True
 
 
-def main() -> int:
-    cd_repo()
-    (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
-    (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
-
-    print(f"Installing into system Python: {platform_python()}")
-
+def install_python_deps() -> None:
+    """Install backend requirements into the active system Python."""
+    print(f"Installing Python deps: {platform_python()}")
     try:
         pip_install(["--upgrade", "pip"])
     except subprocess.CalledProcessError:
@@ -47,8 +43,15 @@ def main() -> int:
             "Warning: could not upgrade pip (common on CDSW); continuing.",
             file=sys.stderr,
         )
-
     pip_install(["-r", "backend/requirements.txt"])
+
+
+def main() -> int:
+    cd_repo()
+    (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
+    (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
+
+    install_python_deps()
 
     if not build_frontend():
         if frontend_dist_ready():
