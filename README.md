@@ -44,8 +44,9 @@ Locally, workers are simulated and Ray runs in-process on CPU.
 ## Development
 
 ```bash
-python3 scripts/install.py   # installs into **system Python** (no .venv)
-python3 scripts/start.py     # auto-installs missing deps, then starts API + UX
+python3 scripts/install.py        # installs into **system Python** (no .venv)
+python3 scripts/start.py          # auto-installs missing deps, then starts API + UX
+python3 scripts/start.py --install  # full install + start (recommended on CAI)
 ```
 
 All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python (`PLATFORM_PYTHON` to override). `start.py` runs `pip install -r backend/requirements.txt` automatically when `uvicorn` / FastAPI are missing (set `PLATFORM_SKIP_DEP_CHECK=1` to skip).
