@@ -3,7 +3,6 @@
   "install": "bash .cursor/install.sh",
   "start": "bash .cursor/start.sh",
   "ports": [
-    { "name": "API", "port": 8000 },
-    { "name": "Web UI", "port": 5173 }
+    { "name": "API", "port": 8000 }
   ]
 }

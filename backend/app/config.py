@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def default_database_url() -> str:
     db_path = (REPO_ROOT / "data" / "platform.db").resolve()
     return f"sqlite:///{db_path}"
+
+
+def effective_cors_origins(cors_origins: str) -> list[str]:
+    origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+    port = os.environ.get("CDSW_APP_PORT")
+    ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
+    if port:
+        for host in ("127.0.0.1", "localhost"):
+            origins.append(f"http://{host}:{port}")
+        if ip:
+            origins.append(f"http://{ip}:{port}")
+    # de-dupe preserving order
+    return list(dict.fromkeys(origins))
 
 
 class Settings(BaseSettings):

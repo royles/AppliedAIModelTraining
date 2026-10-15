@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.openai_routes import router as openai_router
 from app.api.routes import router
-from app.config import REPO_ROOT, get_settings
+from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    origins = effective_cors_origins(settings.cors_origins)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

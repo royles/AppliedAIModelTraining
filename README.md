@@ -49,7 +49,7 @@ bash .cursor/start.sh
 ```
 
 - API: http://127.0.0.1:8000/docs
-- UI: http://127.0.0.1:5173
+- UI: listens on **`CDSW_APP_PORT`** (required in CAI; defaults to `5173` only for local dev)
 
 Create an experiment and start a training job from the UI, or via `POST /api/jobs`.
 
@@ -92,3 +92,4 @@ Set `RAY_LOCAL_MODE=false` in CAI (the session start script does this) so traini
 | `CML_RESOURCE_PROFILE_ID` | Engine size profile |
 | `CML_RESOURCE_GROUP_ID` | Target resource group |
 | `RAY_LOCAL_MODE` | When `true` (default), use local Ray even if head is set |
+| `CDSW_APP_PORT` | Port for the React UI (Vite); required in CAI Application sessions |
