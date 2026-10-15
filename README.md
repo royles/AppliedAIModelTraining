@@ -49,7 +49,7 @@ python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
 ```
 
 - API: http://127.0.0.1:8000/docs
-- UI: **built React** in `frontend/dist`, served by FastAPI (no npm at start). CAI: single process on **`CDSW_APP_PORT`**. Local: http://127.0.0.1:8000/
+- **UX** on **`CDSW_APP_PORT`** (static React + `/api` `/v1` proxy). **API** on **`PLATFORM_API_PORT`** (default `8000`).
 
 Create an experiment and start a training job from the UI, or via `POST /api/jobs`.
 
@@ -74,7 +74,7 @@ python3 scripts/install.py
 python3 scripts/start.py
 ```
 
-On CAI, `start.py` runs **uvicorn in the foreground** on `CDSW_APP_PORT` (API + static UI). Build the UI once with `install.py` (needs npm only at build time). Use `--dev-ui` only if you want Vite hot-reload and have npm at runtime.
+On CAI, `start.py` runs the **API on :8000** (background) and the **UX gateway in the foreground on `CDSW_APP_PORT`**. The browser only needs the Application URL; the UI proxies API calls to port 8000 inside the session.
 
 3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 
@@ -95,6 +95,8 @@ For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (
 | `CML_RESOURCE_PROFILE_ID` | Engine size profile |
 | `CML_RESOURCE_GROUP_ID` | Target resource group |
 | `RAY_LOCAL_MODE` | When `true` (default), use local Ray even if head is set |
-| `CDSW_APP_PORT` | Port for the React UI (Vite); required in CAI Application sessions |
+| `CDSW_APP_PORT` | UX (React) port — required for CAI Application routes |
+| `PLATFORM_API_PORT` | FastAPI backend port (default `8000`) |
+| `PLATFORM_API_UPSTREAM` | Set on the UI gateway (default `http://127.0.0.1:8000`) |
 | `RAY_SKIP_HEAD` | Set to `1` to skip `ray start --head` in `start.py` |
 | `RAY_INCLUDE_DASHBOARD` | Set to `1` to enable Ray dashboard (needs `ray[default]` deps; off by default on CAI) |

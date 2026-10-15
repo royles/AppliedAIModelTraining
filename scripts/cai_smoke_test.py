@@ -16,10 +16,8 @@ import urllib.request
 def _default_api_base() -> str:
     if os.environ.get("API_BASE"):
         return os.environ["API_BASE"].rstrip("/")
-    port = os.environ.get("CDSW_APP_PORT")
-    if port:
-        return f"http://127.0.0.1:{port}"
-    return "http://127.0.0.1:8000"
+    api_port = os.environ.get("PLATFORM_API_PORT", "8000")
+    return f"http://127.0.0.1:{api_port}"
 
 
 API_BASE = _default_api_base().rstrip("/")

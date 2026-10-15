@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Start the platform.
+Start the platform (split ports):
 
-Default (CAI and local): FastAPI on CDSW_APP_PORT (CAI) or :8000 (local) serves
-the **built** React app from frontend/dist — no npm at runtime.
+- **UX** on CDSW_APP_PORT (CAI Application) — static React + proxy to API
+- **API** on PLATFORM_API_PORT (default 8000) — FastAPI, Ray training, SQLite
 
-Optional --dev-ui: Vite dev server (npm required) on CDSW_APP_PORT with API on :8000.
+No npm at runtime when using frontend/dist.
 """
 
 from __future__ import annotations
@@ -20,15 +20,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (
     REPO_ROOT,
     api_health_url,
+    api_port,
     cai_session_ip,
     cd_repo,
     ensure_api_running,
     frontend_dist_ready,
     is_cai_session,
     log_file,
-    run_api_foreground,
+    run_ui_gateway_foreground,
     run_vite_dev_foreground,
     start_ray_head,
+    start_ui_gateway_background,
     ui_port,
     venv_python,
     wait_for_urls,
@@ -38,15 +40,11 @@ from install import main as install_main
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Start Applied AI Model Training services")
-    parser.add_argument(
-        "--install",
-        action="store_true",
-        help="Run install.py before starting",
-    )
+    parser.add_argument("--install", action="store_true", help="Run install.py first")
     parser.add_argument(
         "--dev-ui",
         action="store_true",
-        help="Use Vite dev server (npm required) instead of built frontend/dist",
+        help="Vite dev server on CDSW_APP_PORT (npm) + API on PLATFORM_API_PORT",
     )
     return parser.parse_args()
 
@@ -56,20 +54,17 @@ def main() -> int:
     cd_repo()
 
     if is_cai_session() and not os.environ.get("CDSW_APP_PORT"):
-        print(
-            "CDSW_APP_PORT must be set in a Cloudera AI Application / workbench session.",
-            file=sys.stderr,
-        )
+        print("CDSW_APP_PORT must be set for the CAI Application UX.", file=sys.stderr)
         return 1
 
     os.environ.setdefault("CDSW_APP_PORT", ui_port())
-    port = ui_port()
+    ux_port = ui_port()
+    backend_port = api_port()
 
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
 
     if args.install:
-        print("=== Installing dependencies ===")
         code = install_main()
         if code != 0:
             return code
@@ -79,41 +74,51 @@ def main() -> int:
         start_ray_head()
 
     if args.dev_ui:
-        print("=== Dev UI mode (Vite + API on :8000) ===")
-        ensure_api_running(8000)
-        if not wait_for_urls([api_health_url(8000)], attempts=60):
+        print(f"=== Dev UI: Vite :{ux_port}, API :{backend_port} ===")
+        ensure_api_running(backend_port)
+        if not wait_for_urls([api_health_url(backend_port)], attempts=60):
             print(f"API not ready; see {log_file('api')}", file=sys.stderr)
             return 1
         try:
-            return run_vite_dev_foreground(port)
+            return run_vite_dev_foreground(ux_port)
         except RuntimeError as exc:
             print(exc, file=sys.stderr)
             return 1
 
     if not frontend_dist_ready():
         print(
-            "frontend/dist is missing. Run: python3 scripts/install.py\n"
-            "(needs npm once to build), or pass --dev-ui if npm is available.",
+            "frontend/dist is missing. Run: python3 scripts/install.py",
             file=sys.stderr,
         )
         return 1
 
-    print("=== Starting API + built React UI (no npm) ===")
+    print(
+        f"=== Starting API :{backend_port} + UX :{ux_port} (CDSW_APP_PORT) ==="
+    )
+    ensure_api_running(backend_port)
+    if not wait_for_urls([api_health_url(backend_port)], attempts=60):
+        print(f"API not ready on :{backend_port}; see {log_file('api')}", file=sys.stderr)
+        return 1
+
     if is_cai_session():
         ip = cai_session_ip()
         print(f"CAI session IP: {ip}")
-        print(f"Application listens on CDSW_APP_PORT={port}")
+        print(f"Open the Application URL → UX on CDSW_APP_PORT={ux_port}")
+        print(f"API (internal): http://127.0.0.1:{backend_port}")
         print(
-            f"Smoke test (other terminal): "
-            f"API_BASE=http://127.0.0.1:{port} {venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}"
+            f"Smoke test: API_BASE=http://127.0.0.1:{backend_port} "
+            f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}"
         )
-        return run_api_foreground(port)
+        return run_ui_gateway_foreground(ux_port, backend_port)
 
-    ensure_api_running(8000)
-    if wait_for_urls([api_health_url(8000)], attempts=60):
-        print("API + UI available at http://127.0.0.1:8000/ (static build)")
+    start_ui_gateway_background(ux_port, backend_port)
+    if wait_for_urls(
+        [api_health_url(backend_port), f"http://127.0.0.1:{ux_port}/"],
+        attempts=60,
+    ):
+        print(f"UX: http://127.0.0.1:{ux_port}/  API: http://127.0.0.1:{backend_port}/docs")
         return 0
-    print(f"API not ready; see {log_file('api')}", file=sys.stderr)
+    print(f"Timed out; see {log_file('api')} and {log_file('ui')}", file=sys.stderr)
     return 1
 
 

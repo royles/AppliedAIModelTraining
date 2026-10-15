@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -39,7 +40,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(router, prefix="/api")
     app.include_router(openai_router, prefix="/v1")
-    mount_static_ui(app)
+    # UX is served on CDSW_APP_PORT via app.ui_gateway; optional combined mode for local dev.
+    if os.environ.get("PLATFORM_EMBED_UI", "").lower() in ("1", "true", "yes"):
+        mount_static_ui(app)
     return app
 
 

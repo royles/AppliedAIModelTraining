@@ -152,6 +152,10 @@ def ui_port() -> str:
     return os.environ.get("CDSW_APP_PORT", "5173")
 
 
+def api_port() -> str:
+    return os.environ.get("PLATFORM_API_PORT", "8000")
+
+
 def venv_python() -> str:
     if VENV_PYTHON.is_file():
         return str(VENV_PYTHON)
@@ -293,27 +297,65 @@ def start_background_process(
     print(f"Started {name} pid={proc.pid} log={log_path}")
 
 
-def run_api_foreground(port: str | int) -> int:
-    """Single process: FastAPI + built React static files (no npm at runtime)."""
+def _api_upstream(api: str | int) -> str:
+    return f"http://127.0.0.1:{api}"
+
+
+def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
+    """UX on CDSW_APP_PORT; proxies /api and /v1 to the API backend."""
     py = venv_python()
-    print(f"Starting API + built UI on 0.0.0.0:{port} (uvicorn; no npm) ...")
+    env = venv_subprocess_env()
+    env["PLATFORM_API_UPSTREAM"] = _api_upstream(api)
+    env["CDSW_APP_PORT"] = str(ui)
+    print(
+        f"Starting UX on 0.0.0.0:{ui} (CDSW_APP_PORT; API backend :{api}) ..."
+    )
     return subprocess.call(
         [
             py,
             "-m",
             "uvicorn",
-            "app.main:app",
+            "app.ui_gateway:app",
             "--host",
             "0.0.0.0",
             "--port",
-            str(port),
+            str(ui),
         ],
         cwd=str(REPO_ROOT / "backend"),
-        env=venv_subprocess_env(),
+        env=env,
     )
 
 
-def ensure_api_running(port: str | int = 8000) -> None:
+def start_ui_gateway_background(ui: str | int, api: str | int) -> None:
+    ui_url = f"http://127.0.0.1:{ui}/"
+    if http_ok(ui_url):
+        print(f"UX already responding on CDSW_APP_PORT={ui}")
+        return
+    py = venv_python()
+    env = venv_subprocess_env()
+    env["PLATFORM_API_UPSTREAM"] = _api_upstream(api)
+    env["CDSW_APP_PORT"] = str(ui)
+    print(f"Starting UX on CDSW_APP_PORT={ui} ...")
+    clear_stale_pid("ui")
+    start_background_process(
+        "ui",
+        cwd=REPO_ROOT / "backend",
+        argv=[
+            py,
+            "-m",
+            "uvicorn",
+            "app.ui_gateway:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(ui),
+        ],
+        env=env,
+    )
+
+
+def ensure_api_running(port: str | int | None = None) -> None:
+    port = port if port is not None else api_port()
     health = api_health_url(port)
     if http_ok(health):
         print(f"API already responding on :{port}")
