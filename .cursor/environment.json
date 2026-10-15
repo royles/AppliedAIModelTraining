@@ -1,7 +1,7 @@
 {
   "name": "Applied AI Model Training",
-  "install": "bash .cursor/install.sh",
-  "start": "bash .cursor/start.sh",
+  "install": "python3 scripts/install.py",
+  "start": "python3 scripts/start.py",
   "ports": [
     { "name": "API", "port": 8000 }
   ]

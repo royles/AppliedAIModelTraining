@@ -44,8 +44,8 @@ Locally, workers are simulated and Ray runs in-process on CPU.
 ## Development
 
 ```bash
-bash .cursor/install.sh
-bash .cursor/start.sh
+python3 scripts/install.py
+python3 scripts/start.py
 ```
 
 - API: http://127.0.0.1:8000/docs
@@ -70,13 +70,13 @@ In a **CML workbench session** (Python 3, project cloned from this repo):
 2. Start Ray head, install deps, and run API + UI:
 
 ```bash
-bash scripts/cai_session_start.sh
+python3 scripts/cai_session_start.py
 ```
 
 3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 
 ```bash
-bash scripts/cai_smoke_test.sh
+python3 scripts/cai_smoke_test.py
 ```
 
 For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (UI or API). The platform uses [`cml.workers_v1`](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html) / legacy `cdsw` to run `ray start --block --address=<head>` on worker engines.
