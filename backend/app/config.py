@@ -1,12 +1,20 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def default_database_url() -> str:
+    db_path = (REPO_ROOT / "data" / "platform.db").resolve()
+    return f"sqlite:///{db_path}"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "sqlite:///./data/platform.db"
+    database_url: str = default_database_url()
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

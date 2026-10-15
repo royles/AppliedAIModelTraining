@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.config import REPO_ROOT, get_settings
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.cdsw_workers import (
@@ -55,7 +55,8 @@ def run_training_job(job_id: int) -> None:
         _update_job(db, job_id, status="provisioning")
 
         cfg = resolve_job_config(job)
-        artifact_dir = str(Path("data/models") / f"job_{job_id}")
+        artifact_dir = str((REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve())
+        Path(artifact_dir).mkdir(parents=True, exist_ok=True)
         train_config = cfg.to_train_dict(job_id=job_id, artifact_dir=artifact_dir)
 
         head = ray_head_address() or settings.cdsw_head_address

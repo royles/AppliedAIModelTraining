@@ -29,10 +29,24 @@ from app.training.transformer_config import (
 router = APIRouter()
 
 
+def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in overrides.items():
+        if (
+            key == "architecture"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
+
+
 def _build_config(payload: TrainingJobCreate) -> TransformerTrainingConfig:
     overrides: dict[str, Any] = {}
     if payload.transformer:
-        overrides = payload.transformer.model_dump(exclude_none=True)
+        overrides = payload.transformer.model_dump(exclude_unset=True, exclude_none=True)
     if payload.model_name:
         overrides["base_model"] = payload.model_name
         overrides.setdefault("init_mode", "pretrained")
@@ -44,7 +58,11 @@ def _build_config(payload: TrainingJobCreate) -> TransformerTrainingConfig:
         overrides["max_steps"] = payload.max_steps
     if payload.openai_model_id:
         overrides["openai_model_id"] = payload.openai_model_id
-    return TransformerTrainingConfig.merge_preset(payload.preset, overrides or None)
+    base = TransformerTrainingConfig.merge_preset(payload.preset, None)
+    if not overrides:
+        return base
+    merged = _deep_merge_dict(base.model_dump(), overrides)
+    return TransformerTrainingConfig.model_validate(merged)
 
 
 @router.get("/health", response_model=HealthResponse)

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.openai_routes import router as openai_router
 from app.api.routes import router
-from app.config import get_settings
+from app.config import REPO_ROOT, get_settings
 from app.database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Path("data").mkdir(parents=True, exist_ok=True)
+    (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     init_db()
     yield
 

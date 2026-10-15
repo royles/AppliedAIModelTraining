@@ -61,6 +61,28 @@ curl -X POST http://127.0.0.1:8000/api/jobs/1/scale \
   -d '{"target_workers": 3}'
 ```
 
+## Cloudera AI (CAI) test run
+
+In a **CML workbench session** (Python 3, project cloned from this repo):
+
+1. Optional GPU worker settings (from your CAI admin / project settings):
+   - `CML_ACCELERATOR_LABEL_ID`, `CML_RESOURCE_PROFILE_ID`, `CML_RESOURCE_GROUP_ID`
+2. Start Ray head, install deps, and run API + UI:
+
+```bash
+bash scripts/cai_session_start.sh
+```
+
+3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
+
+```bash
+bash scripts/cai_smoke_test.sh
+```
+
+For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (UI or API). The platform uses [`cml.workers_v1`](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html) / legacy `cdsw` to run `ray start --block --address=<head>` on worker engines.
+
+Set `RAY_LOCAL_MODE=false` in CAI (the session start script does this) so training uses the Ray cluster instead of an in-process local Ray.
+
 ## Environment variables
 
 | Variable | Purpose |
