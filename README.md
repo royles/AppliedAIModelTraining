@@ -44,9 +44,11 @@ Locally, workers are simulated and Ray runs in-process on CPU.
 ## Development
 
 ```bash
-python3 scripts/install.py   # once (or after dependency changes)
+python3 scripts/install.py   # once — installs into **system Python** (no .venv)
 python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
 ```
+
+All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python. Run `install.py` with the same interpreter you use for `start.py`.
 
 - API (direct, session only): http://127.0.0.1:8000/docs and http://127.0.0.1:8000/api/…
 - **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (served in-process by `ui_gateway`, same routes as port 8000)
@@ -111,6 +113,11 @@ On small containers the platform automatically **caps Ray Train to 1 worker** an
 
 Check `GET /api/health` → `details.memory` for detected limits and recommendations.
 
+### Ray worker / Train log messages
+
+- **`ModuleNotFoundError: No module named 'ray'`** on a worker engine — run `python3 scripts/install.py` on the **session** (system Python), then launch workers again. New worker bootstrap code installs `backend/requirements.txt` on first start if Ray is missing.
+- **`PlacementGroupCleaner … Failed to query Ray Train Controller`** — usually transient while the head or workers are still starting, or when workers failed to join. Confirm workers show `ray start --block` running and the head is reachable on port `6379`.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -130,3 +137,4 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `DEFAULT_GPUS_PER_WORKER` | Default GPU count for workers; default `1` |
 | `PLATFORM_CAI_LOW_MEMORY` | `1` = cap Ray Train workers and batch size on tiny sessions |
 | `RAY_TRAIN_NUM_WORKERS` | Max Ray Train workers per job (overrides auto cap when &gt; 0) |
+| `PLATFORM_PYTHON` | Override interpreter for start/install (default: current `python3`) |

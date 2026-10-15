@@ -16,6 +16,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.config import REPO_ROOT
 from app.resource_hints import log_worker_launch_memory
 
 logger = logging.getLogger(__name__)
@@ -80,14 +81,66 @@ def ray_client_address(head: str) -> str:
 
 
 def build_worker_start_code(head_address: str) -> str:
-    """Python code passed to launch_workers `code=` to join the Ray cluster."""
-    # Worker engines often lack `ray` on PATH; use the session Python module entrypoint.
-    return (
-        "import subprocess, sys\n"
-        "cmd = [sys.executable, '-m', 'ray.scripts.scripts', 'start', "
-        f"'--block', '--address={head_address}']\n"
-        "sys.exit(subprocess.call(cmd))\n"
-    )
+    """
+    Python code for launch_workers `code=`.
+
+    Always uses sys.executable (system Python). Installs backend/requirements.txt
+    when Ray is missing (worker engines start with a bare interpreter).
+    """
+    # head_address is session-controlled (IP:port); no user strings in code path.
+    return f'''import os
+import subprocess
+import sys
+from pathlib import Path
+
+HEAD = "{head_address}"
+
+def project_root() -> Path:
+    for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT", "CDSW_WORKING_DIRECTORY"):
+        val = os.environ.get(key)
+        if val:
+            p = Path(val)
+            if p.is_dir():
+                return p.resolve()
+    return Path.cwd().resolve()
+
+def ensure_ray(py: str, root: Path) -> None:
+    import importlib.util
+    if importlib.util.find_spec("ray") is not None:
+        return
+    req = root / "backend" / "requirements.txt"
+    env = {{**os.environ, "PIP_USER": "0"}}
+    if req.is_file():
+        subprocess.check_call([py, "-m", "pip", "install", "-q", "-r", str(req)], env=env, cwd=str(root))
+    else:
+        subprocess.check_call([py, "-m", "pip", "install", "-q", "ray"], env=env)
+
+py = sys.executable
+root = project_root()
+os.chdir(root)
+ensure_ray(py, root)
+cmd = [py, "-m", "ray.scripts.scripts", "start", "--block", f"--address={{HEAD}}"]
+raise SystemExit(subprocess.call(cmd))
+'''
+
+
+def worker_launch_env(project_root: Path | None = None) -> dict[str, str]:
+    root = (project_root or REPO_ROOT).resolve()
+    env: dict[str, str] = {
+        "PIP_USER": "0",
+        "CDSW_PROJECT_ROOT": str(root),
+        "PROJECT_ROOT": str(root),
+    }
+    for key in (
+        "CDSW_WORKING_DIRECTORY",
+        "HOME",
+        "PATH",
+        "PYTHONPATH",
+        "CML_RESOURCE_PROFILE_ID",
+    ):
+        if os.environ.get(key):
+            env[key] = os.environ[key]
+    return env
 
 
 class CdswRayWorkerPool:
@@ -127,7 +180,7 @@ class CdswRayWorkerPool:
             "memory": self.memory_gb,
             "nvidia_gpu": self.gpus_per_worker,
             "code": code,
-            "env": {},
+            "env": worker_launch_env(),
         }
         optional = {
             "accelerator_label_id": os.environ.get("CML_ACCELERATOR_LABEL_ID"),

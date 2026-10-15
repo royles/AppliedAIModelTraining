@@ -15,8 +15,6 @@ from urllib.request import urlopen
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BIND_HOST = "127.0.0.1"
 TMUX_CONF = "/exec-daemon/tmux.portal.conf"
-VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
-VENV_RAY = REPO_ROOT / ".venv" / "bin" / "ray"
 RUN_DIR = Path("/tmp/platform-services")
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
@@ -195,36 +193,32 @@ def api_port() -> str:
     return os.environ.get("PLATFORM_API_PORT", "8000")
 
 
+def platform_python() -> str:
+    """Always use the active system interpreter (no project .venv)."""
+    return os.environ.get("PLATFORM_PYTHON", sys.executable)
+
+
 def venv_python() -> str:
-    if VENV_PYTHON.is_file():
-        return str(VENV_PYTHON)
-    return sys.executable
+    """Alias for platform_python (legacy name used by start/install scripts)."""
+    return platform_python()
 
 
 def venv_ray_argv(*ray_args: str) -> list[str]:
-    if VENV_RAY.is_file():
-        return [str(VENV_RAY), *ray_args]
-    py = venv_python()
+    py = platform_python()
     try:
         import ray  # noqa: F401
     except ImportError:
         raise FileNotFoundError(
-            "Ray is not installed in .venv. Run: python3 scripts/install.py"
+            "Ray is not installed for system Python. Run: python3 scripts/install.py"
         ) from None
     return [py, "-m", "ray.scripts.scripts", *ray_args]
 
 
 def venv_subprocess_env() -> dict[str, str]:
     merged = os.environ.copy()
-    merged["PIP_USER"] = "0"
-    merged["PYTHONNOUSERSITE"] = "1"
-    for key in ("PYTHONUSERBASE", "PIP_USER_SITE"):
-        merged.pop(key, None)
-    venv = REPO_ROOT / ".venv"
-    if venv.is_dir():
-        merged["VIRTUAL_ENV"] = str(venv)
-        bin_dir = venv / "bin"
-        merged["PATH"] = f"{bin_dir}{os.pathsep}{merged.get('PATH', '')}"
+    merged.pop("VIRTUAL_ENV", None)
+    merged.setdefault("PIP_USER", "0")
+    merged.pop("PYTHONNOUSERSITE", None)
     return merged
 
 
@@ -235,26 +229,6 @@ def pip_install(pip_args: Sequence[str], *, check: bool = True) -> subprocess.Co
         env=venv_subprocess_env(),
         check=check,
     )
-
-
-def ensure_python_venv() -> None:
-    if VENV_PYTHON.is_file():
-        return
-
-    probe = REPO_ROOT / ".tmp_venv_probe"
-    try:
-        run([sys.executable, "-m", "venv", str(probe)], check=True)
-    except subprocess.CalledProcessError:
-        run(["sudo", "apt-get", "update", "-qq"], check=False)
-        run(
-            ["sudo", "apt-get", "install", "-y", "-qq", "python3.12-venv"],
-            check=True,
-        )
-    finally:
-        shutil.rmtree(probe, ignore_errors=True)
-
-    if not VENV_PYTHON.is_file():
-        run([sys.executable, "-m", "venv", str(REPO_ROOT / ".venv")], check=True)
 
 
 def _ray_port_open(port: int = 6379) -> bool:

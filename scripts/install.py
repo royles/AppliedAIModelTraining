@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import REPO_ROOT, cd_repo, ensure_python_venv, frontend_dist_ready, pip_install, run
+from common import REPO_ROOT, cd_repo, frontend_dist_ready, pip_install, platform_python, run
 
 
 def build_frontend() -> bool:
@@ -38,7 +38,7 @@ def main() -> int:
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
 
-    ensure_python_venv()
+    print(f"Installing into system Python: {platform_python()}")
 
     try:
         pip_install(["--upgrade", "pip"])
