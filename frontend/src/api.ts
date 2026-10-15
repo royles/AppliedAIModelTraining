@@ -1,0 +1,111 @@
+export type Experiment = {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+};
+
+export type TransformerArchitecture = {
+  family: "gpt2" | "bert";
+  vocab_size: number;
+  hidden_size: number;
+  num_hidden_layers: number;
+  num_attention_heads: number;
+  intermediate_size?: number | null;
+  max_position_embeddings: number;
+  tie_word_embeddings: boolean;
+};
+
+export type TransformerConfig = {
+  init_mode: "from_scratch" | "pretrained";
+  task_type: "causal_lm" | "sequence_classification";
+  architecture: TransformerArchitecture;
+  base_model?: string | null;
+  max_seq_length: number;
+  learning_rate: number;
+  per_device_train_batch_size: number;
+  max_steps: number;
+  openai_model_id?: string | null;
+};
+
+export type TransformerPreset = {
+  name: string;
+  title: string;
+  description: string;
+  config: TransformerConfig;
+};
+
+export type TrainingJob = {
+  id: number;
+  experiment_id: number;
+  name: string;
+  status: string;
+  model_name: string;
+  num_workers: number;
+  gpus_per_worker: number;
+  epochs: number;
+  batch_size: number;
+  learning_rate: number;
+  max_steps: number;
+  config_json: string | null;
+  ray_address: string | null;
+  metrics_json: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Health = {
+  status: string;
+  ray_runtime: string;
+  cdsw_available: boolean;
+  details: Record<string, unknown>;
+};
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  health: () => request<Health>("/api/health"),
+  listPresets: () => request<TransformerPreset[]>("/api/transformer/presets"),
+  estimateArchitecture: (architecture: TransformerArchitecture) =>
+    request<{ estimated_parameters: number }>("/api/transformer/architecture/estimate", {
+      method: "POST",
+      body: JSON.stringify(architecture),
+    }),
+  listExperiments: () => request<Experiment[]>("/api/experiments"),
+  createExperiment: (body: { name: string; description?: string }) =>
+    request<Experiment>("/api/experiments", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listJobs: () => request<TrainingJob[]>("/api/jobs"),
+  createJob: (body: {
+    experiment_id: number;
+    name: string;
+    preset?: string;
+    transformer?: Partial<TransformerConfig>;
+    openai_model_id?: string;
+    num_workers?: number;
+    gpus_per_worker?: number;
+    max_steps?: number;
+  }) =>
+    request<TrainingJob>("/api/jobs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  scaleJob: (jobId: number, target_workers: number) =>
+    request<{ id: number; target_workers: number; status: string }>(
+      `/api/jobs/${jobId}/scale`,
+      { method: "POST", body: JSON.stringify({ target_workers }) },
+    ),
+};

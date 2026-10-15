@@ -1,15 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Idempotent bootstrap for AppliedAIModelTraining.
-# The repository currently has no package lockfiles or service dependencies.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-if [[ ! -f README.md ]]; then
-  echo "Expected README.md at repository root." >&2
+mkdir -p data backend/data
+
+if ! python3 -m venv /tmp/venv-probe 2>/dev/null; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq python3.12-venv
+fi
+rm -rf /tmp/venv-probe
+python3 -m venv .venv
+# shellcheck disable=SC1091
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r backend/requirements.txt
+
+if ! command -v npm >/dev/null; then
+  echo "npm is required for the React UI." >&2
   exit 1
 fi
 
-command -v python3 >/dev/null || { echo "python3 is required." >&2; exit 1; }
-command -v node >/dev/null || { echo "node is required." >&2; exit 1; }
+cd frontend
+npm install
+cd "$ROOT"
 
-echo "Install complete (no project dependencies yet)."
+echo "Install complete."
