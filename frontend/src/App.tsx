@@ -5,6 +5,7 @@ import {
   type TransformerPreset,
   type TrainingJob,
 } from "./api";
+import { JobRunList } from "./JobRunList";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 
 export default function App() {
@@ -215,45 +216,9 @@ export default function App() {
         </article>
       </section>
 
-      <section className="card">
-        <h2>Training jobs</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Init</th>
-              <th>Ray</th>
-              <th>Metrics</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => {
-              let init = "—";
-              try {
-                if (job.config_json) {
-                  const c = JSON.parse(job.config_json);
-                  init = c.init_mode ?? "—";
-                }
-              } catch {
-                /* ignore */
-              }
-              return (
-                <tr key={job.id}>
-                  <td>{job.id}</td>
-                  <td>{job.name}</td>
-                  <td><span className={`pill ${job.status}`}>{job.status}</span></td>
-                  <td>{init}</td>
-                  <td><code>{job.ray_address ?? "—"}</code></td>
-                  <td className="metrics">
-                    {job.metrics_json ?? job.error_message ?? "—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <section className="card jobs-section">
+        <h2>Training runs</h2>
+        <JobRunList jobs={jobs} />
       </section>
     </div>
   );
