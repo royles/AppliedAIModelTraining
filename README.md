@@ -44,8 +44,8 @@ Locally, workers are simulated and Ray runs in-process on CPU.
 ## Development
 
 ```bash
-python3 scripts/install.py
-python3 scripts/start.py
+python3 scripts/install.py   # once (or after dependency changes)
+python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
 ```
 
 - API: http://127.0.0.1:8000/docs
@@ -70,10 +70,11 @@ In a **CML workbench session** (Python 3, project cloned from this repo):
 2. Install deps, start Ray head, API, and UI (UI binds to `CDSW_APP_PORT`):
 
 ```bash
+python3 scripts/install.py
 python3 scripts/start.py
 ```
 
-On CAI, `start.py` runs `install.py` automatically. Use `--skip-install` on restarts. Without `tmux`, logs go to `/tmp/platform-services/`.
+On CAI, `start.py` runs the UI **in the foreground** on `CDSW_APP_PORT` (required for Application routes). API logs: `/tmp/platform-services/api.log`. Optional: `python3 scripts/start.py --install` to install then start in one step.
 
 3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 
@@ -83,7 +84,7 @@ python3 scripts/cai_smoke_test.py
 
 For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (UI or API). The platform uses [`cml.workers_v1`](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html) / legacy `cdsw` to run `ray start --block --address=<head>` on worker engines.
 
-Set `RAY_LOCAL_MODE=false` in CAI (the session start script does this) so training uses the Ray cluster instead of an in-process local Ray.
+`start.py` sets `RAY_LOCAL_MODE=false` on CAI so training uses the Ray cluster instead of an in-process local Ray.
 
 ## Environment variables
 
