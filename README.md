@@ -96,3 +96,5 @@ For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (
 | `CML_RESOURCE_GROUP_ID` | Target resource group |
 | `RAY_LOCAL_MODE` | When `true` (default), use local Ray even if head is set |
 | `CDSW_APP_PORT` | Port for the React UI (Vite); required in CAI Application sessions |
+| `RAY_SKIP_HEAD` | Set to `1` to skip `ray start --head` in `start.py` |
+| `RAY_INCLUDE_DASHBOARD` | Set to `1` to enable Ray dashboard (needs `ray[default]` deps; off by default on CAI) |

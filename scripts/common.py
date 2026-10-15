@@ -209,27 +209,61 @@ def ensure_python_venv() -> None:
         run([sys.executable, "-m", "venv", str(REPO_ROOT / ".venv")], check=True)
 
 
+def _ray_port_open(port: int = 6379) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
 def start_ray_head() -> None:
     ip = cai_session_ip()
     if not ip:
         return
+    if os.environ.get("RAY_SKIP_HEAD", "").lower() in ("1", "true", "yes"):
+        print("Skipping Ray head startup (RAY_SKIP_HEAD is set).")
+        return
+
     os.environ["RAY_HEAD_ADDRESS"] = f"{ip}:6379"
-    print(f"CAI session at {ip}; starting Ray head...")
+
+    if _ray_port_open(6379):
+        print("Ray head already listening on :6379")
+        return
+
+    include_dashboard = os.environ.get("RAY_INCLUDE_DASHBOARD", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    ray_args = ["start", "--head", "--port=6379"]
+    if include_dashboard:
+        ray_args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
+    else:
+        # CAI images often lack ray[default] dashboard deps; training only needs the GCS port.
+        ray_args.append("--include-dashboard=false")
+
+    print(f"CAI session at {ip}; starting Ray head (dashboard={include_dashboard})...")
     try:
-        run(
-            venv_ray_argv(
-                "start",
-                "--head",
-                "--port=6379",
-                "--dashboard-port=8265",
-                "--include-dashboard=true",
-            ),
+        result = run(
+            venv_ray_argv(*ray_args),
             env=venv_subprocess_env(),
             check=False,
         )
     except FileNotFoundError:
         print(
             "Warning: Ray CLI not found in venv; run: python3 scripts/install.py",
+            file=sys.stderr,
+        )
+        return
+
+    if result.returncode != 0:
+        print(
+            "Warning: Ray head did not start. Training may use local Ray or workers "
+            "once the cluster is up. To skip this step: RAY_SKIP_HEAD=1. "
+            "Dashboard (optional): RAY_INCLUDE_DASHBOARD=1 after installing ray[default].",
             file=sys.stderr,
         )
 
