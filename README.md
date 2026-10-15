@@ -49,7 +49,7 @@ python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
 ```
 
 - API: http://127.0.0.1:8000/docs
-- UI: listens on **`CDSW_APP_PORT`** (required in CAI; defaults to `5173` only for local dev)
+- UI: **built React** in `frontend/dist`, served by FastAPI (no npm at start). CAI: single process on **`CDSW_APP_PORT`**. Local: http://127.0.0.1:8000/
 
 Create an experiment and start a training job from the UI, or via `POST /api/jobs`.
 
@@ -74,7 +74,7 @@ python3 scripts/install.py
 python3 scripts/start.py
 ```
 
-On CAI, `start.py` runs the UI **in the foreground** on `CDSW_APP_PORT` (required for Application routes). API logs: `/tmp/platform-services/api.log`. Optional: `python3 scripts/start.py --install` to install then start in one step.
+On CAI, `start.py` runs **uvicorn in the foreground** on `CDSW_APP_PORT` (API + static UI). Build the UI once with `install.py` (needs npm only at build time). Use `--dev-ui` only if you want Vite hot-reload and have npm at runtime.
 
 3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 

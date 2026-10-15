@@ -192,6 +192,17 @@ export default function App() {
             <p className="hint">~{paramEstimate.toLocaleString()} parameters (estimate)</p>
           )}
           <label>
+            Experiment
+            <select
+              value={selectedExp ?? ""}
+              onChange={(e) => setSelectedExp(Number(e.target.value))}
+            >
+              {experiments.map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             OpenAI model id
             <input value={openaiModelId} onChange={(e) => setOpenaiModelId(e.target.value)} />
           </label>

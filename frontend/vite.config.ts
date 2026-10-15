@@ -5,6 +5,10 @@ import react from "@vitejs/plugin-react";
 const uiPort = Number(process.env.CDSW_APP_PORT || process.env.PORT || 5173);
 
 export default defineConfig({
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  },
   plugins: [react()],
   server: {
     host: "0.0.0.0",

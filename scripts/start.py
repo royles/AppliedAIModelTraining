@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Start platform services (API + UI on CDSW_APP_PORT).
+Start the platform.
 
-Install dependencies separately: python3 scripts/install.py
-Use --install only if you want start.py to run install first.
+Default (CAI and local): FastAPI on CDSW_APP_PORT (CAI) or :8000 (local) serves
+the **built** React app from frontend/dist — no npm at runtime.
 
-On Cloudera AI (CAI), the UI runs in the **foreground** on CDSW_APP_PORT so the
-Application route stays alive. API runs in the background on port 8000.
+Optional --dev-ui: Vite dev server (npm required) on CDSW_APP_PORT with API on :8000.
 """
 
 from __future__ import annotations
@@ -20,16 +19,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (
     REPO_ROOT,
-    API_HEALTH_URL,
+    api_health_url,
     cai_session_ip,
     cd_repo,
     ensure_api_running,
+    frontend_dist_ready,
     is_cai_session,
     log_file,
-    run_web_foreground,
+    run_api_foreground,
+    run_vite_dev_foreground,
     start_ray_head,
-    start_web_background,
-    ui_health_url,
     ui_port,
     venv_python,
     wait_for_urls,
@@ -42,7 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--install",
         action="store_true",
-        help="Run install.py before starting (normally run install separately)",
+        help="Run install.py before starting",
+    )
+    parser.add_argument(
+        "--dev-ui",
+        action="store_true",
+        help="Use Vite dev server (npm required) instead of built frontend/dist",
     )
     return parser.parse_args()
 
@@ -69,49 +73,47 @@ def main() -> int:
         code = install_main()
         if code != 0:
             return code
-        print("=== Install finished; starting services ===")
 
     if is_cai_session():
         os.environ["RAY_LOCAL_MODE"] = "false"
         start_ray_head()
 
-    print("=== Starting services ===")
-    try:
-        ensure_api_running()
-    except RuntimeError as exc:
-        print(exc, file=sys.stderr)
-        return 1
-
-    if not wait_for_urls([API_HEALTH_URL], attempts=60):
-        print(f"API did not become ready; see {log_file('api')}", file=sys.stderr)
-        return 1
-    print("API is ready.")
-
-    if is_cai_session():
-        ip = cai_session_ip()
-        print(f"CAI session IP: {ip}")
-        print(f"Open your Application URL (proxies CDSW_APP_PORT={port})")
-        print(f"Smoke test (other terminal): {venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}")
+    if args.dev_ui:
+        print("=== Dev UI mode (Vite + API on :8000) ===")
+        ensure_api_running(8000)
+        if not wait_for_urls([api_health_url(8000)], attempts=60):
+            print(f"API not ready; see {log_file('api')}", file=sys.stderr)
+            return 1
         try:
-            return run_web_foreground(port)
+            return run_vite_dev_foreground(port)
         except RuntimeError as exc:
             print(exc, file=sys.stderr)
             return 1
 
-    try:
-        start_web_background(port)
-    except RuntimeError as exc:
-        print(exc, file=sys.stderr)
+    if not frontend_dist_ready():
+        print(
+            "frontend/dist is missing. Run: python3 scripts/install.py\n"
+            "(needs npm once to build), or pass --dev-ui if npm is available.",
+            file=sys.stderr,
+        )
         return 1
 
-    if wait_for_urls([API_HEALTH_URL, ui_health_url(port)]):
-        print(f"API and UI are up (UI port CDSW_APP_PORT={port}).")
-        return 0
+    print("=== Starting API + built React UI (no npm) ===")
+    if is_cai_session():
+        ip = cai_session_ip()
+        print(f"CAI session IP: {ip}")
+        print(f"Application listens on CDSW_APP_PORT={port}")
+        print(
+            f"Smoke test (other terminal): "
+            f"API_BASE=http://127.0.0.1:{port} {venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}"
+        )
+        return run_api_foreground(port)
 
-    print(
-        f"Timed out waiting for UI; check {log_file('api')} and {log_file('web')}",
-        file=sys.stderr,
-    )
+    ensure_api_running(8000)
+    if wait_for_urls([api_health_url(8000)], attempts=60):
+        print("API + UI available at http://127.0.0.1:8000/ (static build)")
+        return 0
+    print(f"API not ready; see {log_file('api')}", file=sys.stderr)
     return 1
 
 

@@ -17,12 +17,15 @@ TMUX_CONF = "/exec-daemon/tmux.portal.conf"
 VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
 VENV_RAY = REPO_ROOT / ".venv" / "bin" / "ray"
 RUN_DIR = Path("/tmp/platform-services")
-
-API_HEALTH_URL = "http://127.0.0.1:8000/api/health"
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
 
 def cd_repo() -> None:
     os.chdir(REPO_ROOT)
+
+
+def frontend_dist_ready() -> bool:
+    return FRONTEND_DIST.is_dir() and (FRONTEND_DIST / "index.html").is_file()
 
 
 def cai_session_ip() -> str | None:
@@ -31,6 +34,12 @@ def cai_session_ip() -> str | None:
 
 def is_cai_session() -> bool:
     return cai_session_ip() is not None
+
+
+def api_health_url(port: str | int | None = None) -> str:
+    if port is None:
+        port = os.environ.get("CDSW_APP_PORT") if is_cai_session() else "8000"
+    return f"http://127.0.0.1:{port}/api/health"
 
 
 def run(
@@ -131,10 +140,6 @@ def http_ok(url: str, timeout: float = 5.0) -> bool:
         return False
 
 
-def ui_health_url(port: str) -> str:
-    return f"http://127.0.0.1:{port}/"
-
-
 def wait_for_urls(urls: Sequence[str], attempts: int = 90, delay: float = 1.0) -> bool:
     for _ in range(attempts):
         if all(http_ok(u) for u in urls):
@@ -229,17 +234,6 @@ def start_ray_head() -> None:
         )
 
 
-def _start_api_background() -> None:
-    py = venv_python()
-    clear_stale_pid("api")
-    start_background_process(
-        "api",
-        cwd=REPO_ROOT / "backend",
-        argv=[py, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
-        env=venv_subprocess_env(),
-    )
-
-
 def start_background_process(
     name: str,
     *,
@@ -265,62 +259,69 @@ def start_background_process(
     print(f"Started {name} pid={proc.pid} log={log_path}")
 
 
-def ensure_api_running() -> None:
-    if http_ok(API_HEALTH_URL):
-        print("API already responding on :8000")
+def run_api_foreground(port: str | int) -> int:
+    """Single process: FastAPI + built React static files (no npm at runtime)."""
+    py = venv_python()
+    print(f"Starting API + built UI on 0.0.0.0:{port} (uvicorn; no npm) ...")
+    return subprocess.call(
+        [
+            py,
+            "-m",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+        ],
+        cwd=str(REPO_ROOT / "backend"),
+        env=venv_subprocess_env(),
+    )
+
+
+def ensure_api_running(port: str | int = 8000) -> None:
+    health = api_health_url(port)
+    if http_ok(health):
+        print(f"API already responding on :{port}")
         return
-    print("Starting API on :8000 ...")
+    print(f"Starting API on :{port} ...")
     py = venv_python()
     if tmux_available():
         if not tmux_has_session("api"):
             api_cmd = (
-                f'"{py}" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 '
+                f'"{py}" -m uvicorn app.main:app --host 0.0.0.0 --port {port} '
                 f"2>&1 | tee {log_file('api')}"
             )
             tmux_new_session("api", REPO_ROOT / "backend", api_cmd)
         return
-    _start_api_background()
-
-
-def run_web_foreground(port: str) -> int:
-    """Block on Vite — required for CAI Application routes on CDSW_APP_PORT."""
-    npm = shutil.which("npm")
-    if not npm:
-        raise RuntimeError("npm is required to start the UI")
-    env = venv_subprocess_env()
-    env["CDSW_APP_PORT"] = port
-    print(f"Starting UI in foreground on CDSW_APP_PORT={port} ...")
-    return subprocess.call(
-        [npm, "run", "dev"],
-        cwd=str(REPO_ROOT / "frontend"),
-        env=env,
+    clear_stale_pid("api")
+    start_background_process(
+        "api",
+        cwd=REPO_ROOT / "backend",
+        argv=[
+            py,
+            "-m",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+        ],
+        env=venv_subprocess_env(),
     )
 
 
-def start_web_background(port: str) -> None:
-    if http_ok(ui_health_url(port)):
-        print(f"UI already responding on CDSW_APP_PORT={port}")
-        return
-    print(f"Starting UI on CDSW_APP_PORT={port} ...")
+def run_vite_dev_foreground(port: str) -> int:
+    """Optional hot-reload dev server (requires npm)."""
     npm = shutil.which("npm")
     if not npm:
-        raise RuntimeError("npm is required to start the UI")
-
-    if tmux_available():
-        if not tmux_has_session("web"):
-            web_cmd = (
-                f'export CDSW_APP_PORT="{port}" && npm run dev '
-                f"2>&1 | tee {log_file('web')}"
-            )
-            tmux_new_session("web", REPO_ROOT / "frontend", web_cmd)
-        return
-
-    clear_stale_pid("web")
+        raise RuntimeError("npm is required for --dev-ui (Vite dev server)")
     env = venv_subprocess_env()
     env["CDSW_APP_PORT"] = port
-    start_background_process(
-        "web",
-        cwd=REPO_ROOT / "frontend",
-        argv=[npm, "run", "dev"],
+    print(f"Starting Vite dev server on CDSW_APP_PORT={port} ...")
+    return subprocess.call(
+        [npm, "run", "dev"],
+        cwd=str(REPO_ROOT / "frontend"),
         env=env,
     )

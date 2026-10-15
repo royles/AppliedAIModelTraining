@@ -13,7 +13,16 @@ import time
 import urllib.error
 import urllib.request
 
-API_BASE = os.environ.get("API_BASE", "http://127.0.0.1:8000").rstrip("/")
+def _default_api_base() -> str:
+    if os.environ.get("API_BASE"):
+        return os.environ["API_BASE"].rstrip("/")
+    port = os.environ.get("CDSW_APP_PORT")
+    if port:
+        return f"http://127.0.0.1:{port}"
+    return "http://127.0.0.1:8000"
+
+
+API_BASE = _default_api_base().rstrip("/")
 GPUS_PER_WORKER = int(os.environ.get("GPUS_PER_WORKER", "0"))
 
 

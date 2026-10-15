@@ -9,6 +9,7 @@ from app.api.openai_routes import router as openai_router
 from app.api.routes import router
 from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import init_db
+from app.static_ui import mount_static_ui
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(router, prefix="/api")
     app.include_router(openai_router, prefix="/v1")
+    mount_static_ui(app)
     return app
 
 
