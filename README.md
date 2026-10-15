@@ -67,11 +67,13 @@ In a **CML workbench session** (Python 3, project cloned from this repo):
 
 1. Optional GPU worker settings (from your CAI admin / project settings):
    - `CML_ACCELERATOR_LABEL_ID`, `CML_RESOURCE_PROFILE_ID`, `CML_RESOURCE_GROUP_ID`
-2. Start Ray head, install deps, and run API + UI:
+2. Install deps, start Ray head, API, and UI (UI binds to `CDSW_APP_PORT`):
 
 ```bash
-python3 scripts/cai_session_start.py
+python3 scripts/start.py
 ```
+
+On CAI, `start.py` runs `install.py` automatically. Use `--skip-install` on restarts. Without `tmux`, logs go to `/tmp/platform-services/`.
 
 3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 

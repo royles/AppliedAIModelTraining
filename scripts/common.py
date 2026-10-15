@@ -10,16 +10,25 @@ import time
 from pathlib import Path
 from typing import Sequence
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TMUX_CONF = "/exec-daemon/tmux.portal.conf"
 VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
-VENV_PIP = REPO_ROOT / ".venv" / "bin" / "pip"
+VENV_RAY = REPO_ROOT / ".venv" / "bin" / "ray"
+RUN_DIR = Path("/tmp/platform-services")
 
 
 def cd_repo() -> None:
     os.chdir(REPO_ROOT)
+
+
+def cai_session_ip() -> str | None:
+    return os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
+
+
+def is_cai_session() -> bool:
+    return cai_session_ip() is not None
 
 
 def run(
@@ -42,11 +51,23 @@ def run(
     )
 
 
+def tmux_available() -> bool:
+    if not shutil.which("tmux"):
+        return False
+    if Path(TMUX_CONF).is_file():
+        return True
+    return shutil.which("tmux") is not None
+
+
 def tmux_cmd(*args: str) -> list[str]:
-    return ["tmux", "-f", TMUX_CONF, *args]
+    if Path(TMUX_CONF).is_file():
+        return ["tmux", "-f", TMUX_CONF, *args]
+    return ["tmux", *args]
 
 
 def tmux_has_session(name: str) -> bool:
+    if not tmux_available():
+        return False
     return (
         subprocess.run(
             tmux_cmd("has-session", "-t", name),
@@ -69,6 +90,59 @@ def tmux_new_session(name: str, cwd: Path, shell_command: str) -> None:
             shell_command,
         )
     )
+
+
+def _pid_file(name: str) -> Path:
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    return RUN_DIR / f"{name}.pid"
+
+
+def _log_file(name: str) -> Path:
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    return RUN_DIR / f"{name}.log"
+
+
+def process_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def start_background_process(
+    name: str,
+    *,
+    cwd: Path,
+    argv: Sequence[str],
+    env: dict[str, str] | None = None,
+) -> None:
+    pid_path = _pid_file(name)
+    if pid_path.is_file():
+        try:
+            if process_running(int(pid_path.read_text().strip())):
+                return
+        except ValueError:
+            pass
+
+    log_path = _log_file(name)
+    merged = os.environ.copy()
+    if env:
+        merged.update(env)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("ab", buffering=0) as log_fp:
+        proc = subprocess.Popen(
+            list(argv),
+            cwd=str(cwd),
+            env=merged,
+            stdout=log_fp,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    pid_path.write_text(str(proc.pid))
+    print(f"Started {name} pid={proc.pid} log={log_path}")
 
 
 def http_ok(url: str, timeout: float = 5.0) -> bool:
@@ -97,13 +171,15 @@ def venv_python() -> str:
     return sys.executable
 
 
-def venv_subprocess_env() -> dict[str, str]:
-    """
-    Environment for pip/python inside the project virtualenv.
+def venv_ray_argv(*ray_args: str) -> list[str]:
+    if VENV_RAY.is_file():
+        return [str(VENV_RAY), *ray_args]
+    raise FileNotFoundError(
+        "Ray is not installed in .venv. Run: python3 scripts/install.py"
+    )
 
-    Cloudera AI / CDSW often sets PIP_USER=1 globally; that breaks `pip install`
-    inside an active virtualenv.
-    """
+
+def venv_subprocess_env() -> dict[str, str]:
     merged = os.environ.copy()
     merged["PIP_USER"] = "0"
     merged["PYTHONNOUSERSITE"] = "1"
@@ -144,3 +220,71 @@ def ensure_python_venv() -> None:
 
     if not VENV_PYTHON.is_file():
         run([sys.executable, "-m", "venv", str(REPO_ROOT / ".venv")], check=True)
+
+
+def start_ray_head() -> None:
+    ip = cai_session_ip()
+    if not ip:
+        return
+    os.environ["RAY_HEAD_ADDRESS"] = f"{ip}:6379"
+    print(f"CAI session at {ip}; starting Ray head...")
+    try:
+        run(
+            venv_ray_argv(
+                "start",
+                "--head",
+                "--port=6379",
+                "--dashboard-port=8265",
+                "--include-dashboard=true",
+            ),
+            env=venv_subprocess_env(),
+            check=False,
+        )
+    except FileNotFoundError:
+        print(
+            "Warning: Ray CLI not found in venv; run scripts/install.py first.",
+            file=sys.stderr,
+        )
+
+
+def start_api_service() -> None:
+    py = venv_python()
+    if tmux_available():
+        if not tmux_has_session("api"):
+            api_cmd = (
+                f'"{py}" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 '
+                f"2>&1 | tee {_log_file('api')}"
+            )
+            tmux_new_session("api", REPO_ROOT / "backend", api_cmd)
+        return
+
+    start_background_process(
+        "api",
+        cwd=REPO_ROOT / "backend",
+        argv=[py, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+        env=venv_subprocess_env(),
+    )
+
+
+def start_web_service(port: str) -> None:
+    npm = shutil.which("npm")
+    if not npm:
+        raise RuntimeError("npm is required to start the UI")
+
+    if tmux_available():
+        if not tmux_has_session("web"):
+            web_cmd = (
+                f'export CDSW_APP_PORT="{port}" && npm run dev '
+                f"2>&1 | tee {_log_file('web')}"
+            )
+            tmux_new_session("web", REPO_ROOT / "frontend", web_cmd)
+        return
+
+    env = venv_subprocess_env()
+    env["CDSW_APP_PORT"] = port
+    start_background_process(
+        "web",
+        cwd=REPO_ROOT / "frontend",
+        argv=[npm, "run", "dev"],
+        env=env,
+    )
