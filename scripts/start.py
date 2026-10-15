@@ -25,6 +25,7 @@ from common import (
     cai_session_ip,
     cd_repo,
     ensure_api_running,
+    ensure_runtime_ready,
     frontend_dist_ready,
     is_cai_session,
     log_file,
@@ -67,8 +68,15 @@ def main() -> int:
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
 
+    code = ensure_runtime_ready()
+    if code != 0:
+        return code
+
     if args.install:
         code = install_main()
+        if code != 0:
+            return code
+        code = ensure_runtime_ready()
         if code != 0:
             return code
 
@@ -99,7 +107,14 @@ def main() -> int:
     )
     ensure_api_running(backend_port)
     if not wait_for_urls([api_health_url(backend_port)], attempts=60):
-        print(f"API not ready on :{backend_port}; see {log_file('api')}", file=sys.stderr)
+        print(
+            f"API not ready on :{backend_port}; see {log_file('api')}",
+            file=sys.stderr,
+        )
+        print(
+            f"Tip: {venv_python()} -m pip install -r backend/requirements.txt",
+            file=sys.stderr,
+        )
         return 1
 
     if is_cai_session():
@@ -108,6 +123,8 @@ def main() -> int:
         print(f"Application route → UX on CDSW_APP_PORT={ux_port} ({BIND_HOST})")
         print(f"Smoke test: API_BASE=http://{BIND_HOST}:{backend_port} "
               f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}")
+        if ensure_runtime_ready() != 0:
+            return 1
         return run_ui_gateway_foreground(ux_port, backend_port)
 
     start_ui_gateway_background(ux_port, backend_port)

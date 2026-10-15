@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -17,6 +18,10 @@ BIND_HOST = "127.0.0.1"
 TMUX_CONF = "/exec-daemon/tmux.portal.conf"
 RUN_DIR = Path("/tmp/platform-services")
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
+BACKEND_DIR = REPO_ROOT / "backend"
+REQUIREMENTS_FILE = BACKEND_DIR.parent / "backend" / "requirements.txt"
+# Modules required before uvicorn / FastAPI can start.
+RUNTIME_IMPORTS = ("uvicorn", "fastapi", "sqlalchemy", "pydantic")
 
 
 def cd_repo() -> None:
@@ -219,16 +224,125 @@ def venv_subprocess_env() -> dict[str, str]:
     merged.pop("VIRTUAL_ENV", None)
     merged.setdefault("PIP_USER", "0")
     merged.pop("PYTHONNOUSERSITE", None)
+    backend = str(BACKEND_DIR.resolve())
+    path = merged.get("PYTHONPATH", "")
+    merged["PYTHONPATH"] = f"{backend}{os.pathsep}{path}" if path else backend
     return merged
 
 
 def pip_install(pip_args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    py = venv_python()
-    return run(
-        [py, "-m", "pip", "install", *pip_args],
+    """Install with CDSW-friendly fallbacks (PEP 668, --user)."""
+    py = platform_python()
+    if "--break-system-packages" in pip_args or "--user" in pip_args:
+        return run([py, "-m", "pip", "install", *pip_args], env=venv_subprocess_env(), check=check)
+
+    attempts: list[tuple[list[str], dict[str, str]]] = [
+        ([py, "-m", "pip", "install", *pip_args], venv_subprocess_env()),
+        (
+            [py, "-m", "pip", "install", "--break-system-packages", *pip_args],
+            venv_subprocess_env(),
+        ),
+    ]
+    user_env = venv_subprocess_env()
+    user_env["PIP_USER"] = "1"
+    attempts.append(([py, "-m", "pip", "install", "--user", *pip_args], user_env))
+
+    last_error: subprocess.CalledProcessError | None = None
+    for cmd, env in attempts:
+        try:
+            return run(cmd, env=env, check=check)
+        except subprocess.CalledProcessError as exc:
+            last_error = exc
+            print(f"pip attempt failed ({' '.join(cmd[4:6])}…): exit {exc.returncode}", file=sys.stderr)
+    if last_error:
+        raise last_error
+    raise RuntimeError("pip install failed with no attempts")
+
+
+def python_can_import(*modules: str) -> bool:
+    """True when platform_python() can import modules (always checked in a subprocess)."""
+    py = platform_python()
+    script = "import " + ", ".join(modules)
+    result = subprocess.run(
+        [py, "-c", script],
+        cwd=str(REPO_ROOT),
         env=venv_subprocess_env(),
-        check=check,
+        capture_output=True,
+        text=True,
     )
+    if result.returncode != 0 and result.stderr:
+        print(result.stderr.strip(), file=sys.stderr)
+    return result.returncode == 0
+
+
+def uvicorn_cli_ready() -> bool:
+    py = platform_python()
+    result = subprocess.run(
+        [py, "-m", "uvicorn", "--version"],
+        cwd=str(REPO_ROOT),
+        env=venv_subprocess_env(),
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def install_minimal_runtime() -> None:
+    """Fast path so API/UX can start even if full requirements.txt is heavy."""
+    print("Installing minimal API runtime (uvicorn, fastapi, sqlalchemy)…", flush=True)
+    pip_install(
+        [
+            "uvicorn[standard]>=0.32.0",
+            "fastapi>=0.115.0",
+            "sqlalchemy>=2.0.36",
+            "pydantic>=2.9.0",
+            "pydantic-settings>=2.6.0",
+            "httpx>=0.27.0",
+            "python-multipart>=0.0.12",
+        ]
+    )
+
+
+def ensure_runtime_ready() -> int:
+    """
+    Ensure system Python has packages needed to run API + UX (uvicorn, FastAPI, …).
+    Runs pip automatically when imports are missing.
+    """
+    if os.environ.get("PLATFORM_SKIP_DEP_CHECK", "").lower() in ("1", "true", "yes"):
+        return 0
+
+    py = platform_python()
+    if python_can_import(*RUNTIME_IMPORTS) and uvicorn_cli_ready():
+        print(f"Python runtime ready: {py}")
+        return 0
+
+    print(f"Missing packages for {py} — installing dependencies…", flush=True)
+    from install import install_python_deps  # noqa: PLC0415
+
+    try:
+        install_python_deps()
+    except subprocess.CalledProcessError:
+        print("Full requirements install failed; trying minimal runtime packages.", file=sys.stderr)
+        try:
+            install_minimal_runtime()
+        except subprocess.CalledProcessError as exc:
+            print(f"Minimal install failed (exit {exc.returncode}).", file=sys.stderr)
+            return 1
+
+    if not uvicorn_cli_ready():
+        print(
+            "uvicorn still not available. Run manually:\n"
+            f"  {py} -m pip install 'uvicorn[standard]>=0.32.0'\n"
+            f"  {py} -m pip install -r backend/requirements.txt",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not python_can_import(*RUNTIME_IMPORTS):
+        print("Warning: some runtime imports still missing; API may be limited.", file=sys.stderr)
+
+    print("Python dependencies ready.")
+    return 0
 
 
 def _ray_port_open(port: int = 6379) -> bool:
@@ -354,6 +468,24 @@ def _ui_gateway_env(api: str | int) -> dict[str, str]:
     return env
 
 
+def _uvicorn_argv(app_target: str, port: str | int) -> list[str]:
+    if ensure_runtime_ready() != 0:
+        raise RuntimeError(
+            f"uvicorn is not installed for {platform_python()}. "
+            "Run: python3 scripts/install.py"
+        )
+    return [
+        platform_python(),
+        "-m",
+        "uvicorn",
+        app_target,
+        "--host",
+        BIND_HOST,
+        "--port",
+        str(port),
+    ]
+
+
 def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
     """Bind UX exactly once on CDSW_APP_PORT (127.0.0.1 only)."""
     ui_s = str(ui)
@@ -376,22 +508,12 @@ def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
             )
         return 1
 
-    py = venv_python()
     print(
         f"Starting UX on {BIND_HOST}:{ui_s} (CDSW_APP_PORT; API on {BIND_HOST}:{api}) ..."
     )
     return subprocess.call(
-        [
-            py,
-            "-m",
-            "uvicorn",
-            "app.ui_gateway:app",
-            "--host",
-            BIND_HOST,
-            "--port",
-            ui_s,
-        ],
-        cwd=str(REPO_ROOT / "backend"),
+        _uvicorn_argv("app.ui_gateway:app", ui_s),
+        cwd=str(BACKEND_DIR),
         env=_ui_gateway_env(api),
     )
 
@@ -407,56 +529,46 @@ def start_ui_gateway_background(ui: str | int, api: str | int) -> None:
             file=sys.stderr,
         )
         return
-    py = venv_python()
     print(f"Starting UX on {BIND_HOST}:{ui_s} ...")
     clear_stale_pid("ui")
     start_background_process(
         "ui",
-        cwd=REPO_ROOT / "backend",
-        argv=[
-            py,
-            "-m",
-            "uvicorn",
-            "app.ui_gateway:app",
-            "--host",
-            BIND_HOST,
-            "--port",
-            ui_s,
-        ],
+        cwd=BACKEND_DIR,
+        argv=_uvicorn_argv("app.ui_gateway:app", ui_s),
         env=_ui_gateway_env(api),
     )
 
 
 def ensure_api_running(port: str | int | None = None) -> None:
+    if ensure_runtime_ready() != 0:
+        raise RuntimeError("Cannot start API: Python dependencies are not installed.")
     port = port if port is not None else api_port()
     health = api_health_url(port)
     if http_ok(health):
-        print(f"API already responding on :{port}")
-        return
+        if uvicorn_cli_ready():
+            print(f"API already responding on :{port}")
+            return
+        print(
+            f"Port :{port} responds but uvicorn is missing for {platform_python()}; "
+            "starting a new API process after install.",
+            file=sys.stderr,
+        )
     print(f"Starting API on :{port} ...")
-    py = venv_python()
+    py = platform_python()
+    uvicorn_argv = _uvicorn_argv("app.main:app", port)
     if tmux_available():
         if not tmux_has_session("api"):
             api_cmd = (
                 f'"{py}" -m uvicorn app.main:app --host {BIND_HOST} --port {port} '
                 f"2>&1 | tee {log_file('api')}"
             )
-            tmux_new_session("api", REPO_ROOT / "backend", api_cmd)
+            tmux_new_session("api", BACKEND_DIR, api_cmd)
         return
     clear_stale_pid("api")
     start_background_process(
         "api",
-        cwd=REPO_ROOT / "backend",
-        argv=[
-            py,
-            "-m",
-            "uvicorn",
-            "app.main:app",
-            "--host",
-            BIND_HOST,
-            "--port",
-            str(port),
-        ],
+        cwd=BACKEND_DIR,
+        argv=uvicorn_argv,
         env=venv_subprocess_env(),
     )
 
