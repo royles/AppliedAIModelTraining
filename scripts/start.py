@@ -28,6 +28,7 @@ from common import (
     frontend_dist_ready,
     is_cai_session,
     log_file,
+    print_cai_memory_hints,
     resolve_ux_port,
     run_ui_gateway_foreground,
     run_vite_dev_foreground,
@@ -73,6 +74,7 @@ def main() -> int:
 
     if is_cai_session():
         os.environ["RAY_LOCAL_MODE"] = "false"
+        print_cai_memory_hints()
         start_ray_head()
 
     if args.dev_ui:

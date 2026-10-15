@@ -9,6 +9,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT, get_settings
+from app.resource_hints import effective_ray_train_workers, is_low_memory_container
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.cdsw_workers import (
@@ -99,9 +100,29 @@ def run_training_job(job_id: int) -> None:
         if settings.ray_local_mode and not pool.is_remote:
             ray_addr = None
 
+        train_workers = effective_ray_train_workers(max(1, job.num_workers))
+        if train_workers < job.num_workers:
+            logger.warning(
+                "Capping Ray Train workers from %s to %s (small container / "
+                "PLATFORM_CAI_LOW_MEMORY / RAY_TRAIN_NUM_WORKERS).",
+                job.num_workers,
+                train_workers,
+            )
+        if is_low_memory_container() and train_config.get("per_device_train_batch_size", 4) > 2:
+            train_config = {
+                **train_config,
+                "per_device_train_batch_size": min(
+                    2, int(train_config["per_device_train_batch_size"])
+                ),
+            }
+            logger.warning(
+                "Low-memory container: reduced per_device_train_batch_size to %s",
+                train_config["per_device_train_batch_size"],
+            )
+
         result = run_transformer_training(
             ray_address=ray_addr,
-            num_workers=max(1, job.num_workers),
+            num_workers=train_workers,
             use_gpu=use_gpu,
             train_config=train_config,
         )

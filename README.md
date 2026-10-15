@@ -87,6 +87,30 @@ For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (
 
 `start.py` sets `RAY_LOCAL_MODE=false` on CAI so training uses the Ray cluster instead of an in-process local Ray.
 
+## Memory and resource profiles (CAI)
+
+Ray OOM errors (`worker(s) were killed … low on memory`) mean the **container cgroup limit** is too small for Ray head + training workers. The platform passes `memory=` to `launch_workers`, but the **CML resource profile** (via `CML_RESOURCE_PROFILE_ID`) sets the real cap.
+
+| Role | Minimum | Recommended |
+| --- | --- | --- |
+| **Session** (API, Ray head, `start.py`) | 8 GiB | **16 GiB** |
+| **CDSW worker** (scratch tiny / CPU) | 8 GiB | **16 GiB** |
+| **CDSW worker** (GPU / larger models) | 16 GiB | **32 GiB+** |
+
+A **~4 GiB** profile is too small for Ray training on the session pod. Use separate **≥16 GiB** worker profiles for jobs, keep the session on **≥16 GiB** when running a local Ray head.
+
+On small containers the platform automatically **caps Ray Train to 1 worker** and **batch size ≤ 2**. Override with care:
+
+| Variable | Purpose |
+| --- | --- |
+| `DEFAULT_WORKER_MEMORY_GB` | GiB sent to `launch_workers` (default `16`; must match profile) |
+| `DEFAULT_WORKER_CPU` | CPUs sent to `launch_workers` (default `4`) |
+| `DEFAULT_GPUS_PER_WORKER` | Default GPUs per worker (default `1`) |
+| `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force low-memory caps; auto-detected when cgroup &lt; 6 GiB |
+| `RAY_TRAIN_NUM_WORKERS` | Hard cap on Ray Train worker processes (e.g. `1`) |
+
+Check `GET /api/health` → `details.memory` for detected limits and recommendations.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -101,3 +125,8 @@ For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (
 | `PLATFORM_API_UPSTREAM` | Set on the UI gateway (default `http://127.0.0.1:8000`) |
 | `RAY_SKIP_HEAD` | Set to `1` to skip `ray start --head` in `start.py` |
 | `RAY_INCLUDE_DASHBOARD` | Set to `1` to enable Ray dashboard (needs `ray[default]` deps; off by default on CAI) |
+| `DEFAULT_WORKER_MEMORY_GB` | CDSW worker RAM (GiB); default `16` |
+| `DEFAULT_WORKER_CPU` | CDSW worker CPUs; default `4` |
+| `DEFAULT_GPUS_PER_WORKER` | Default GPU count for workers; default `1` |
+| `PLATFORM_CAI_LOW_MEMORY` | `1` = cap Ray Train workers and batch size on tiny sessions |
+| `RAY_TRAIN_NUM_WORKERS` | Max Ray Train workers per job (overrides auto cap when &gt; 0) |

@@ -267,6 +267,38 @@ def _ray_port_open(port: int = 6379) -> bool:
         return False
 
 
+def print_cai_memory_hints() -> None:
+    if not is_cai_session():
+        return
+    backend = REPO_ROOT / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from app.resource_hints import (  # noqa: PLC0415
+        RECOMMENDED_SESSION_MEMORY_GB,
+        RECOMMENDED_WORKER_MEMORY_GB,
+        container_memory_limit_gb,
+        is_low_memory_container,
+    )
+
+    limit = container_memory_limit_gb()
+    if limit is not None:
+        print(
+            f"CAI container memory limit ~{limit:.2f} GiB "
+            f"(recommended session >={RECOMMENDED_SESSION_MEMORY_GB:.0f} GiB)."
+        )
+    if is_low_memory_container():
+        print(
+            "Low-memory mode: Ray Train uses 1 worker and batch<=2. "
+            "Set a larger CML resource profile or PLATFORM_CAI_LOW_MEMORY=0 "
+            "when using >=8 GiB workers.",
+            file=sys.stderr,
+        )
+    print(
+        f"CDSW workers: set CML_RESOURCE_PROFILE_ID to >={RECOMMENDED_WORKER_MEMORY_GB:.0f} GiB "
+        f"(DEFAULT_WORKER_MEMORY_GB env, default 16)."
+    )
+
+
 def start_ray_head() -> None:
     ip = cai_session_ip()
     if not ip:

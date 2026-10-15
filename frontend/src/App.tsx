@@ -99,7 +99,7 @@ export default function App() {
           tie_word_embeddings: true,
         },
         max_seq_length: 256,
-        per_device_train_batch_size: 4,
+        per_device_train_batch_size: 2,
         max_steps: maxSteps,
         learning_rate: 6e-4,
       },

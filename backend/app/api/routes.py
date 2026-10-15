@@ -18,6 +18,7 @@ from app.schemas import (
     TransformerPresetRead,
     WorkerGroupRead,
 )
+from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.training.architecture import TransformerArchitectureConfig
@@ -88,6 +89,7 @@ def health() -> HealthResponse:
         details={
             "ray_head": cdsw_workers.ray_head_address(),
             "docs": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html",
+            "memory": memory_guidance_for_health(),
         },
     )
 

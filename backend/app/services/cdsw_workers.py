@@ -16,6 +16,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.resource_hints import log_worker_launch_memory
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,6 +138,7 @@ class CdswRayWorkerPool:
             if val is not None:
                 kwargs[key] = int(val)
 
+        log_worker_launch_memory(self.memory_gb, self.gpus_per_worker)
         raw = self._client.launch_workers(**kwargs)
         worker_ids = _extract_worker_ids(raw)
         self._launched = LaunchedWorkers(worker_ids=worker_ids, raw=raw)

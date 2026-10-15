@@ -2,6 +2,7 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -35,9 +36,16 @@ class Settings(BaseSettings):
     # Ray / Cloudera
     ray_local_mode: bool = True
     cdsw_head_address: str | None = None
-    default_worker_cpu: float = 4.0
-    default_worker_memory_gb: float = 16.0
-    default_gpus_per_worker: int = 1
+    default_worker_cpu: float = Field(
+        default=4.0,
+        description="CPU cores passed to CDSW launch_workers (match CML_RESOURCE_PROFILE_ID).",
+    )
+    default_worker_memory_gb: float = Field(
+        default=16.0,
+        ge=1.0,
+        description="GiB passed to launch_workers; must match a profile with enough RAM.",
+    )
+    default_gpus_per_worker: int = Field(default=1, ge=0, le=8)
 
 
 @lru_cache
