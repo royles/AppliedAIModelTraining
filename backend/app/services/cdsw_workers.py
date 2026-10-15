@@ -151,10 +151,17 @@ class CdswRayWorkerPool:
         cpu: float = 4.0,
         memory_gb: float = 16.0,
         gpus_per_worker: int = 1,
+        *,
+        accelerator_label_id: str | None = None,
+        resource_profile_id: str | None = None,
+        resource_group_id: str | None = None,
     ) -> None:
         self.cpu = cpu
         self.memory_gb = memory_gb
         self.gpus_per_worker = gpus_per_worker
+        self._accelerator_label_id = accelerator_label_id
+        self._resource_profile_id = resource_profile_id
+        self._resource_group_id = resource_group_id
         self._client = _import_workers_client()
         self._launched: LaunchedWorkers | None = None
 
@@ -183,12 +190,15 @@ class CdswRayWorkerPool:
             "env": worker_launch_env(),
         }
         optional = {
-            "accelerator_label_id": os.environ.get("CML_ACCELERATOR_LABEL_ID"),
-            "resource_profile_id": os.environ.get("CML_RESOURCE_PROFILE_ID"),
-            "resource_group_id": os.environ.get("CML_RESOURCE_GROUP_ID"),
+            "accelerator_label_id": self._accelerator_label_id
+            or os.environ.get("CML_ACCELERATOR_LABEL_ID"),
+            "resource_profile_id": self._resource_profile_id
+            or os.environ.get("CML_RESOURCE_PROFILE_ID"),
+            "resource_group_id": self._resource_group_id
+            or os.environ.get("CML_RESOURCE_GROUP_ID"),
         }
         for key, val in optional.items():
-            if val is not None:
+            if val is not None and str(val).strip():
                 kwargs[key] = int(val)
 
         log_worker_launch_memory(self.memory_gb, self.gpus_per_worker)

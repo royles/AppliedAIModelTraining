@@ -62,6 +62,39 @@ export type Health = {
   details: Record<string, unknown>;
 };
 
+export type RaySettings = {
+  ray_local_mode: boolean;
+  ray_head_address: string | null;
+  ray_train_num_workers: number;
+};
+
+export type CdswWorkerSettings = {
+  worker_cpu: number;
+  worker_memory_gb: number;
+  gpus_per_worker: number;
+  default_job_num_workers: number;
+  accelerator_label_id: string | null;
+  resource_profile_id: string | null;
+  resource_group_id: string | null;
+};
+
+export type PlatformRuntimeInfo = {
+  ray_runtime: string;
+  cdsw_available: boolean;
+  detected_ray_head: string | null;
+};
+
+export type PlatformSettings = {
+  ray: RaySettings;
+  cdsw_workers: CdswWorkerSettings;
+  runtime: PlatformRuntimeInfo;
+};
+
+export type PlatformSettingsUpdate = {
+  ray?: RaySettings;
+  cdsw_workers?: CdswWorkerSettings;
+};
+
 /** Resolve API paths against the current page URL (works behind CAI path prefixes). */
 export function resolveApiUrl(path: string): string {
   const relative = path.startsWith("/") ? path.slice(1) : path;
@@ -89,6 +122,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<Health>("/api/health"),
+  getPlatformSettings: () => request<PlatformSettings>("/api/platform/settings"),
+  updatePlatformSettings: (body: PlatformSettingsUpdate) =>
+    request<PlatformSettings>("/api/platform/settings", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   listPresets: () => request<TransformerPreset[]>("/api/transformer/presets"),
   estimateArchitecture: (architecture: TransformerArchitecture) =>
     request<{ estimated_parameters: number }>("/api/transformer/architecture/estimate", {

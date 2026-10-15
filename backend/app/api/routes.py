@@ -17,10 +17,13 @@ from app.schemas import (
     TrainingJobRead,
     TransformerPresetRead,
     WorkerGroupRead,
+    PlatformSettingsRead,
+    PlatformSettingsUpdate,
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
 from app.services.job_runner import enqueue_training_job, scale_job_workers
+from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.transformer_config import (
     TransformerTrainingConfig,
@@ -92,6 +95,18 @@ def health() -> HealthResponse:
             "memory": memory_guidance_for_health(),
         },
     )
+
+
+@router.get("/platform/settings", response_model=PlatformSettingsRead)
+def read_platform_settings(db: Session = Depends(get_db)) -> PlatformSettingsRead:
+    return get_platform_settings(db)
+
+
+@router.put("/platform/settings", response_model=PlatformSettingsRead)
+def write_platform_settings(
+    payload: PlatformSettingsUpdate, db: Session = Depends(get_db)
+) -> PlatformSettingsRead:
+    return update_platform_settings(db, payload)
 
 
 @router.get("/transformer/presets", response_model=list[TransformerPresetRead])

@@ -66,6 +66,27 @@ class WorkerGroup(Base):
     job: Mapped["TrainingJob"] = relationship(back_populates="worker_group")
 
 
+class PlatformSettings(Base):
+    """Singleton (id=1) Ray + CDSW worker defaults for the platform."""
+
+    __tablename__ = "platform_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    ray_local_mode: Mapped[bool] = mapped_column(default=True)
+    ray_head_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    ray_train_num_workers: Mapped[int] = mapped_column(Integer, default=0)
+    worker_cpu: Mapped[float] = mapped_column(Float, default=4.0)
+    worker_memory_gb: Mapped[float] = mapped_column(Float, default=16.0)
+    gpus_per_worker: Mapped[int] = mapped_column(Integer, default=0)
+    default_job_num_workers: Mapped[int] = mapped_column(Integer, default=1)
+    accelerator_label_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_profile_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class TrainedModel(Base):
     """Registered artifact exposed via the OpenAI-compatible /v1 API."""
 

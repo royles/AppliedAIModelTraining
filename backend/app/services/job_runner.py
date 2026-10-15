@@ -8,14 +8,18 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import REPO_ROOT, get_settings
+from app.config import REPO_ROOT
 from app.resource_hints import effective_ray_train_workers, is_low_memory_container
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.cdsw_workers import (
     CdswRayWorkerPool,
-    ray_head_address,
     worker_ids_to_json,
+)
+from app.services.platform_settings import (
+    ensure_platform_settings,
+    resolved_ray_head,
+    worker_pool_kwargs,
 )
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.transformer_config import TransformerTrainingConfig
@@ -46,7 +50,6 @@ def resolve_job_config(job: TrainingJob) -> TransformerTrainingConfig:
 
 
 def run_training_job(job_id: int) -> None:
-    settings = get_settings()
     db = SessionLocal()
     pool: CdswRayWorkerPool | None = None
     try:
@@ -60,11 +63,11 @@ def run_training_job(job_id: int) -> None:
         Path(artifact_dir).mkdir(parents=True, exist_ok=True)
         train_config = cfg.to_train_dict(job_id=job_id, artifact_dir=artifact_dir)
 
-        head = ray_head_address() or settings.cdsw_head_address
+        platform = ensure_platform_settings(db)
+        head = resolved_ray_head(platform)
         pool = CdswRayWorkerPool(
-            cpu=settings.default_worker_cpu,
-            memory_gb=settings.default_worker_memory_gb,
-            gpus_per_worker=job.gpus_per_worker or settings.default_gpus_per_worker,
+            **worker_pool_kwargs(platform),
+            gpus_per_worker=job.gpus_per_worker,
         )
 
         worker_group = WorkerGroup(
@@ -97,10 +100,13 @@ def run_training_job(job_id: int) -> None:
         )
 
         use_gpu = job.gpus_per_worker > 0
-        if settings.ray_local_mode and not pool.is_remote:
+        if platform.ray_local_mode and not pool.is_remote:
             ray_addr = None
 
-        train_workers = effective_ray_train_workers(max(1, job.num_workers))
+        train_workers = effective_ray_train_workers(
+            max(1, job.num_workers),
+            platform.ray_train_num_workers,
+        )
         if train_workers < job.num_workers:
             logger.warning(
                 "Capping Ray Train workers from %s to %s (small container / "
@@ -173,14 +179,13 @@ def scale_job_workers(job_id: int, target: int, db: Session) -> WorkerGroup:
         raise ValueError("Job not found")
     if not job.worker_group:
         raise ValueError("Job has no worker group")
-    settings = get_settings()
-    head = job.worker_group.head_address or ray_head_address() or settings.cdsw_head_address
+    platform = ensure_platform_settings(db)
+    head = job.worker_group.head_address or resolved_ray_head(platform)
     if not head:
         raise ValueError("No Ray head address; run inside CML/CDSW or set RAY_HEAD_ADDRESS")
 
     pool = CdswRayWorkerPool(
-        cpu=settings.default_worker_cpu,
-        memory_gb=settings.default_worker_memory_gb,
+        **worker_pool_kwargs(platform),
         gpus_per_worker=job.gpus_per_worker,
     )
     launched = pool.scale(target, head)

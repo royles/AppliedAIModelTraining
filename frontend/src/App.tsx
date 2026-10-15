@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api,
   type Experiment,
-  type Health,
   type TransformerPreset,
   type TrainingJob,
 } from "./api";
+import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const [jobWorkers, setJobWorkers] = useState(1);
+  const [jobGpus, setJobGpus] = useState(0);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [jobs, setJobs] = useState<TrainingJob[]>([]);
   const [presets, setPresets] = useState<TransformerPreset[]>([]);
@@ -28,13 +29,11 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [h, exps, j, pr] = await Promise.all([
-        api.health(),
+      const [exps, j, pr] = await Promise.all([
         api.listExperiments(),
         api.listJobs(),
         api.listPresets(),
       ]);
-      setHealth(h);
       setExperiments(exps);
       setJobs(j);
       setPresets(pr);
@@ -46,6 +45,13 @@ export default function App() {
       setError(e instanceof Error ? e.message : String(e));
     }
   }, [selectedExp]);
+
+  useEffect(() => {
+    api.getPlatformSettings().then((s) => {
+      setJobWorkers(s.cdsw_workers.default_job_num_workers);
+      setJobGpus(s.cdsw_workers.gpus_per_worker);
+    });
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -83,8 +89,8 @@ export default function App() {
       name: jobName,
       preset,
       openai_model_id: openaiModelId,
-      num_workers: 1,
-      gpus_per_worker: 0,
+      num_workers: jobWorkers,
+      gpus_per_worker: jobGpus,
       max_steps: maxSteps,
       transformer: {
         init_mode: "from_scratch",
@@ -119,21 +125,14 @@ export default function App() {
       {error && <div className="banner error">{error}</div>}
 
       <section className="grid">
-        <article className="card">
-          <h2>Platform health</h2>
-          {health ? (
-            <ul className="kv">
-              <li><span>API</span><strong>{health.status}</strong></li>
-              <li><span>Ray</span><strong>{health.ray_runtime}</strong></li>
-              <li>
-                <span>CDSW workers</span>
-                <strong>{health.cdsw_available ? "available" : "local sim"}</strong>
-              </li>
-            </ul>
-          ) : (
-            <p>Loading…</p>
-          )}
-        </article>
+        <PlatformSettingsPanel
+          onSaved={() => {
+            api.getPlatformSettings().then((s) => {
+              setJobWorkers(s.cdsw_workers.default_job_num_workers);
+              setJobGpus(s.cdsw_workers.gpus_per_worker);
+            });
+          }}
+        />
 
         <article className="card">
           <h2>Experiment</h2>

@@ -98,3 +98,44 @@ class TransformerPresetRead(BaseModel):
 class ArchitectureSummary(BaseModel):
     architecture: TransformerArchitectureConfig
     estimated_parameters: int
+
+
+class RaySettings(BaseModel):
+    ray_local_mode: bool = True
+    ray_head_address: str | None = Field(
+        default=None,
+        description="Override Ray GCS head host:port (e.g. session IP:6379). Empty uses auto-detect.",
+    )
+    ray_train_num_workers: int = Field(
+        default=0,
+        ge=0,
+        le=32,
+        description="Cap Ray Train workers per job; 0 = automatic (low-memory aware).",
+    )
+
+
+class CdswWorkerSettings(BaseModel):
+    worker_cpu: float = Field(default=4.0, gt=0, le=128)
+    worker_memory_gb: float = Field(default=16.0, ge=1, le=512)
+    gpus_per_worker: int = Field(default=0, ge=0, le=8)
+    default_job_num_workers: int = Field(default=1, ge=1, le=32)
+    accelerator_label_id: str | None = None
+    resource_profile_id: str | None = None
+    resource_group_id: str | None = None
+
+
+class PlatformRuntimeInfo(BaseModel):
+    ray_runtime: str
+    cdsw_available: bool
+    detected_ray_head: str | None = None
+
+
+class PlatformSettingsRead(BaseModel):
+    ray: RaySettings
+    cdsw_workers: CdswWorkerSettings
+    runtime: PlatformRuntimeInfo
+
+
+class PlatformSettingsUpdate(BaseModel):
+    ray: RaySettings | None = None
+    cdsw_workers: CdswWorkerSettings | None = None

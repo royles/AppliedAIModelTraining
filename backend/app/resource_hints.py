@@ -50,10 +50,14 @@ def is_low_memory_container() -> bool:
     return limit is not None and limit < LOW_MEMORY_CONTAINER_GB
 
 
-def effective_ray_train_workers(requested: int) -> int:
+def effective_ray_train_workers(
+    requested: int, persisted_cap: int | None = None
+) -> int:
     """Cap Ray Train worker count on small session pods to reduce OOM kills."""
     requested = max(1, requested)
-    cap = int(os.environ.get("RAY_TRAIN_NUM_WORKERS", "0"))
+    cap = persisted_cap if persisted_cap is not None else 0
+    if cap <= 0:
+        cap = int(os.environ.get("RAY_TRAIN_NUM_WORKERS", "0") or 0)
     if cap > 0:
         return min(requested, cap)
     if is_low_memory_container():

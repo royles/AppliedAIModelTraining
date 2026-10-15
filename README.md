@@ -44,17 +44,19 @@ Locally, workers are simulated and Ray runs in-process on CPU.
 ## Development
 
 ```bash
-python3 scripts/install.py   # once — installs into **system Python** (no .venv)
-python3 scripts/start.py       # starts API + UI; on CAI keeps UI in foreground
+python3 scripts/install.py   # installs into **system Python** (no .venv)
+python3 scripts/start.py     # auto-installs missing deps, then starts API + UX
 ```
 
-All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python. Run `install.py` with the same interpreter you use for `start.py`.
+All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python (`PLATFORM_PYTHON` to override). `start.py` runs `pip install -r backend/requirements.txt` automatically when `uvicorn` / FastAPI are missing (set `PLATFORM_SKIP_DEP_CHECK=1` to skip).
 
 - API (direct, session only): http://127.0.0.1:8000/docs and http://127.0.0.1:8000/api/…
 - **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (served in-process by `ui_gateway`, same routes as port 8000)
 - **UX** binds **`CDSW_APP_PORT`**; **API** binds **`PLATFORM_API_PORT`** (default `8000`) on `127.0.0.1` only
 
 Create an experiment and start a training job from the UI, or via `POST /api/jobs`.
+
+Ray and CDSW worker defaults are editable in the UI and persisted in SQLite (`GET`/`PUT` `/api/platform/settings`).
 
 Scale GPU workers on a running job (CML/CDSW only):
 
@@ -138,3 +140,4 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `PLATFORM_CAI_LOW_MEMORY` | `1` = cap Ray Train workers and batch size on tiny sessions |
 | `RAY_TRAIN_NUM_WORKERS` | Max Ray Train workers per job (overrides auto cap when &gt; 0) |
 | `PLATFORM_PYTHON` | Override interpreter for start/install (default: current `python3`) |
+| `PLATFORM_SKIP_DEP_CHECK` | Set `1` to skip automatic `pip install` in `start.py` |
