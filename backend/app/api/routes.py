@@ -26,6 +26,7 @@ from app.services import cdsw_workers
 from app.services.job_delete import delete_training_job
 from app.services.job_log import build_job_logs
 from app.services.job_runner import enqueue_training_job, scale_job_workers
+from app.services.model_registry import get_trained_model_for_job, openai_model_ids_for_jobs
 from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.transformer_config import (
@@ -34,6 +35,24 @@ from app.training.transformer_config import (
 )
 
 router = APIRouter()
+
+
+def _job_to_read(db: Session, job: TrainingJob) -> TrainingJobRead:
+    base = TrainingJobRead.model_validate(job)
+    record = get_trained_model_for_job(db, job.id)
+    if record:
+        return base.model_copy(update={"openai_model_id": record.openai_model_id})
+    return base
+
+
+def _jobs_to_read(db: Session, jobs: list[TrainingJob]) -> list[TrainingJobRead]:
+    model_ids = openai_model_ids_for_jobs(db, [j.id for j in jobs])
+    out: list[TrainingJobRead] = []
+    for job in jobs:
+        base = TrainingJobRead.model_validate(job)
+        mid = model_ids.get(job.id)
+        out.append(base.model_copy(update={"openai_model_id": mid}) if mid else base)
+    return out
 
 
 def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -137,16 +156,17 @@ def create_experiment(payload: ExperimentCreate, db: Session = Depends(get_db)) 
 
 
 @router.get("/jobs", response_model=list[TrainingJobRead])
-def list_jobs(db: Session = Depends(get_db)) -> list[TrainingJob]:
-    return list(db.scalars(select(TrainingJob).order_by(TrainingJob.created_at.desc())))
+def list_jobs(db: Session = Depends(get_db)) -> list[TrainingJobRead]:
+    jobs = list(db.scalars(select(TrainingJob).order_by(TrainingJob.created_at.desc())))
+    return _jobs_to_read(db, jobs)
 
 
 @router.get("/jobs/{job_id}", response_model=TrainingJobRead)
-def get_job(job_id: int, db: Session = Depends(get_db)) -> TrainingJob:
+def get_job(job_id: int, db: Session = Depends(get_db)) -> TrainingJobRead:
     job = db.get(TrainingJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return _job_to_read(db, job)
 
 
 @router.post("/jobs", response_model=TrainingJobRead)
@@ -173,7 +193,7 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
     db.commit()
     db.refresh(job)
     enqueue_training_job(job.id)
-    return job
+    return _job_to_read(db, job)
 
 
 @router.post("/jobs/{job_id}/scale", response_model=WorkerGroupRead)

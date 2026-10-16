@@ -59,6 +59,7 @@ class TrainingJobRead(BaseModel):
     ray_address: str | None
     metrics_json: str | None
     error_message: str | None
+    openai_model_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

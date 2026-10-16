@@ -1,5 +1,6 @@
 import type { TrainingJob } from "./api";
 import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
+import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 
 type Props = {
@@ -42,6 +43,7 @@ export function TaskCardGrid({ jobs, onSelect, onDelete }: Props) {
               <li><span>Ray</span><span><code>{job.ray_address ?? "—"}</code></span></li>
             </ul>
             <span className="task-card-cta">View logs →</span>
+            <ModelInferenceLinks job={job} compact />
           </button>
           <button
             type="button"

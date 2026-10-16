@@ -71,3 +71,18 @@ def list_models(db: Session) -> list[TrainedModel]:
     return list(
         db.scalars(select(TrainedModel).order_by(TrainedModel.created_at_unix.desc()))
     )
+
+
+def get_trained_model_for_job(db: Session, job_id: int) -> TrainedModel | None:
+    return db.scalar(select(TrainedModel).where(TrainedModel.job_id == job_id))
+
+
+def openai_model_ids_for_jobs(db: Session, job_ids: list[int]) -> dict[int, str]:
+    if not job_ids:
+        return {}
+    rows = db.execute(
+        select(TrainedModel.job_id, TrainedModel.openai_model_id).where(
+            TrainedModel.job_id.in_(job_ids)
+        )
+    )
+    return {int(job_id): model_id for job_id, model_id in rows.all()}

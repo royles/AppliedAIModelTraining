@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
 import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
+import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 
 type Props = {
@@ -71,6 +72,8 @@ export function TaskDetailView({ job, onBack, onDelete }: Props) {
           <li><span>Ray</span><span><code>{job.ray_address ?? "local"}</code></span></li>
         </ul>
       </article>
+
+      <ModelInferenceLinks job={job} />
 
       {error && <div className="banner error">{error}</div>}
 

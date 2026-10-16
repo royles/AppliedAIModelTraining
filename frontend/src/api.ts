@@ -51,6 +51,7 @@ export type TrainingJob = {
   ray_address: string | null;
   metrics_json: string | null;
   error_message: string | null;
+  openai_model_id: string | null;
   created_at: string;
   updated_at: string;
 };
