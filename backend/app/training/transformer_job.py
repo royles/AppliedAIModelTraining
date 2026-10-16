@@ -7,11 +7,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-import ray
-from ray.train import ScalingConfig
-from ray.train.torch import TorchTrainer
-
-
 def _build_scheduler(optimizer, config: dict[str, Any]):
     import torch
     from torch.optim.lr_scheduler import LambdaLR
@@ -101,6 +96,7 @@ def _sample_texts(task_type: str) -> list[str]:
 
 
 def _train_loop(config: dict[str, Any]) -> None:
+    import ray
     import torch
     from torch.utils.data import DataLoader, TensorDataset
     from app.training.model_builder import build_model_and_tokenizer
@@ -236,6 +232,10 @@ def run_transformer_training(
     use_gpu: bool,
     train_config: dict[str, Any],
 ) -> dict[str, Any]:
+    import ray
+    from ray.train import ScalingConfig
+    from ray.train.torch import TorchTrainer
+
     if ray_address:
         if not ray.is_initialized():
             ray.init(address=ray_address, ignore_reinit_error=True)

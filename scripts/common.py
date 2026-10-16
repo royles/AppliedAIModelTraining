@@ -293,6 +293,7 @@ def install_minimal_runtime() -> None:
         [
             "uvicorn[standard]>=0.32.0",
             "fastapi>=0.115.0",
+            "numpy>=2.0.0,<3",
             "sqlalchemy>=2.0.36",
             "pydantic>=2.9.0",
             "pydantic-settings>=2.6.0",

@@ -23,7 +23,6 @@ from app.services.platform_settings import (
 )
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.transformer_config import TransformerTrainingConfig
-from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +84,8 @@ def run_training_job(job_id: int) -> None:
             worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
             worker_group.status = "running"
             db.commit()
+
+        from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
         ray_addr = resolve_ray_address(head)
         if head and ray_addr is None:
