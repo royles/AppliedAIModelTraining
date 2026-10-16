@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -46,8 +46,19 @@ def mount_gateway_spa(app: FastAPI) -> bool:
 
     index_path = dist / "index.html"
 
+    def _spa_index_response() -> FileResponse:
+        return FileResponse(index_path)
+
     @app.get("/", include_in_schema=False)
     async def spa_index() -> FileResponse:
-        return FileResponse(index_path)
+        return _spa_index_response()
+
+    @app.get("/{spa_path:path}", include_in_schema=False)
+    async def spa_fallback(spa_path: str) -> FileResponse:
+        blocked_prefixes = ("api/", "v1/", "assets/")
+        blocked_exact = {"api", "v1", "assets", "docs", "redoc", "openapi.json"}
+        if spa_path in blocked_exact or any(spa_path.startswith(p) for p in blocked_prefixes):
+            raise HTTPException(status_code=404, detail="Not found")
+        return _spa_index_response()
 
     return True

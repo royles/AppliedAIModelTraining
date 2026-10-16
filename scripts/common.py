@@ -31,6 +31,50 @@ def frontend_dist_ready() -> bool:
     return FRONTEND_DIST.is_dir() and (FRONTEND_DIST / "index.html").is_file()
 
 
+def frontend_dist_stale() -> bool:
+    """True when source or tooling changed since the last production build."""
+    if not frontend_dist_ready():
+        return True
+    dist_mtime = (FRONTEND_DIST / "index.html").stat().st_mtime
+    frontend_dir = REPO_ROOT / "frontend"
+    watch_roots = (
+        frontend_dir / "src",
+        frontend_dir / "index.html",
+        frontend_dir / "package.json",
+        frontend_dir / "package-lock.json",
+        frontend_dir / "vite.config.ts",
+        frontend_dir / "tsconfig.json",
+    )
+    for root in watch_roots:
+        if not root.exists():
+            continue
+        if root.is_file():
+            if root.stat().st_mtime > dist_mtime:
+                return True
+            continue
+        for path in root.rglob("*"):
+            if path.is_file() and path.stat().st_mtime > dist_mtime:
+                return True
+    return False
+
+
+def read_ui_build_label() -> str | None:
+    stamp = FRONTEND_DIST / ".ui-build-stamp"
+    if stamp.is_file():
+        return stamp.read_text(encoding="utf-8").strip() or None
+    return None
+
+
+def write_ui_build_stamp() -> None:
+    if not frontend_dist_ready():
+        return
+    stamp = FRONTEND_DIST / ".ui-build-stamp"
+    stamp.write_text(
+        f"built_at={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n",
+        encoding="utf-8",
+    )
+
+
 def cai_session_ip() -> str | None:
     return os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
 

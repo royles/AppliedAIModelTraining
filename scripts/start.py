@@ -27,6 +27,8 @@ from common import (
     ensure_api_running,
     ensure_runtime_ready,
     frontend_dist_ready,
+    frontend_dist_stale,
+    read_ui_build_label,
     is_cai_session,
     log_file,
     print_cai_memory_hints,
@@ -39,7 +41,7 @@ from common import (
     venv_python,
     wait_for_urls,
 )
-from install import main as install_main
+from install import build_frontend, main as install_main
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,6 +51,11 @@ def parse_args() -> argparse.Namespace:
         "--dev-ui",
         action="store_true",
         help="Vite dev server on UX port (npm) + API on PLATFORM_API_PORT",
+    )
+    parser.add_argument(
+        "--rebuild-ui",
+        action="store_true",
+        help="Run npm run build into frontend/dist (also with --install)",
     )
     return parser.parse_args()
 
@@ -72,7 +79,15 @@ def main() -> int:
     if code != 0:
         return code
 
+    if args.rebuild_ui:
+        if build_frontend(force=True) is False:
+            return 1
+
     if args.install:
+        if args.rebuild_ui:
+            import os as _os
+
+            _os.environ["PLATFORM_UI_REBUILD"] = "1"
         code = install_main()
         if code != 0:
             return code
@@ -100,6 +115,17 @@ def main() -> int:
     if not frontend_dist_ready():
         print("frontend/dist is missing. Run: python3 scripts/install.py", file=sys.stderr)
         return 1
+
+    if not args.dev_ui and frontend_dist_stale():
+        print(
+            "WARNING: frontend/dist is older than frontend/src — you may be serving a stale UX.\n"
+            "  Fix: python3 scripts/build_ui.py   or   python3 scripts/start.py --rebuild-ui",
+            file=sys.stderr,
+        )
+    elif not args.dev_ui:
+        label = read_ui_build_label()
+        if label:
+            print(f"Production UI bundle: {label}")
 
     print(
         f"=== API {BIND_HOST}:{backend_port} + UX {BIND_HOST}:{ux_port} "
