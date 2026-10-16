@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
-  type Experiment,
+  type Project,
+  type TransformerArchitecture,
   type TransformerPreset,
   type TrainingDatasetConfig,
   type TokenizerBuildConfig,
@@ -11,6 +12,19 @@ import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { TaskCardGrid } from "./TaskCardGrid";
 import { TaskDetailView } from "./TaskDetailView";
+import {
+  DEFAULT_DATASET,
+  DEFAULT_HEADS,
+  DEFAULT_HIDDEN_SIZE,
+  DEFAULT_JOB_NAME,
+  DEFAULT_LAYERS,
+  DEFAULT_MAX_STEPS,
+  DEFAULT_OPENAI_MODEL_ID,
+  DEFAULT_PRESET,
+  DEFAULT_PROJECT_NAME,
+  DEFAULT_TOKENIZER,
+  DEFAULT_VOCAB_SIZE,
+} from "./modelTaskDefaults";
 
 type NavView = "tasks" | "framework" | "model-tasks";
 
@@ -20,31 +34,28 @@ export default function App() {
 
   const [jobWorkers, setJobWorkers] = useState(1);
   const [jobGpus, setJobGpus] = useState(0);
-  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [jobs, setJobs] = useState<TrainingJob[]>([]);
   const [presets, setPresets] = useState<TransformerPreset[]>([]);
-  const [preset, setPreset] = useState("scratch_gpt2_tiny");
+  const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [paramEstimate, setParamEstimate] = useState<number | null>(null);
-  const [expName, setExpName] = useState("Scratch transformer");
-  const [jobName, setJobName] = useState("From-scratch GPT-2");
-  const [openaiModelId, setOpenaiModelId] = useState("my-scratch-chat");
+  const [projectName, setProjectName] = useState(DEFAULT_PROJECT_NAME);
+  const [jobName, setJobName] = useState(DEFAULT_JOB_NAME);
+  const [openaiModelId, setOpenaiModelId] = useState(DEFAULT_OPENAI_MODEL_ID);
   const [selectedExp, setSelectedExp] = useState<number | null>(null);
   const [initMode, setInitMode] = useState<"from_scratch" | "pretrained">("from_scratch");
-  const [tokenizer, setTokenizer] = useState<TokenizerBuildConfig>({
-    mode: "train_bpe_from_dataset",
-    vocab_size: 8192,
-    min_frequency: 2,
-  });
-  const [vocabSize, setVocabSize] = useState(8192);
-  const [hiddenSize, setHiddenSize] = useState(256);
-  const [layers, setLayers] = useState(4);
-  const [heads, setHeads] = useState(4);
-  const [maxSteps, setMaxSteps] = useState(40);
-  const [dataset, setDataset] = useState<TrainingDatasetConfig>({
-    source: "builtin",
-    builtin_name: "platform_demo",
-    repeat: 40,
-  });
+  const [tokenizer, setTokenizer] = useState<TokenizerBuildConfig>(DEFAULT_TOKENIZER);
+  const [vocabSize, setVocabSize] = useState(DEFAULT_VOCAB_SIZE);
+  const [hiddenSize, setHiddenSize] = useState(DEFAULT_HIDDEN_SIZE);
+  const [layers, setLayers] = useState(DEFAULT_LAYERS);
+  const [heads, setHeads] = useState(DEFAULT_HEADS);
+  const [maxPosition, setMaxPosition] = useState(512);
+  const [archFamily, setArchFamily] = useState<TransformerArchitecture["family"]>("gpt2");
+  const [taskType, setTaskType] = useState<"causal_lm" | "sequence_classification">("causal_lm");
+  const [intermediateSize, setIntermediateSize] = useState(DEFAULT_HIDDEN_SIZE * 4);
+  const [tieWordEmbeddings, setTieWordEmbeddings] = useState(true);
+  const [maxSteps, setMaxSteps] = useState(DEFAULT_MAX_STEPS);
+  const [dataset, setDataset] = useState<TrainingDatasetConfig>(DEFAULT_DATASET);
   const [error, setError] = useState<string | null>(null);
 
   const selectedPreset = presets.find((p) => p.name === preset);
@@ -56,11 +67,11 @@ export default function App() {
   const refresh = useCallback(async () => {
     try {
       const [exps, j, pr] = await Promise.all([
-        api.listExperiments(),
+        api.listProjects(),
         api.listJobs(),
         api.listPresets(),
       ]);
-      setExperiments(exps);
+      setProjects(exps);
       setJobs(j);
       setPresets(pr);
       if (selectedExp === null && exps.length > 0) {
@@ -86,35 +97,70 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
-    const arch = selectedPreset?.config.architecture;
-    if (!arch) return;
+    const p = presets.find((x) => x.name === preset);
+    if (!p) return;
+    const arch = p.config.architecture;
+    const c = p.config;
     setHiddenSize(arch.hidden_size);
     setLayers(arch.num_hidden_layers);
     setHeads(arch.num_attention_heads);
-    if (selectedPreset.config.dataset) {
-      setDataset(selectedPreset.config.dataset);
+    setMaxPosition(arch.max_position_embeddings);
+    setArchFamily(arch.family);
+    setTaskType(c.task_type);
+    setIntermediateSize(arch.intermediate_size ?? arch.hidden_size * 4);
+    setTieWordEmbeddings(arch.tie_word_embeddings);
+    if (c.max_steps) setMaxSteps(c.max_steps);
+    if (c.dataset) setDataset(c.dataset);
+    if (c.tokenizer) {
+      setTokenizer(c.tokenizer);
+      if (c.tokenizer.vocab_size) setVocabSize(c.tokenizer.vocab_size);
     }
-    if (selectedPreset.config.tokenizer) {
-      setTokenizer(selectedPreset.config.tokenizer);
-      if (selectedPreset.config.tokenizer.vocab_size) {
-        setVocabSize(selectedPreset.config.tokenizer.vocab_size);
-      }
+    setInitMode(c.init_mode ?? "from_scratch");
+  }, [preset, presets]);
+
+  useEffect(() => {
+    if (initMode !== "from_scratch") {
+      setParamEstimate(null);
+      return;
     }
-    setInitMode(selectedPreset.config.init_mode ?? "from_scratch");
     api
       .estimateArchitecture({
-        ...arch,
+        family: archFamily,
+        vocab_size: vocabSize,
         hidden_size: hiddenSize,
         num_hidden_layers: layers,
         num_attention_heads: heads,
+        intermediate_size: intermediateSize,
+        max_position_embeddings: maxPosition,
+        tie_word_embeddings: tieWordEmbeddings,
       })
       .then((r) => setParamEstimate(r.estimated_parameters))
       .catch(() => setParamEstimate(null));
-  }, [selectedPreset, hiddenSize, layers, heads]);
+  }, [
+    initMode,
+    archFamily,
+    vocabSize,
+    hiddenSize,
+    layers,
+    heads,
+    maxPosition,
+    intermediateSize,
+    tieWordEmbeddings,
+  ]);
 
-  async function onCreateExperiment() {
-    await api.createExperiment({ name: expName });
-    setExpName("");
+  function handleHiddenSizeChange(n: number) {
+    setHiddenSize(n);
+    setIntermediateSize(n * 4);
+  }
+
+  function handleVocabSizeChange(n: number) {
+    setVocabSize(n);
+    setTokenizer((t) => ({ ...t, vocab_size: n }));
+  }
+
+  async function onCreateProject() {
+    await api.createProject({ name: projectName });
+    setProjectName("");
     await refresh();
   }
 
@@ -130,18 +176,19 @@ export default function App() {
       max_steps: maxSteps,
       transformer: {
         init_mode: initMode,
-        task_type: "causal_lm",
+        task_type: taskType,
         tokenizer,
         architecture: {
-          family: "gpt2",
+          family: archFamily,
           vocab_size: vocabSize,
           hidden_size: hiddenSize,
           num_hidden_layers: layers,
           num_attention_heads: heads,
-          max_position_embeddings: 512,
-          tie_word_embeddings: true,
+          intermediate_size: intermediateSize,
+          max_position_embeddings: maxPosition,
+          tie_word_embeddings: tieWordEmbeddings,
         },
-        max_seq_length: 256,
+        max_seq_length: Math.min(256, maxPosition),
         per_device_train_batch_size: 2,
         max_steps: maxSteps,
         learning_rate: 6e-4,
@@ -265,16 +312,16 @@ export default function App() {
             heads={heads}
             maxSteps={maxSteps}
             paramEstimate={paramEstimate}
-            onHiddenSizeChange={setHiddenSize}
+            onHiddenSizeChange={handleHiddenSizeChange}
             onLayersChange={setLayers}
             onHeadsChange={setHeads}
             onMaxStepsChange={setMaxSteps}
-            experiments={experiments}
-            selectedExp={selectedExp}
-            onSelectedExpChange={setSelectedExp}
-            expName={expName}
-            onExpNameChange={setExpName}
-            onCreateExperiment={onCreateExperiment}
+            projects={projects}
+            selectedProjectId={selectedExp}
+            onSelectedProjectIdChange={setSelectedExp}
+            projectName={projectName}
+            onProjectNameChange={setProjectName}
+            onCreateProject={onCreateProject}
             jobName={jobName}
             onJobNameChange={setJobName}
             openaiModelId={openaiModelId}
@@ -291,7 +338,15 @@ export default function App() {
             tokenizer={tokenizer}
             onTokenizerChange={setTokenizer}
             vocabSize={vocabSize}
-            onVocabSizeChange={setVocabSize}
+            onVocabSizeChange={handleVocabSizeChange}
+            maxPosition={maxPosition}
+            onMaxPositionChange={setMaxPosition}
+            archFamily={archFamily}
+            taskType={taskType}
+            intermediateSize={intermediateSize}
+            tieWordEmbeddings={tieWordEmbeddings}
+            baseModel={selectedPreset?.config.base_model}
+            useLora={selectedPreset?.config.use_lora ?? false}
           />
         )}
       </main>

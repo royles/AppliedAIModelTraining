@@ -1,7 +1,6 @@
-import type { Experiment, TrainingDatasetConfig, TransformerPreset } from "./api";
+import type { Project, TrainingDatasetConfig, TransformerPreset, TokenizerBuildConfig } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
-import type { TokenizerBuildConfig } from "./api";
 import { TrainingRecipeChecklist } from "./TrainingRecipeChecklist";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 import { useState } from "react";
@@ -20,12 +19,12 @@ type Props = {
   onLayersChange: (n: number) => void;
   onHeadsChange: (n: number) => void;
   onMaxStepsChange: (n: number) => void;
-  experiments: Experiment[];
-  selectedExp: number | null;
-  onSelectedExpChange: (id: number) => void;
-  expName: string;
-  onExpNameChange: (v: string) => void;
-  onCreateExperiment: () => void;
+  projects: Project[];
+  selectedProjectId: number | null;
+  onSelectedProjectIdChange: (id: number) => void;
+  projectName: string;
+  onProjectNameChange: (v: string) => void;
+  onCreateProject: () => void;
   jobName: string;
   onJobNameChange: (v: string) => void;
   openaiModelId: string;
@@ -43,6 +42,14 @@ type Props = {
   onTokenizerChange: (t: TokenizerBuildConfig) => void;
   vocabSize: number;
   onVocabSizeChange: (n: number) => void;
+  maxPosition: number;
+  onMaxPositionChange: (n: number) => void;
+  archFamily: "gpt2" | "bert";
+  taskType: "causal_lm" | "sequence_classification";
+  intermediateSize: number;
+  tieWordEmbeddings: boolean;
+  baseModel?: string | null;
+  useLora?: boolean;
 };
 
 export function ModelTasksPanel(props: Props) {
@@ -60,12 +67,12 @@ export function ModelTasksPanel(props: Props) {
     onLayersChange,
     onHeadsChange,
     onMaxStepsChange,
-    experiments,
-    selectedExp,
-    onSelectedExpChange,
-    expName,
-    onExpNameChange,
-    onCreateExperiment,
+    projects,
+    selectedProjectId,
+    onSelectedProjectIdChange,
+    projectName,
+    onProjectNameChange,
+    onCreateProject,
     jobName,
     onJobNameChange,
     openaiModelId,
@@ -83,6 +90,14 @@ export function ModelTasksPanel(props: Props) {
     onTokenizerChange,
     vocabSize,
     onVocabSizeChange,
+    maxPosition,
+    onMaxPositionChange,
+    archFamily,
+    taskType,
+    intermediateSize,
+    tieWordEmbeddings,
+    baseModel,
+    useLora,
   } = props;
 
   const [recipeReady, setRecipeReady] = useState(false);
@@ -107,7 +122,7 @@ export function ModelTasksPanel(props: Props) {
         jobWorkers={jobWorkers}
         jobGpus={jobGpus}
         dataset={dataset}
-        selectedExp={selectedExp}
+        selectedExp={selectedProjectId}
         jobName={jobName}
         openaiModelId={openaiModelId}
         paramEstimate={paramEstimate}
@@ -115,15 +130,17 @@ export function ModelTasksPanel(props: Props) {
       />
 
       <article className="card">
-        <h3>Experiment</h3>
+        <p className="recipe-step-label">Recipe step: Project</p>
+        <h3>Project</h3>
         <label>
-          New experiment name
-          <input value={expName} onChange={(e) => onExpNameChange(e.target.value)} />
+          New project name
+          <input value={projectName} onChange={(e) => onProjectNameChange(e.target.value)} />
         </label>
-        <button type="button" onClick={onCreateExperiment}>Create experiment</button>
+        <button type="button" onClick={onCreateProject}>Create project</button>
       </article>
 
       <article className="card">
+        <p className="recipe-step-label">Recipe step: Ray / CDSW compute</p>
         <h3>Per-run worker settings</h3>
         <div className="arch-grid">
           <label>
@@ -149,6 +166,9 @@ export function ModelTasksPanel(props: Props) {
         </div>
       </article>
 
+      <div className="recipe-step-label-wrap">
+        <p className="recipe-step-label">Recipe steps: Training mode · Tokenizer</p>
+      </div>
       <FromScratchConfigFields
         initMode={initMode}
         onInitModeChange={onInitModeChange}
@@ -161,10 +181,19 @@ export function ModelTasksPanel(props: Props) {
         layers={layers}
       />
 
+      <div className="recipe-step-label-wrap">
+        <p className="recipe-step-label">Recipe step: Training dataset</p>
+      </div>
       <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
 
       <article className="card">
-        <h3>Transformer architecture (from scratch)</h3>
+        <p className="recipe-step-label">
+          Recipe steps: Transformer geometry · Optimization · Task metadata
+        </p>
+        <h3>
+          Transformer architecture
+          {initMode === "from_scratch" ? " (from scratch)" : " (fine-tune)"}
+        </h3>
         <label>
           Preset
           <select value={preset} onChange={(e) => onPresetChange(e.target.value)}>
@@ -174,11 +203,19 @@ export function ModelTasksPanel(props: Props) {
           </select>
         </label>
         <TransformerArchitectureDiagram
+          presetTitle={selectedPreset?.title}
+          family={archFamily}
+          initMode={initMode}
+          taskType={taskType}
+          baseModel={baseModel}
+          useLora={useLora}
           hiddenSize={hiddenSize}
           layers={layers}
           heads={heads}
           vocabSize={vocabSize}
-          maxPosition={selectedPreset?.config.architecture.max_position_embeddings ?? 512}
+          maxPosition={maxPosition}
+          intermediateSize={intermediateSize}
+          tieWordEmbeddings={tieWordEmbeddings}
           paramEstimate={paramEstimate}
           onHiddenSizeChange={onHiddenSizeChange}
           onLayersChange={onLayersChange}
@@ -217,15 +254,24 @@ export function ModelTasksPanel(props: Props) {
               onChange={(e) => onMaxStepsChange(Number(e.target.value))}
             />
           </label>
+          <label>
+            Max positions
+            <input
+              type="number"
+              min={128}
+              value={maxPosition}
+              onChange={(e) => onMaxPositionChange(Number(e.target.value))}
+            />
+          </label>
         </div>
         <label>
-          Experiment
+          Project
           <select
-            value={selectedExp ?? ""}
-            onChange={(e) => onSelectedExpChange(Number(e.target.value))}
+            value={selectedProjectId ?? ""}
+            onChange={(e) => onSelectedProjectIdChange(Number(e.target.value))}
           >
-            {experiments.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
@@ -241,7 +287,7 @@ export function ModelTasksPanel(props: Props) {
           Start model task
         </button>
         {!recipeReady && (
-          <p className="hint">Complete all recipe steps above before starting.</p>
+          <p className="hint">Complete all recipe steps before starting.</p>
         )}
       </article>
     </div>

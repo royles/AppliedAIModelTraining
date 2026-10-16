@@ -202,6 +202,19 @@ body {
   font-size: 0.8rem;
 }
 
+.recipe-step-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.recipe-step-label-wrap {
+  margin-top: 0.5rem;
+}
+
 .recipe-checklist {
   border-color: #3b82f6;
 }
@@ -563,6 +576,37 @@ body {
 .transformer-diagram .diagram-stack-badge text {
   fill: #6b7c96;
   font-size: 9px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-arch-badge {
+  fill: #9eb8e8;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-layer-ghost rect {
+  fill: none;
+  stroke: #3d5278;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}
+
+.transformer-diagram .diagram-node-checkpoint rect {
+  stroke: #6b9fff;
+  fill: #121a2b;
+}
+
+.transformer-diagram .diagram-mono {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+
+.transformer-diagram .diagram-lora-badge {
+  fill: #c4a35a;
+  font-size: 10px;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
 }
 

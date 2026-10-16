@@ -1,9 +1,13 @@
-export type Experiment = {
+/** Training project (groups model tasks). API table name remains `experiments`. */
+export type Project = {
   id: number;
   name: string;
   description: string | null;
   created_at: string;
 };
+
+/** @deprecated Use Project */
+export type Experiment = Project;
 
 export type TransformerArchitecture = {
   family: "gpt2" | "bert";
@@ -51,6 +55,7 @@ export type TransformerConfig = {
   openai_model_id?: string | null;
   dataset?: TrainingDatasetConfig;
   tokenizer?: TokenizerBuildConfig;
+  use_lora?: boolean;
 };
 
 export type TransformerPreset = {
@@ -189,9 +194,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify(architecture),
     }),
-  listExperiments: () => request<Experiment[]>("/api/experiments"),
+  listProjects: () => request<Project[]>("/api/projects"),
+  createProject: (body: { name: string; description?: string }) =>
+    request<Project>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  /** @deprecated Use listProjects */
+  listExperiments: () => request<Project[]>("/api/experiments"),
+  /** @deprecated Use createProject */
   createExperiment: (body: { name: string; description?: string }) =>
-    request<Experiment>("/api/experiments", {
+    request<Project>("/api/experiments", {
       method: "POST",
       body: JSON.stringify(body),
     }),
