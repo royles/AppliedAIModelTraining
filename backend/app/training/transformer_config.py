@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.training.architecture import InitMode, TransformerArchitectureConfig  # noqa: TC001
 from app.training.dataset_config import TrainingDatasetConfig
+from app.training.tokenizer_config import TokenizerBuildConfig
 
 
 TaskType = Literal["causal_lm", "sequence_classification"]
@@ -119,6 +120,10 @@ class TransformerTrainingConfig(BaseModel):
         default_factory=TrainingDatasetConfig,
         description="Training corpus (builtin, inline, files under data/datasets, or Hugging Face).",
     )
+    tokenizer: TokenizerBuildConfig = Field(
+        default_factory=TokenizerBuildConfig,
+        description="Tokenizer pipeline (train BPE on dataset vs pretrained GPT-2 vocab).",
+    )
 
     @field_validator("bf16")
     @classmethod
@@ -133,6 +138,9 @@ class TransformerTrainingConfig(BaseModel):
             raise ValueError("base_model is required when init_mode=pretrained.")
         if self.init_mode == "from_scratch" and self.use_lora:
             raise ValueError("use_lora requires init_mode=pretrained.")
+        if self.init_mode == "from_scratch" and self.tokenizer.mode == "train_bpe_from_dataset":
+            if self.architecture.vocab_size != self.tokenizer.vocab_size:
+                object.__setattr__(self.architecture, "vocab_size", self.tokenizer.vocab_size)
         if self.init_mode == "from_scratch":
             if self.task_type == "causal_lm" and self.architecture.family != "gpt2":
                 raise ValueError("from_scratch causal_lm requires architecture.family=gpt2.")
@@ -224,9 +232,13 @@ TRANSFORMER_PRESETS: dict[str, TransformerPreset] = {
         config=TransformerTrainingConfig(
             init_mode="from_scratch",
             task_type="causal_lm",
+            tokenizer=TokenizerBuildConfig(
+                mode="train_bpe_from_dataset",
+                vocab_size=8192,
+            ),
             architecture=TransformerArchitectureConfig(
                 family="gpt2",
-                vocab_size=50257,
+                vocab_size=8192,
                 hidden_size=256,
                 num_hidden_layers=4,
                 num_attention_heads=4,

@@ -30,7 +30,8 @@ from app.services.model_registry import get_trained_model_for_job, openai_model_
 from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.dataset_config import TrainingDatasetConfig
-from app.training.dataset_loader import BUILTIN_DATASET_CATALOG, list_dataset_files
+from app.training.dataset_loader import BUILTIN_DATASET_CATALOG, list_dataset_files, load_training_samples
+from app.training.from_scratch import from_scratch_resource_guidance
 from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
@@ -120,6 +121,28 @@ def write_platform_settings(
     payload: PlatformSettingsUpdate, db: Session = Depends(get_db)
 ) -> PlatformSettingsRead:
     return update_platform_settings(db, payload)
+
+
+@router.post("/training/from-scratch/guidance")
+def from_scratch_guidance(payload: TransformerTrainingConfig) -> dict:
+    return from_scratch_resource_guidance(payload)
+
+
+@router.post("/training/dataset/preview")
+def dataset_preview(
+    dataset: TrainingDatasetConfig,
+    task_type: str = "causal_lm",
+) -> dict[str, int | str]:
+    try:
+        texts, _ = load_training_samples(dataset.model_dump(), task_type=task_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    total_chars = sum(len(t) for t in texts)
+    return {
+        "examples": len(texts),
+        "total_characters": total_chars,
+        "source": dataset.source,
+    }
 
 
 @router.get("/training/datasets/builtin")

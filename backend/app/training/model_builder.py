@@ -33,8 +33,15 @@ def build_tokenizer(config: dict[str, Any]) -> PreTrainedTokenizerBase:
     init_mode = config.get("init_mode", "pretrained")
     arch = _architecture_from_config(config)
 
+    tokenizer_path = config.get("tokenizer_path")
+    if tokenizer_path:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        return tokenizer
+
     if init_mode == "from_scratch":
-        # Byte-level BPE compatible with GPT-2; resize embeddings to declared vocab if needed.
+        # Fallback when driver did not train BPE (pretrained_gpt2 tokenizer mode).
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token

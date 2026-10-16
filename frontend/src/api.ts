@@ -16,6 +16,13 @@ export type TransformerArchitecture = {
   tie_word_embeddings: boolean;
 };
 
+export type TokenizerBuildConfig = {
+  mode: "train_bpe_from_dataset" | "pretrained_gpt2" | "saved_artifact";
+  vocab_size?: number;
+  min_frequency?: number;
+  min_corpus_chars?: number | null;
+};
+
 export type TrainingDatasetConfig = {
   source: "builtin" | "inline" | "text_file" | "jsonl_file" | "huggingface";
   builtin_name?: string;
@@ -43,6 +50,7 @@ export type TransformerConfig = {
   max_steps: number;
   openai_model_id?: string | null;
   dataset?: TrainingDatasetConfig;
+  tokenizer?: TokenizerBuildConfig;
 };
 
 export type TransformerPreset = {
@@ -166,6 +174,16 @@ export const api = {
     request<{ path: string; kind: string; size_bytes: string }[]>("/api/training/datasets/files"),
   listBuiltinDatasets: () =>
     request<Record<string, { title: string; description: string }>>("/api/training/datasets/builtin"),
+  fromScratchGuidance: (body: Partial<TransformerConfig> & { init_mode: string; task_type: string }) =>
+    request<Record<string, unknown>>("/api/training/from-scratch/guidance", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  datasetPreview: (dataset: TrainingDatasetConfig) =>
+    request<{ examples: number; total_characters: number; source: string }>(
+      "/api/training/dataset/preview",
+      { method: "POST", body: JSON.stringify(dataset) },
+    ),
   estimateArchitecture: (architecture: TransformerArchitecture) =>
     request<{ estimated_parameters: number }>("/api/transformer/architecture/estimate", {
       method: "POST",

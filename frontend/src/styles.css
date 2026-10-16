@@ -202,6 +202,116 @@ body {
   font-size: 0.8rem;
 }
 
+.recipe-checklist {
+  border-color: #3b82f6;
+}
+
+.recipe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.recipe-header h3 {
+  margin: 0;
+}
+
+.recipe-progress {
+  font-size: 0.85rem;
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.recipe-steps {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.recipe-step {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #243049;
+  background: #0b1220;
+}
+
+.recipe-step.done {
+  border-color: #14532d;
+  background: #0a1510;
+}
+
+.recipe-step.blocked:not(.done) {
+  opacity: 0.72;
+}
+
+.recipe-tick {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #243049;
+  color: #9fb0c9;
+}
+
+.recipe-step.done .recipe-tick {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+.recipe-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-step-body strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.recipe-req {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b8c5da;
+}
+
+.recipe-vol {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+}
+
+.recipe-dep,
+.recipe-warn {
+  margin: 0.25rem 0 0;
+  color: #fbbf24;
+  font-size: 0.78rem;
+}
+
+.guidance-box {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #070d18;
+  border-radius: 8px;
+  border: 1px solid #243049;
+}
+
+.guidance-notes {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #9fb0c9;
+}
+
 .inference-curl pre {
   margin: 0.5rem 0 0;
   padding: 0.65rem;

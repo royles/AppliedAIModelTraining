@@ -1,6 +1,10 @@
 import type { Experiment, TrainingDatasetConfig, TransformerPreset } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
+import { FromScratchConfigFields } from "./FromScratchConfigFields";
+import type { TokenizerBuildConfig } from "./api";
+import { TrainingRecipeChecklist } from "./TrainingRecipeChecklist";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
+import { useState } from "react";
 
 type Props = {
   presets: TransformerPreset[];
@@ -33,6 +37,12 @@ type Props = {
   onCreateJob: () => void;
   dataset: TrainingDatasetConfig;
   onDatasetChange: (d: TrainingDatasetConfig) => void;
+  initMode: "from_scratch" | "pretrained";
+  onInitModeChange: (m: "from_scratch" | "pretrained") => void;
+  tokenizer: TokenizerBuildConfig;
+  onTokenizerChange: (t: TokenizerBuildConfig) => void;
+  vocabSize: number;
+  onVocabSizeChange: (n: number) => void;
 };
 
 export function ModelTasksPanel(props: Props) {
@@ -67,16 +77,42 @@ export function ModelTasksPanel(props: Props) {
     onCreateJob,
     dataset,
     onDatasetChange,
+    initMode,
+    onInitModeChange,
+    tokenizer,
+    onTokenizerChange,
+    vocabSize,
+    onVocabSizeChange,
   } = props;
+
+  const [recipeReady, setRecipeReady] = useState(false);
 
   return (
     <div className="settings-page">
       <header className="main-panel-header">
         <h2>Model Tasks</h2>
         <p className="hint">
-          Defaults for each training run: architecture, hyperparameters, workers, and experiment.
+          Configure the training recipe below; start the task when every step is checked.
         </p>
       </header>
+
+      <TrainingRecipeChecklist
+        initMode={initMode}
+        tokenizer={tokenizer}
+        vocabSize={vocabSize}
+        hiddenSize={hiddenSize}
+        layers={layers}
+        heads={heads}
+        maxSteps={maxSteps}
+        jobWorkers={jobWorkers}
+        jobGpus={jobGpus}
+        dataset={dataset}
+        selectedExp={selectedExp}
+        jobName={jobName}
+        openaiModelId={openaiModelId}
+        paramEstimate={paramEstimate}
+        onReadyChange={setRecipeReady}
+      />
 
       <article className="card">
         <h3>Experiment</h3>
@@ -113,6 +149,18 @@ export function ModelTasksPanel(props: Props) {
         </div>
       </article>
 
+      <FromScratchConfigFields
+        initMode={initMode}
+        onInitModeChange={onInitModeChange}
+        tokenizer={tokenizer}
+        onTokenizerChange={onTokenizerChange}
+        vocabSize={vocabSize}
+        onVocabSizeChange={onVocabSizeChange}
+        maxSteps={maxSteps}
+        hiddenSize={hiddenSize}
+        layers={layers}
+      />
+
       <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
 
       <article className="card">
@@ -129,7 +177,7 @@ export function ModelTasksPanel(props: Props) {
           hiddenSize={hiddenSize}
           layers={layers}
           heads={heads}
-          vocabSize={selectedPreset?.config.architecture.vocab_size ?? 50257}
+          vocabSize={vocabSize}
           maxPosition={selectedPreset?.config.architecture.max_position_embeddings ?? 512}
           paramEstimate={paramEstimate}
           onHiddenSizeChange={onHiddenSizeChange}
@@ -189,9 +237,12 @@ export function ModelTasksPanel(props: Props) {
           Job name
           <input value={jobName} onChange={(e) => onJobNameChange(e.target.value)} />
         </label>
-        <button type="button" onClick={onCreateJob} disabled={!selectedExp}>
+        <button type="button" onClick={onCreateJob} disabled={!recipeReady}>
           Start model task
         </button>
+        {!recipeReady && (
+          <p className="hint">Complete all recipe steps above before starting.</p>
+        )}
       </article>
     </div>
   );

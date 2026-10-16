@@ -23,6 +23,7 @@ from app.services.platform_settings import (
 )
 from app.services.job_log import append_job_log
 from app.services.model_registry import default_openai_model_id, register_trained_model
+from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,20 @@ def run_training_job(job_id: int) -> None:
         artifact_dir = str((REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve())
         Path(artifact_dir).mkdir(parents=True, exist_ok=True)
         train_config = cfg.to_train_dict(job_id=job_id, artifact_dir=artifact_dir)
+
+        def framework_log(msg: str) -> None:
+            append_job_log(db, job_id, "framework", msg)
+
+        if cfg.init_mode == "from_scratch":
+            try:
+                train_config = prepare_from_scratch_training(
+                    cfg,
+                    train_config,
+                    log=framework_log,
+                )
+            except ValueError as exc:
+                append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
+                raise
 
         platform = ensure_platform_settings(db)
         head = resolved_ray_head(platform)

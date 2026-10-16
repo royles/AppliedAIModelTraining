@@ -4,6 +4,7 @@ import {
   type Experiment,
   type TransformerPreset,
   type TrainingDatasetConfig,
+  type TokenizerBuildConfig,
   type TrainingJob,
 } from "./api";
 import { ModelTasksPanel } from "./ModelTasksPanel";
@@ -28,6 +29,13 @@ export default function App() {
   const [jobName, setJobName] = useState("From-scratch GPT-2");
   const [openaiModelId, setOpenaiModelId] = useState("my-scratch-chat");
   const [selectedExp, setSelectedExp] = useState<number | null>(null);
+  const [initMode, setInitMode] = useState<"from_scratch" | "pretrained">("from_scratch");
+  const [tokenizer, setTokenizer] = useState<TokenizerBuildConfig>({
+    mode: "train_bpe_from_dataset",
+    vocab_size: 8192,
+    min_frequency: 2,
+  });
+  const [vocabSize, setVocabSize] = useState(8192);
   const [hiddenSize, setHiddenSize] = useState(256);
   const [layers, setLayers] = useState(4);
   const [heads, setHeads] = useState(4);
@@ -86,6 +94,13 @@ export default function App() {
     if (selectedPreset.config.dataset) {
       setDataset(selectedPreset.config.dataset);
     }
+    if (selectedPreset.config.tokenizer) {
+      setTokenizer(selectedPreset.config.tokenizer);
+      if (selectedPreset.config.tokenizer.vocab_size) {
+        setVocabSize(selectedPreset.config.tokenizer.vocab_size);
+      }
+    }
+    setInitMode(selectedPreset.config.init_mode ?? "from_scratch");
     api
       .estimateArchitecture({
         ...arch,
@@ -114,11 +129,12 @@ export default function App() {
       gpus_per_worker: jobGpus,
       max_steps: maxSteps,
       transformer: {
-        init_mode: "from_scratch",
+        init_mode: initMode,
         task_type: "causal_lm",
+        tokenizer,
         architecture: {
           family: "gpt2",
-          vocab_size: 50257,
+          vocab_size: vocabSize,
           hidden_size: hiddenSize,
           num_hidden_layers: layers,
           num_attention_heads: heads,
@@ -270,6 +286,12 @@ export default function App() {
             onCreateJob={onCreateJob}
             dataset={dataset}
             onDatasetChange={setDataset}
+            initMode={initMode}
+            onInitModeChange={setInitMode}
+            tokenizer={tokenizer}
+            onTokenizerChange={setTokenizer}
+            vocabSize={vocabSize}
+            onVocabSizeChange={setVocabSize}
           />
         )}
       </main>
