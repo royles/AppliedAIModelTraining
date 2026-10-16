@@ -57,6 +57,7 @@ export default function App() {
   const [maxSteps, setMaxSteps] = useState(DEFAULT_MAX_STEPS);
   const [dataset, setDataset] = useState<TrainingDatasetConfig>(DEFAULT_DATASET);
   const [error, setError] = useState<string | null>(null);
+  const [uiBuildLabel, setUiBuildLabel] = useState<string | null>(null);
 
   const selectedPreset = presets.find((p) => p.name === preset);
   const selectedJob = useMemo(
@@ -88,6 +89,11 @@ export default function App() {
       setJobWorkers(s.cdsw_workers.default_job_num_workers);
       setJobGpus(s.cdsw_workers.gpus_per_worker);
     });
+    api.uiBuildInfo().then((info) => {
+      if (info.status === "ready" && info.js) {
+        setUiBuildLabel(info.js.replace(/^index-/, "").replace(/\.js$/, ""));
+      }
+    }).catch(() => setUiBuildLabel(null));
   }, []);
 
   useEffect(() => {
@@ -257,6 +263,11 @@ export default function App() {
             Model Tasks
           </button>
         </nav>
+        {uiBuildLabel && (
+          <p className="hint sidebar-ui-build" title="UI bundle id from /api/ui/build-info">
+            UI build {uiBuildLabel.slice(0, 8)}
+          </p>
+        )}
       </aside>
 
       <main className="main-panel">

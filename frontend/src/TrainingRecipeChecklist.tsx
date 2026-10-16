@@ -23,7 +23,9 @@ type Props = {
   jobName: string;
   openaiModelId: string;
   paramEstimate: number | null;
-  onReadyChange?: (ready: boolean) => void;
+  confirmedStepIds: ReadonlySet<string>;
+  onStepSelect?: (stepId: string) => void;
+  onStepsChange?: (steps: ReturnType<typeof buildTrainingRecipe>) => void;
 };
 
 export function TrainingRecipeChecklist(props: Props) {
@@ -42,7 +44,9 @@ export function TrainingRecipeChecklist(props: Props) {
     jobName,
     openaiModelId,
     paramEstimate,
-    onReadyChange,
+    confirmedStepIds,
+    onStepSelect,
+    onStepsChange,
   } = props;
 
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
@@ -137,49 +141,66 @@ export function TrainingRecipeChecklist(props: Props) {
   );
 
   const steps = useMemo(() => buildTrainingRecipe(ctx), [ctx]);
-  const ready = recipeReady(steps);
+  const ready = recipeReady(steps, confirmedStepIds);
 
   useEffect(() => {
-    onReadyChange?.(ready);
-  }, [ready, onReadyChange]);
+    onStepsChange?.(steps);
+  }, [steps, onStepsChange]);
 
-  const doneCount = steps.filter((s) => s.done).length;
+  const doneCount = steps.filter(
+    (s) => s.done && confirmedStepIds.has(s.id),
+  ).length;
 
   return (
     <article className="card recipe-checklist">
       <header className="recipe-header">
         <h3>Training recipe</h3>
         <span className="recipe-progress">
-          {doneCount}/{steps.length} complete
+          {doneCount}/{steps.length} confirmed
         </span>
       </header>
       <p className="hint">
-        Hard dependencies run top to bottom. Each step shows required volumetrics; a tick means the
-        current configuration satisfies it.
+        Steps unlock top to bottom. Click a step to jump to its config. Use{" "}
+        <strong>Confirm step</strong> on the right when values are final.
       </p>
       {previewError && dataset.source !== "builtin" && (
         <p className="hint recipe-warn">Dataset preview: {previewError}</p>
       )}
       <ol className="recipe-steps">
-        {steps.map((step) => (
-          <li
-            key={step.id}
-            className={`recipe-step ${step.done ? "done" : ""} ${step.waitingOn.length ? "blocked" : ""}`}
-          >
-            <span className="recipe-tick" aria-hidden>{step.done ? "✓" : "○"}</span>
-            <div className="recipe-step-body">
-              <strong>{step.title}</strong>
-              <p className="recipe-req">{step.requirement}</p>
-              <p className="hint recipe-vol">{step.volumetrics}</p>
-              {step.waitingOn.length > 0 && (
-                <p className="hint recipe-dep">
-                  Waiting on: {step.waitingOn.join(", ")}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
+        {steps.map((step) => {
+          const confirmed = confirmedStepIds.has(step.id);
+          const complete = step.done && confirmed;
+          return (
+            <li key={step.id}>
+              <button
+                type="button"
+                className={`recipe-step recipe-step-button ${complete ? "done" : ""} ${
+                  step.waitingOn.length ? "blocked" : ""
+                } ${confirmed && !complete ? "confirmed-pending" : ""}`}
+                onClick={() => onStepSelect?.(step.id)}
+              >
+                <span className="recipe-tick" aria-hidden>
+                  {complete ? "✓" : confirmed ? "◐" : "○"}
+                </span>
+                <div className="recipe-step-body">
+                  <strong>{step.title}</strong>
+                  <p className="recipe-req">{step.requirement}</p>
+                  <p className="hint recipe-vol">{step.volumetrics}</p>
+                  {step.waitingOn.length > 0 && (
+                    <p className="hint recipe-dep">
+                      Waiting on: {step.waitingOn.join(", ")}
+                    </p>
+                  )}
+                  {step.done && !confirmed && (
+                    <p className="hint recipe-confirm-hint">Ready — confirm on the right →</p>
+                  )}
+                </div>
+              </button>
+            </li>
+          );
+        })}
       </ol>
+      {ready && <p className="hint recipe-all-ready">All steps confirmed — you can start the task.</p>}
     </article>
   );
 }

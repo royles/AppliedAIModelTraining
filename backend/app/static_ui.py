@@ -28,6 +28,32 @@ def mount_static_ui(app: FastAPI) -> bool:
     return True
 
 
+def read_ui_build_info() -> dict[str, str]:
+    """Asset hashes from index.html + optional stamp for debugging stale CAI bundles."""
+    dist = frontend_dist_dir()
+    info: dict[str, str] = {"status": "missing"}
+    if not frontend_dist_ready():
+        return info
+    index_path = dist / "index.html"
+    try:
+        html = index_path.read_text(encoding="utf-8")
+    except OSError:
+        return info
+    import re
+
+    js_match = re.search(r'/assets/(index-[^"\']+\.js)', html)
+    css_match = re.search(r'/assets/(index-[^"\']+\.css)', html)
+    stamp_path = dist / ".ui-build-stamp"
+    stamp = stamp_path.read_text(encoding="utf-8").strip() if stamp_path.is_file() else ""
+    info = {
+        "status": "ready",
+        "js": js_match.group(1) if js_match else "",
+        "css": css_match.group(1) if css_match else "",
+        "stamp": stamp,
+    }
+    return info
+
+
 def mount_gateway_spa(app: FastAPI) -> bool:
     """
     Serve the built React app without a catch-all / mount (keeps /api and /v1 routable).
@@ -47,7 +73,10 @@ def mount_gateway_spa(app: FastAPI) -> bool:
     index_path = dist / "index.html"
 
     def _spa_index_response() -> FileResponse:
-        return FileResponse(index_path)
+        return FileResponse(
+            index_path,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
 
     @app.get("/", include_in_schema=False)
     async def spa_index() -> FileResponse:

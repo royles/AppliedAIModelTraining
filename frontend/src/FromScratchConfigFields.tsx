@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type TokenizerBuildConfig } from "./api";
 
 type Props = {
+  section?: "mode" | "tokenizer" | "all";
   initMode: "from_scratch" | "pretrained";
   onInitModeChange: (mode: "from_scratch" | "pretrained") => void;
   tokenizer: TokenizerBuildConfig;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function FromScratchConfigFields({
+  section = "all",
   initMode,
   onInitModeChange,
   tokenizer,
@@ -62,23 +64,39 @@ export function FromScratchConfigFields({
     }
   }
 
-  return (
-    <article className="card">
-      <h3>Training mode</h3>
-      <label>
-        Initialization
-        <select
-          value={initMode}
-          onChange={(e) =>
-            onInitModeChange(e.target.value as "from_scratch" | "pretrained")
-          }
-        >
-          <option value="from_scratch">Full from scratch (random weights)</option>
-          <option value="pretrained">Fine-tune pretrained checkpoint</option>
-        </select>
-      </label>
+  const showMode = section === "all" || section === "mode";
+  const showTokenizer = section === "all" || section === "tokenizer";
 
-      {initMode === "from_scratch" && (
+  const wrapper = section === "all" ? "article" : "div";
+  const Wrapper = wrapper as "article" | "div";
+
+  return (
+    <Wrapper className={section === "all" ? "card" : "recipe-section-fields"}>
+      {showMode && (
+        <>
+          {section === "all" && <h3>Training mode</h3>}
+          <label>
+            Initialization
+            <select
+              value={initMode}
+              onChange={(e) =>
+                onInitModeChange(e.target.value as "from_scratch" | "pretrained")
+              }
+            >
+              <option value="from_scratch">Full from scratch (random weights)</option>
+              <option value="pretrained">Fine-tune pretrained checkpoint</option>
+            </select>
+          </label>
+          {initMode === "pretrained" && (
+            <p className="hint">
+              Fine-tuning loads Hugging Face weights from the preset&apos;s <code>base_model</code>.
+              Use a pretrained preset (e.g. causal_lm_small) or pass <code>base_model</code> via API.
+            </p>
+          )}
+        </>
+      )}
+
+      {showTokenizer && initMode === "from_scratch" && (
         <>
           <p className="hint">
             True from-scratch builds train a <strong>BPE tokenizer on your dataset</strong> and
@@ -151,12 +169,9 @@ export function FromScratchConfigFields({
         </>
       )}
 
-      {initMode === "pretrained" && (
-        <p className="hint">
-          Fine-tuning loads Hugging Face weights from the preset&apos;s <code>base_model</code>.
-          Use a pretrained preset (e.g. causal_lm_small) or pass <code>base_model</code> via API.
-        </p>
+      {showTokenizer && initMode === "pretrained" && (
+        <p className="hint">Tokenizer comes from the pretrained checkpoint preset.</p>
       )}
-    </article>
+    </Wrapper>
   );
 }

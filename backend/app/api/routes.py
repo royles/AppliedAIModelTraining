@@ -32,6 +32,7 @@ from app.training.architecture import TransformerArchitectureConfig
 from app.training.dataset_config import TrainingDatasetConfig
 from app.training.dataset_loader import BUILTIN_DATASET_CATALOG, list_dataset_files, load_training_samples
 from app.training.from_scratch import from_scratch_resource_guidance
+from app.static_ui import read_ui_build_info
 from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
@@ -92,6 +93,12 @@ def _build_config(payload: TrainingJobCreate) -> TransformerTrainingConfig:
         return base
     merged = _deep_merge_dict(base.model_dump(), overrides)
     return TransformerTrainingConfig.model_validate(merged)
+
+
+@router.get("/ui/build-info")
+def ui_build_info() -> dict[str, str]:
+    """Which committed frontend/dist bundle is on disk (helps debug stale CAI UX)."""
+    return read_ui_build_info()
 
 
 @router.get("/health", response_model=HealthResponse)

@@ -119,13 +119,21 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
       volumetrics: `d=${ctx.hiddenSize} · L=${ctx.layers} · H=${ctx.heads} · ~${
         ctx.paramEstimate?.toLocaleString() ?? "?"
       } params`,
-      done:
-        ctx.hiddenSize > 0 &&
-        ctx.layers > 0 &&
-        ctx.heads > 0 &&
-        ctx.hiddenSize % ctx.heads === 0 &&
-        ctx.paramEstimate !== null &&
-        ctx.paramEstimate < 500_000_000,
+      done: (() => {
+        const geomOk =
+          ctx.hiddenSize > 0 &&
+          ctx.layers > 0 &&
+          ctx.heads > 0 &&
+          ctx.hiddenSize % ctx.heads === 0;
+        if (ctx.initMode === "pretrained") {
+          return geomOk;
+        }
+        return (
+          geomOk &&
+          ctx.paramEstimate !== null &&
+          ctx.paramEstimate < 500_000_000
+        );
+      })(),
     },
     {
       id: "training",
@@ -170,6 +178,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
   });
 }
 
-export function recipeReady(steps: RecipeStep[]): boolean {
-  return steps.length > 0 && steps.every((s) => s.done);
+export function recipeReady(steps: RecipeStep[], confirmedStepIds?: ReadonlySet<string>): boolean {
+  if (steps.length === 0) return false;
+  return steps.every(
+    (s) => s.done && (confirmedStepIds ? confirmedStepIds.has(s.id) : true),
+  );
 }
