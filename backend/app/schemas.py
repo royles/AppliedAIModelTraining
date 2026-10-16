@@ -65,6 +65,21 @@ class TrainingJobRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LogLineRead(BaseModel):
+    ts: str
+    message: str
+
+
+class JobLogsRead(BaseModel):
+    job_id: int
+    status: str
+    ray_address: str | None
+    framework: list[LogLineRead]
+    training: list[LogLineRead]
+    ray_status: dict[str, Any]
+    metrics: dict[str, Any] | None
+
+
 class ScaleWorkersRequest(BaseModel):
     target_workers: int = Field(ge=1, le=32)
 

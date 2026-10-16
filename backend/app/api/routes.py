@@ -15,6 +15,7 @@ from app.schemas import (
     ScaleWorkersRequest,
     TrainingJobCreate,
     TrainingJobRead,
+    JobLogsRead,
     TransformerPresetRead,
     WorkerGroupRead,
     PlatformSettingsRead,
@@ -22,6 +23,7 @@ from app.schemas import (
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
+from app.services.job_log import build_job_logs
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
@@ -193,6 +195,14 @@ def scale_workers(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return wg
+
+
+@router.get("/jobs/{job_id}/logs", response_model=JobLogsRead)
+def job_logs(job_id: int, db: Session = Depends(get_db)) -> JobLogsRead:
+    payload = build_job_logs(db, job_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobLogsRead(**payload)
 
 
 @router.get("/jobs/{job_id}/metrics")

@@ -168,6 +168,25 @@ def _train_loop(config: dict[str, Any]) -> None:
     model.train()
     optimizer.zero_grad()
 
+    job_id = int(config.get("job_id") or 0)
+    from app.services.job_log import append_training_log_file
+
+    def _log_training(message: str) -> None:
+        if job_id <= 0:
+            return
+        try:
+            import ray as _ray
+
+            if _ray.train.get_context().get_world_rank() != 0:
+                return
+        except Exception:  # noqa: BLE001
+            pass
+        append_training_log_file(job_id, message)
+
+    _log_training(
+        f"Worker ready: task={task} batch={batch_size} max_steps={max_steps} device={device}"
+    )
+
     while step < max_steps:
         for batch in loader:
             if task == "causal_lm":
@@ -208,12 +227,17 @@ def _train_loop(config: dict[str, Any]) -> None:
                 optimizer.zero_grad()
                 step += 1
                 if step % log_every == 0:
+                    loss_val = float(loss.item() * accum)
+                    lr_val = scheduler.get_last_lr()[0]
                     ray.train.report(
                         {
-                            "train_loss": float(loss.item() * accum),
+                            "train_loss": loss_val,
                             "step": step,
-                            "lr": scheduler.get_last_lr()[0],
+                            "lr": lr_val,
                         }
+                    )
+                    _log_training(
+                        f"step={step}/{max_steps} train_loss={loss_val:.4f} lr={lr_val:.2e}"
                     )
                 if step >= max_steps:
                     break
@@ -222,7 +246,9 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     ctx = ray.train.get_context()
     if ctx.get_world_rank() == 0 and task == "causal_lm":
+        _log_training("Saving model artifacts.")
         _save_artifacts(model, tokenizer, artifact_dir, config)
+        _log_training("Artifacts saved.")
 
 
 def run_transformer_training(

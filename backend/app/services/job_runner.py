@@ -21,6 +21,7 @@ from app.services.platform_settings import (
     resolved_ray_head,
     worker_pool_kwargs,
 )
+from app.services.job_log import append_job_log
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.transformer_config import TransformerTrainingConfig
 
@@ -56,6 +57,7 @@ def run_training_job(job_id: int) -> None:
         if not job:
             return
         _update_job(db, job_id, status="provisioning")
+        append_job_log(db, job_id, "framework", "Job queued; starting provisioning.")
 
         cfg = resolve_job_config(job)
         artifact_dir = str((REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve())
@@ -78,10 +80,22 @@ def run_training_job(job_id: int) -> None:
         db.refresh(worker_group)
 
         if head and job.num_workers > 0:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                f"Launching {job.num_workers} CDSW worker(s) for Ray head {head}.",
+            )
             launched = pool.launch(job.num_workers, head)
             worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
             worker_group.status = "running"
             db.commit()
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                f"Workers launched: {launched.worker_ids}",
+            )
 
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
@@ -90,13 +104,6 @@ def run_training_job(job_id: int) -> None:
             from app.services.cdsw_workers import ray_client_address
 
             ray_addr = ray_client_address(head)
-
-        _update_job(
-            db,
-            job_id,
-            status="running",
-            ray_address=ray_addr or "local",
-        )
 
         use_gpu = job.gpus_per_worker > 0
         if platform.ray_local_mode and not pool.is_remote:
@@ -107,12 +114,31 @@ def run_training_job(job_id: int) -> None:
             platform.ray_train_num_workers,
         )
         if train_workers < job.num_workers:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                f"Capping Ray Train workers from {job.num_workers} to {train_workers}.",
+            )
             logger.warning(
                 "Capping Ray Train workers from %s to %s (small container / "
                 "PLATFORM_CAI_LOW_MEMORY / RAY_TRAIN_NUM_WORKERS).",
                 job.num_workers,
                 train_workers,
             )
+
+        _update_job(
+            db,
+            job_id,
+            status="running",
+            ray_address=ray_addr or "local",
+        )
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            f"Training starting (Ray={ray_addr or 'local'}, train_workers={train_workers}, gpu={use_gpu}).",
+        )
         if is_low_memory_container() and train_config.get("per_device_train_batch_size", 4) > 2:
             train_config = {
                 **train_config,
@@ -125,11 +151,18 @@ def run_training_job(job_id: int) -> None:
                 train_config["per_device_train_batch_size"],
             )
 
+        append_job_log(db, job_id, "framework", "Ray Train job submitted.")
         result = run_transformer_training(
             ray_address=ray_addr,
             num_workers=train_workers,
             use_gpu=use_gpu,
             train_config=train_config,
+        )
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            f"Training finished. Metrics: {json.dumps(result.get('metrics', {}))}",
         )
         _update_job(
             db,
@@ -157,6 +190,7 @@ def run_training_job(job_id: int) -> None:
             )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Training job %s failed", job_id)
+        append_job_log(db, job_id, "framework", f"Job failed: {exc}")
         _update_job(db, job_id, status="failed", error_message=str(exc))
     finally:
         if pool is not None:

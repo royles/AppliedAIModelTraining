@@ -95,6 +95,21 @@ export type PlatformSettingsUpdate = {
   cdsw_workers?: CdswWorkerSettings;
 };
 
+export type LogLine = {
+  ts: string;
+  message: string;
+};
+
+export type JobLogs = {
+  job_id: number;
+  status: string;
+  ray_address: string | null;
+  framework: LogLine[];
+  training: LogLine[];
+  ray_status: Record<string, unknown>;
+  metrics: Record<string, unknown> | null;
+};
+
 /** Resolve API paths against the current page URL (works behind CAI path prefixes). */
 export function resolveApiUrl(path: string): string {
   const relative = path.startsWith("/") ? path.slice(1) : path;
@@ -141,6 +156,8 @@ export const api = {
       body: JSON.stringify(body),
     }),
   listJobs: () => request<TrainingJob[]>("/api/jobs"),
+  getJob: (jobId: number) => request<TrainingJob>(`/api/jobs/${jobId}`),
+  getJobLogs: (jobId: number) => request<JobLogs>(`/api/jobs/${jobId}/logs`),
   createJob: (body: {
     experiment_id: number;
     name: string;

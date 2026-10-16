@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   type Experiment,
   type TransformerPreset,
   type TrainingJob,
 } from "./api";
-import { JobRunList } from "./JobRunList";
+import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
-import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
+import { TaskCardGrid } from "./TaskCardGrid";
+import { TaskDetailView } from "./TaskDetailView";
+
+type NavView = "tasks" | "framework" | "model-tasks";
 
 export default function App() {
+  const [nav, setNav] = useState<NavView>("tasks");
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+
   const [jobWorkers, setJobWorkers] = useState(1);
   const [jobGpus, setJobGpus] = useState(0);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -28,6 +34,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const selectedPreset = presets.find((p) => p.name === preset);
+  const selectedJob = useMemo(
+    () => jobs.find((j) => j.id === selectedJobId) ?? null,
+    [jobs, selectedJobId],
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -113,124 +123,129 @@ export default function App() {
       },
     });
     await refresh();
+    setNav("tasks");
+    setSelectedJobId(null);
+  }
+
+  function openTask(jobId: number) {
+    setSelectedJobId(jobId);
+  }
+
+  function closeTask() {
+    setSelectedJobId(null);
+  }
+
+  function goNav(view: NavView) {
+    setNav(view);
+    setSelectedJobId(null);
   }
 
   return (
-    <div className="layout">
-      <header>
-        <h1>Applied AI Model Training</h1>
-        <p className="subtitle">
-          Build transformers from scratch · Ray · OpenAI-compatible <code>/v1</code> API
-        </p>
-      </header>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <h1>Applied AI</h1>
+          <p className="subtitle">Model Training</p>
+        </div>
+        <nav className="sidebar-nav" aria-label="Main">
+          <button
+            type="button"
+            className={nav === "tasks" && selectedJobId === null ? "active" : ""}
+            onClick={() => goNav("tasks")}
+          >
+            Tasks
+          </button>
+          <button
+            type="button"
+            className={nav === "framework" ? "active" : ""}
+            onClick={() => goNav("framework")}
+          >
+            Framework Configuration
+          </button>
+          <button
+            type="button"
+            className={nav === "model-tasks" ? "active" : ""}
+            onClick={() => goNav("model-tasks")}
+          >
+            Model Tasks
+          </button>
+        </nav>
+      </aside>
 
-      {error && <div className="banner error">{error}</div>}
+      <main className="main-panel">
+        <header className="main-panel-header compact">
+          <p className="subtitle">
+            Ray · CDSW workers · OpenAI-compatible <code>/v1</code> API
+          </p>
+        </header>
 
-      <section className="grid">
-        <PlatformSettingsPanel
-          onSaved={() => {
-            api.getPlatformSettings().then((s) => {
-              setJobWorkers(s.cdsw_workers.default_job_num_workers);
-              setJobGpus(s.cdsw_workers.gpus_per_worker);
-            });
-          }}
-        />
+        {error && <div className="banner error">{error}</div>}
 
-        <article className="card">
-          <h2>Experiment</h2>
-          <label>
-            Name
-            <input value={expName} onChange={(e) => setExpName(e.target.value)} />
-          </label>
-          <button type="button" onClick={onCreateExperiment}>Create experiment</button>
-        </article>
-
-        <article className="card wide">
-          <h2>Transformer architecture (from scratch)</h2>
-          <label>
-            Preset
-            <select value={preset} onChange={(e) => setPreset(e.target.value)}>
-              {presets.map((p) => (
-                <option key={p.name} value={p.name}>{p.title}</option>
-              ))}
-            </select>
-          </label>
-          <TransformerArchitectureDiagram
+        {selectedJob && selectedJobId !== null ? (
+          <TaskDetailView
+            job={selectedJob}
+            onBack={() => {
+              closeTask();
+              setNav("tasks");
+            }}
+          />
+        ) : nav === "tasks" ? (
+          <>
+            <header className="main-panel-header">
+              <h2>Model task runs</h2>
+              <p className="hint">Click a card to open live framework and training logs.</p>
+            </header>
+            <TaskCardGrid jobs={jobs} onSelect={openTask} />
+          </>
+        ) : nav === "framework" ? (
+          <div className="settings-page">
+            <header className="main-panel-header">
+              <h2>Framework Configuration</h2>
+              <p className="hint">Ray runtime and CDSW worker defaults for the platform.</p>
+            </header>
+            <PlatformSettingsPanel
+              title="Ray &amp; CDSW workers"
+              onSaved={() => {
+                api.getPlatformSettings().then((s) => {
+                  setJobWorkers(s.cdsw_workers.default_job_num_workers);
+                  setJobGpus(s.cdsw_workers.gpus_per_worker);
+                });
+              }}
+            />
+          </div>
+        ) : (
+          <ModelTasksPanel
+            presets={presets}
+            preset={preset}
+            onPresetChange={setPreset}
+            selectedPreset={selectedPreset}
             hiddenSize={hiddenSize}
             layers={layers}
             heads={heads}
-            vocabSize={selectedPreset?.config.architecture.vocab_size ?? 50257}
-            maxPosition={
-              selectedPreset?.config.architecture.max_position_embeddings ?? 512
-            }
+            maxSteps={maxSteps}
             paramEstimate={paramEstimate}
             onHiddenSizeChange={setHiddenSize}
             onLayersChange={setLayers}
             onHeadsChange={setHeads}
+            onMaxStepsChange={setMaxSteps}
+            experiments={experiments}
+            selectedExp={selectedExp}
+            onSelectedExpChange={setSelectedExp}
+            expName={expName}
+            onExpNameChange={setExpName}
+            onCreateExperiment={onCreateExperiment}
+            jobName={jobName}
+            onJobNameChange={setJobName}
+            openaiModelId={openaiModelId}
+            onOpenaiModelIdChange={setOpenaiModelId}
+            jobWorkers={jobWorkers}
+            onJobWorkersChange={setJobWorkers}
+            jobGpus={jobGpus}
+            onJobGpusChange={setJobGpus}
+            onCreateJob={onCreateJob}
           />
-          <div className="arch-grid arch-grid-compact">
-            <label>
-              Hidden size
-              <input
-                type="number"
-                value={hiddenSize}
-                onChange={(e) => setHiddenSize(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Layers
-              <input
-                type="number"
-                value={layers}
-                onChange={(e) => setLayers(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Attention heads
-              <input
-                type="number"
-                value={heads}
-                onChange={(e) => setHeads(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Training steps
-              <input
-                type="number"
-                value={maxSteps}
-                onChange={(e) => setMaxSteps(Number(e.target.value))}
-              />
-            </label>
-          </div>
-          <label>
-            Experiment
-            <select
-              value={selectedExp ?? ""}
-              onChange={(e) => setSelectedExp(Number(e.target.value))}
-            >
-              {experiments.map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            OpenAI model id
-            <input value={openaiModelId} onChange={(e) => setOpenaiModelId(e.target.value)} />
-          </label>
-          <label>
-            Job name
-            <input value={jobName} onChange={(e) => setJobName(e.target.value)} />
-          </label>
-          <button type="button" onClick={onCreateJob} disabled={!selectedExp}>
-            Train &amp; register for /v1/chat/completions
-          </button>
-        </article>
-      </section>
-
-      <section className="card jobs-section">
-        <h2>Training runs</h2>
-        <JobRunList jobs={jobs} />
-      </section>
+        )}
+      </main>
     </div>
   );
 }

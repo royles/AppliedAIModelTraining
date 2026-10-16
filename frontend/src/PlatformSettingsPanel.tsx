@@ -8,9 +8,10 @@ import {
 
 type Props = {
   onSaved?: () => void;
+  title?: string;
 };
 
-export function PlatformSettingsPanel({ onSaved }: Props) {
+export function PlatformSettingsPanel({ onSaved, title = "Framework Configuration" }: Props) {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [ray, setRay] = useState<RaySettings | null>(null);
   const [cdsw, setCdsw] = useState<CdswWorkerSettings | null>(null);
@@ -46,7 +47,7 @@ export function PlatformSettingsPanel({ onSaved }: Props) {
   if (!settings || !ray || !cdsw) {
     return (
       <article className="card wide">
-        <h2>Ray &amp; CDSW workers</h2>
+        <h2>{title}</h2>
         <p>Loading platform settings…</p>
       </article>
     );
@@ -54,7 +55,7 @@ export function PlatformSettingsPanel({ onSaved }: Props) {
 
   return (
     <article className="card wide">
-      <h2>Ray &amp; CDSW workers</h2>
+      <h2>{title}</h2>
       <p className="hint">
         Runtime: Ray <strong>{settings.runtime.ray_runtime}</strong>
         · CDSW API <strong>{settings.runtime.cdsw_available ? "available" : "local sim"}</strong>

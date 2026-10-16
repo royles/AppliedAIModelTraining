@@ -36,6 +36,7 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _sqlite_add_column_if_missing("training_jobs", "config_json", "config_json TEXT")
+    _sqlite_add_column_if_missing("training_jobs", "log_json", "log_json TEXT")
 
 
 def get_db() -> Generator[Session, None, None]:
