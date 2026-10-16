@@ -47,10 +47,18 @@ def build_frontend(force: bool = False) -> bool:
 
     if not shutil.which("npm"):
         if frontend_dist_ready():
+            from common import ui_bundle_has_sidebar_ux
+
+            if frontend_dist_stale() and not ui_bundle_has_sidebar_ux():
+                print(
+                    "ERROR: npm not found and frontend/dist is missing or outdated.\n"
+                    "  On CAI: git pull origin main  (production UI is committed in frontend/dist)\n"
+                    "  Off CAI: npm run build in frontend/ and commit dist, or install Node here.",
+                    file=sys.stderr,
+                )
+                return False
             print(
-                "npm not found; using existing frontend/dist. "
-                "For the latest UX, run 'npm run build' in frontend/ on a machine with Node.",
-                file=sys.stderr,
+                "npm not found; using prebuilt frontend/dist from the repo (no compile step).",
             )
             return True
         print(

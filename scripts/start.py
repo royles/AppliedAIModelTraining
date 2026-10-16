@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from common import (
     ensure_api_running,
     ensure_runtime_ready,
     frontend_dist_ready,
+    ensure_prebuilt_ui_or_npm,
     frontend_dist_stale,
     read_ui_build_label,
     is_cai_session,
@@ -80,8 +82,14 @@ def main() -> int:
         return code
 
     if args.rebuild_ui:
-        if build_frontend(force=True) is False:
-            return 1
+        if shutil.which("npm"):
+            if build_frontend(force=True) is False:
+                return 1
+        else:
+            ok, message = ensure_prebuilt_ui_or_npm()
+            print(message)
+            if not ok:
+                return 1
 
     if args.install:
         if args.rebuild_ui:
@@ -112,9 +120,12 @@ def main() -> int:
             print(exc, file=sys.stderr)
             return 1
 
-    if not frontend_dist_ready():
-        print("frontend/dist is missing. Run: python3 scripts/install.py", file=sys.stderr)
+    ok, ui_message = ensure_prebuilt_ui_or_npm()
+    if not ok:
+        print(ui_message, file=sys.stderr)
         return 1
+    if not args.dev_ui:
+        print(ui_message)
 
     if not args.dev_ui and frontend_dist_stale():
         print(

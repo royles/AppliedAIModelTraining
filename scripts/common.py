@@ -75,6 +75,44 @@ def write_ui_build_stamp() -> None:
     )
 
 
+def ui_bundle_has_sidebar_ux() -> bool:
+    """Heuristic: current production bundle includes the sidebar shell."""
+    assets = FRONTEND_DIST / "assets"
+    if not assets.is_dir():
+        return False
+    for js_path in assets.glob("index-*.js"):
+        try:
+            text = js_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "app-shell" in text and "Framework Configuration" in text:
+            return True
+    return False
+
+
+def ensure_prebuilt_ui_or_npm() -> tuple[bool, str]:
+    """
+    CAI/CDSW often has no Node. Return (ok, message) for whether UX can start.
+    """
+    if not frontend_dist_ready():
+        if shutil.which("npm"):
+            return False, "frontend/dist is missing; run: python3 scripts/build_ui.py"
+        return (
+            False,
+            "frontend/dist is missing and npm is not installed. "
+            "Run `git pull origin main` (dist is committed) or copy frontend/dist from a dev machine.",
+        )
+    if ui_bundle_has_sidebar_ux():
+        return True, "Using prebuilt frontend/dist (no npm required)."
+    if shutil.which("npm"):
+        return False, "frontend/dist is present but outdated; run: python3 scripts/build_ui.py"
+    return (
+        False,
+        "frontend/dist is outdated and npm is not available. "
+        "Run `git pull origin main` to fetch the latest committed production bundle.",
+    )
+
+
 def cai_session_ip() -> str | None:
     return os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
 

@@ -49,6 +49,15 @@ python3 scripts/start.py          # auto-installs missing deps, then starts API 
 python3 scripts/start.py --install  # full install + start (recommended on CAI)
 ```
 
+### Production UI without Node (CAI / CDSW)
+
+The React app is **precompiled into `frontend/dist/` and committed to git**. CAI sessions usually do **not** have `npm`; you do **not** need Node to run the platform.
+
+1. `git pull origin main` — ensures `frontend/dist/` matches the latest UX.
+2. `python3 scripts/start.py` — serves that bundle from `ui_gateway`.
+
+Only use `python3 scripts/build_ui.py` on a machine with Node when changing `frontend/src`. On CAI, `build_ui.py` exits successfully if a current prebuilt `frontend/dist` is already present.
+
 All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python (`PLATFORM_PYTHON` to override). `start.py` runs `pip install -r backend/requirements.txt` automatically when `uvicorn` / FastAPI are missing (set `PLATFORM_SKIP_DEP_CHECK=1` to skip).
 
 - API (direct, session only): http://127.0.0.1:8000/docs and http://127.0.0.1:8000/api/…
