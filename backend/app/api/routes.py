@@ -23,6 +23,7 @@ from app.schemas import (
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
+from app.services.job_delete import delete_training_job
 from app.services.job_log import build_job_logs
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.platform_settings import get_platform_settings, update_platform_settings
@@ -195,6 +196,15 @@ def scale_workers(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return wg
+
+
+@router.delete("/jobs/{job_id}")
+def remove_job(job_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
+    try:
+        delete_training_job(db, job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": "deleted", "job_id": str(job_id)}
 
 
 @router.get("/jobs/{job_id}/logs", response_model=JobLogsRead)

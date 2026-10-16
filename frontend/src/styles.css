@@ -125,10 +125,23 @@ body {
 }
 
 .task-card {
-  text-align: left;
   background: #121a2b;
   border: 1px solid #243049;
   border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.task-card:hover {
+  border-color: #3b82f6;
+}
+
+.task-card-main {
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 1rem;
   color: inherit;
   cursor: pointer;
@@ -136,11 +149,29 @@ body {
   flex-direction: column;
   gap: 0.5rem;
   font-weight: 400;
+  flex: 1;
 }
 
-.task-card:hover {
-  border-color: #3b82f6;
+.task-card-main:hover {
   background: #0f1729;
+}
+
+.task-card-delete {
+  margin: 0 1rem 1rem;
+  align-self: flex-start;
+}
+
+.task-detail-delete {
+  margin-left: auto;
+}
+
+.btn-danger {
+  background: #991b1b;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
 }
 
 .task-card-head {

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
 import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
+import { confirmDeleteTask } from "./taskDelete";
 
 type Props = {
   job: TrainingJob;
   onBack: () => void;
+  onDelete: (jobId: number) => void | Promise<void>;
 };
 
 function formatLogLines(lines: { ts: string; message: string }[]): string {
@@ -12,7 +14,7 @@ function formatLogLines(lines: { ts: string; message: string }[]): string {
   return lines.map((l) => `[${l.ts}] ${l.message}`).join("\n");
 }
 
-export function TaskDetailView({ job, onBack }: Props) {
+export function TaskDetailView({ job, onBack, onDelete }: Props) {
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +48,17 @@ export function TaskDetailView({ job, onBack }: Props) {
           <h2>{job.name}</h2>
           <span className={`pill ${job.status}`}>{job.status}</span>
         </div>
+        <button
+          type="button"
+          className="btn-danger task-detail-delete"
+          onClick={() => {
+            if (confirmDeleteTask(job)) {
+              void onDelete(job.id);
+            }
+          }}
+        >
+          Delete task
+        </button>
       </div>
 
       <article className="card task-detail-summary">

@@ -158,6 +158,10 @@ export const api = {
   listJobs: () => request<TrainingJob[]>("/api/jobs"),
   getJob: (jobId: number) => request<TrainingJob>(`/api/jobs/${jobId}`),
   getJobLogs: (jobId: number) => request<JobLogs>(`/api/jobs/${jobId}/logs`),
+  deleteJob: (jobId: number) =>
+    request<{ status: string; job_id: string }>(`/api/jobs/${jobId}`, {
+      method: "DELETE",
+    }),
   createJob: (body: {
     experiment_id: number;
     name: string;

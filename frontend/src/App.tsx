@@ -140,6 +140,20 @@ export default function App() {
     setSelectedJobId(null);
   }
 
+  async function deleteTask(jobId: number) {
+    try {
+      await api.deleteJob(jobId);
+      if (selectedJobId === jobId) {
+        closeTask();
+        setNav("tasks");
+      }
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -188,6 +202,7 @@ export default function App() {
               closeTask();
               setNav("tasks");
             }}
+            onDelete={deleteTask}
           />
         ) : nav === "tasks" ? (
           <>
@@ -195,7 +210,7 @@ export default function App() {
               <h2>Model task runs</h2>
               <p className="hint">Click a card to open live framework and training logs.</p>
             </header>
-            <TaskCardGrid jobs={jobs} onSelect={openTask} />
+            <TaskCardGrid jobs={jobs} onSelect={openTask} onDelete={deleteTask} />
           </>
         ) : nav === "framework" ? (
           <div className="settings-page">
