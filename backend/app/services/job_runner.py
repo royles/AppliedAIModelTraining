@@ -64,10 +64,8 @@ def run_training_job(job_id: int) -> None:
 
         platform = ensure_platform_settings(db)
         head = resolved_ray_head(platform)
-        pool = CdswRayWorkerPool(
-            **worker_pool_kwargs(platform),
-            gpus_per_worker=job.gpus_per_worker,
-        )
+        pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": job.gpus_per_worker}
+        pool = CdswRayWorkerPool(**pool_kwargs)
 
         worker_group = WorkerGroup(
             job_id=job.id,
@@ -185,10 +183,8 @@ def scale_job_workers(job_id: int, target: int, db: Session) -> WorkerGroup:
     if not head:
         raise ValueError("No Ray head address; run inside CML/CDSW or set RAY_HEAD_ADDRESS")
 
-    pool = CdswRayWorkerPool(
-        **worker_pool_kwargs(platform),
-        gpus_per_worker=job.gpus_per_worker,
-    )
+    pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": job.gpus_per_worker}
+    pool = CdswRayWorkerPool(**pool_kwargs)
     launched = pool.scale(target, head)
     job.worker_group.target_workers = target
     job.worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
