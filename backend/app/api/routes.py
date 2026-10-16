@@ -29,6 +29,8 @@ from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.model_registry import get_trained_model_for_job, openai_model_ids_for_jobs
 from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
+from app.training.dataset_config import TrainingDatasetConfig
+from app.training.dataset_loader import BUILTIN_DATASET_CATALOG, list_dataset_files
 from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
@@ -118,6 +120,16 @@ def write_platform_settings(
     payload: PlatformSettingsUpdate, db: Session = Depends(get_db)
 ) -> PlatformSettingsRead:
     return update_platform_settings(db, payload)
+
+
+@router.get("/training/datasets/builtin")
+def builtin_datasets() -> dict[str, dict[str, str]]:
+    return BUILTIN_DATASET_CATALOG
+
+
+@router.get("/training/datasets/files")
+def dataset_files() -> list[dict[str, str]]:
+    return list_dataset_files()
 
 
 @router.get("/transformer/presets", response_model=list[TransformerPresetRead])

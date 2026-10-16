@@ -80,21 +80,6 @@ def _save_artifacts(model, tokenizer, artifact_dir: str, config: dict[str, Any])
     (path / "platform_config.json").write_text(json.dumps(meta, indent=2))
 
 
-def _sample_texts(task_type: str) -> list[str]:
-    if task_type == "causal_lm":
-        return [
-            "User: How does Ray scale training?\nAssistant: Ray shards workers across GPUs.",
-            "User: What is LoRA?\nAssistant: Low-rank adapters that fine-tune efficiently.",
-            "User: Explain CDSW workers.\nAssistant: They launch elastic engines on Cloudera AI.",
-        ] * 40
-    return [
-        "ray scales transformer training across GPUs",
-        "cdsw workers attach elastic compute to the cluster",
-        "local development uses CPU ray workers",
-        "cloudera machine learning hosts the control plane",
-    ] * 32
-
-
 def _train_loop(config: dict[str, Any]) -> None:
     import ray
     import torch
@@ -116,7 +101,10 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     model = _maybe_apply_lora(model, config)
 
-    texts = _sample_texts(task)
+    from app.training.dataset_loader import load_training_samples
+
+    dataset_cfg = config.get("dataset") or {"source": "builtin", "builtin_name": "platform_demo"}
+    texts, label_list = load_training_samples(dataset_cfg, task_type=task)
     if task == "causal_lm":
         enc = tokenizer(
             texts,
@@ -127,7 +115,7 @@ def _train_loop(config: dict[str, Any]) -> None:
         )
         dataset = TensorDataset(enc["input_ids"], enc["attention_mask"])
     else:
-        labels = [i % config["num_labels"] for i in range(len(texts))]
+        labels = label_list or [i % config["num_labels"] for i in range(len(texts))]
         enc = tokenizer(
             texts,
             truncation=True,
@@ -183,8 +171,10 @@ def _train_loop(config: dict[str, Any]) -> None:
             pass
         append_training_log_file(job_id, message)
 
+    ds = config.get("dataset") or {}
     _log_training(
-        f"Worker ready: task={task} batch={batch_size} max_steps={max_steps} device={device}"
+        f"Worker ready: task={task} batch={batch_size} max_steps={max_steps} "
+        f"device={device} dataset_source={ds.get('source', 'builtin')} examples={len(texts)}"
     )
 
     while step < max_steps:

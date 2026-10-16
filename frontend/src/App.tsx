@@ -3,6 +3,7 @@ import {
   api,
   type Experiment,
   type TransformerPreset,
+  type TrainingDatasetConfig,
   type TrainingJob,
 } from "./api";
 import { ModelTasksPanel } from "./ModelTasksPanel";
@@ -31,6 +32,11 @@ export default function App() {
   const [layers, setLayers] = useState(4);
   const [heads, setHeads] = useState(4);
   const [maxSteps, setMaxSteps] = useState(40);
+  const [dataset, setDataset] = useState<TrainingDatasetConfig>({
+    source: "builtin",
+    builtin_name: "platform_demo",
+    repeat: 40,
+  });
   const [error, setError] = useState<string | null>(null);
 
   const selectedPreset = presets.find((p) => p.name === preset);
@@ -77,6 +83,9 @@ export default function App() {
     setHiddenSize(arch.hidden_size);
     setLayers(arch.num_hidden_layers);
     setHeads(arch.num_attention_heads);
+    if (selectedPreset.config.dataset) {
+      setDataset(selectedPreset.config.dataset);
+    }
     api
       .estimateArchitecture({
         ...arch,
@@ -120,6 +129,7 @@ export default function App() {
         per_device_train_batch_size: 2,
         max_steps: maxSteps,
         learning_rate: 6e-4,
+        dataset,
       },
     });
     await refresh();
@@ -258,6 +268,8 @@ export default function App() {
             jobGpus={jobGpus}
             onJobGpusChange={setJobGpus}
             onCreateJob={onCreateJob}
+            dataset={dataset}
+            onDatasetChange={setDataset}
           />
         )}
       </main>

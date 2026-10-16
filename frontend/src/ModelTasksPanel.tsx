@@ -1,4 +1,5 @@
-import type { Experiment, TransformerPreset } from "./api";
+import type { Experiment, TrainingDatasetConfig, TransformerPreset } from "./api";
+import { DatasetConfigFields } from "./DatasetConfigFields";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 
 type Props = {
@@ -30,6 +31,8 @@ type Props = {
   jobGpus: number;
   onJobGpusChange: (n: number) => void;
   onCreateJob: () => void;
+  dataset: TrainingDatasetConfig;
+  onDatasetChange: (d: TrainingDatasetConfig) => void;
 };
 
 export function ModelTasksPanel(props: Props) {
@@ -62,6 +65,8 @@ export function ModelTasksPanel(props: Props) {
     jobGpus,
     onJobGpusChange,
     onCreateJob,
+    dataset,
+    onDatasetChange,
   } = props;
 
   return (
@@ -107,6 +112,8 @@ export function ModelTasksPanel(props: Props) {
           </label>
         </div>
       </article>
+
+      <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
 
       <article className="card">
         <h3>Transformer architecture (from scratch)</h3>

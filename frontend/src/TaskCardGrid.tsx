@@ -1,5 +1,5 @@
 import type { TrainingJob } from "./api";
-import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
+import { jobArchitectureSummary, jobDatasetSummary, jobInitMode } from "./jobUtils";
 import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 
@@ -35,6 +35,7 @@ export function TaskCardGrid({ jobs, onSelect, onDelete }: Props) {
             <h3 className="task-card-title">{job.name}</h3>
             <ul className="task-card-kv">
               <li><span>Mode</span><span>{jobInitMode(job)}</span></li>
+            <li><span>Dataset</span><span>{jobDatasetSummary(job)}</span></li>
               <li><span>Architecture</span><span>{jobArchitectureSummary(job)}</span></li>
               <li><span>Workers</span><span>{job.num_workers} · GPU/worker {job.gpus_per_worker}</span></li>
               <li><span>Steps</span><span>{job.max_steps}</span></li>

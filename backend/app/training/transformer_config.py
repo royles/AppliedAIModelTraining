@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.training.architecture import InitMode, TransformerArchitectureConfig  # noqa: TC001
+from app.training.dataset_config import TrainingDatasetConfig
 
 
 TaskType = Literal["causal_lm", "sequence_classification"]
@@ -113,6 +114,11 @@ class TransformerTrainingConfig(BaseModel):
 
     # Classification-only
     num_labels: int = Field(default=2, ge=2, le=512)
+
+    dataset: TrainingDatasetConfig = Field(
+        default_factory=TrainingDatasetConfig,
+        description="Training corpus (builtin, inline, files under data/datasets, or Hugging Face).",
+    )
 
     @field_validator("bf16")
     @classmethod
@@ -235,6 +241,11 @@ TRANSFORMER_PRESETS: dict[str, TransformerPreset] = {
             warmup_ratio=0.05,
             weight_decay=0.1,
             lr_scheduler_type="cosine",
+            dataset=TrainingDatasetConfig(
+                source="builtin",
+                builtin_name="platform_demo",
+                repeat=40,
+            ),
         ),
     ),
     "scratch_gpt2_small": TransformerPreset(

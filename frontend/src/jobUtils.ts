@@ -14,6 +14,22 @@ export function jobInitMode(job: TrainingJob): string {
   return (c?.init_mode as string) ?? "—";
 }
 
+export function jobDatasetSummary(job: TrainingJob): string {
+  const c = parseJobConfig(job);
+  const ds = c?.dataset as Record<string, unknown> | undefined;
+  if (!ds || ds.source === "builtin") {
+    return `builtin:${(ds?.builtin_name as string) ?? "platform_demo"}`;
+  }
+  if (ds.source === "inline") {
+    const texts = ds.texts as string[] | undefined;
+    return `inline (${texts?.length ?? 0} examples)`;
+  }
+  if (ds.source === "huggingface") {
+    return `hf:${ds.hf_dataset ?? "?"}`;
+  }
+  return `${ds.source}:${ds.path ?? "?"}`;
+}
+
 export function jobArchitectureSummary(job: TrainingJob): string {
   const c = parseJobConfig(job);
   const arch = c?.architecture as Record<string, number> | undefined;

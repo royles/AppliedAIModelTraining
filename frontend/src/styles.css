@@ -534,6 +534,17 @@ label {
   color: #b8c5da;
 }
 
+textarea {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #33415f;
+  background: #0b1220;
+  color: inherit;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 6rem;
+}
+
 input,
 select {
   padding: 0.5rem 0.6rem;

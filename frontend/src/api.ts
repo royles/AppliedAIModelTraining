@@ -16,6 +16,22 @@ export type TransformerArchitecture = {
   tie_word_embeddings: boolean;
 };
 
+export type TrainingDatasetConfig = {
+  source: "builtin" | "inline" | "text_file" | "jsonl_file" | "huggingface";
+  builtin_name?: string;
+  texts?: string[];
+  labels?: number[] | null;
+  path?: string | null;
+  text_field?: string;
+  label_field?: string | null;
+  hf_dataset?: string | null;
+  hf_split?: string;
+  hf_text_column?: string;
+  hf_label_column?: string | null;
+  max_samples?: number | null;
+  repeat?: number;
+};
+
 export type TransformerConfig = {
   init_mode: "from_scratch" | "pretrained";
   task_type: "causal_lm" | "sequence_classification";
@@ -26,6 +42,7 @@ export type TransformerConfig = {
   per_device_train_batch_size: number;
   max_steps: number;
   openai_model_id?: string | null;
+  dataset?: TrainingDatasetConfig;
 };
 
 export type TransformerPreset = {
@@ -145,6 +162,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   listPresets: () => request<TransformerPreset[]>("/api/transformer/presets"),
+  listDatasetFiles: () =>
+    request<{ path: string; kind: string; size_bytes: string }[]>("/api/training/datasets/files"),
+  listBuiltinDatasets: () =>
+    request<Record<string, { title: string; description: string }>>("/api/training/datasets/builtin"),
   estimateArchitecture: (architecture: TransformerArchitecture) =>
     request<{ estimated_parameters: number }>("/api/transformer/architecture/estimate", {
       method: "POST",
