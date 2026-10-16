@@ -7,6 +7,7 @@ import {
 } from "./api";
 import { JobRunList } from "./JobRunList";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
+import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 
 export default function App() {
   const [jobWorkers, setJobWorkers] = useState(1);
@@ -154,7 +155,20 @@ export default function App() {
               ))}
             </select>
           </label>
-          <div className="arch-grid">
+          <TransformerArchitectureDiagram
+            hiddenSize={hiddenSize}
+            layers={layers}
+            heads={heads}
+            vocabSize={selectedPreset?.config.architecture.vocab_size ?? 50257}
+            maxPosition={
+              selectedPreset?.config.architecture.max_position_embeddings ?? 512
+            }
+            paramEstimate={paramEstimate}
+            onHiddenSizeChange={setHiddenSize}
+            onLayersChange={setLayers}
+            onHeadsChange={setHeads}
+          />
+          <div className="arch-grid arch-grid-compact">
             <label>
               Hidden size
               <input
@@ -188,9 +202,6 @@ export default function App() {
               />
             </label>
           </div>
-          {paramEstimate !== null && (
-            <p className="hint">~{paramEstimate.toLocaleString()} parameters (estimate)</p>
-          )}
           <label>
             Experiment
             <select

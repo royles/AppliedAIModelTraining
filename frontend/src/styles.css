@@ -68,6 +68,127 @@ header h1 {
   gap: 0.75rem;
 }
 
+.arch-grid-compact {
+  margin-top: 1rem;
+}
+
+.transformer-diagram-wrap {
+  margin: 1rem 0 0.5rem;
+  padding: 1rem;
+  background: #070d18;
+  border: 1px solid #243049;
+  border-radius: 10px;
+}
+
+.diagram-caption {
+  margin: 0 0 0.75rem;
+}
+
+.transformer-diagram-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.transformer-diagram {
+  display: block;
+  min-width: 720px;
+  width: 100%;
+  height: auto;
+}
+
+.transformer-diagram .diagram-node rect {
+  fill: #121a2b;
+  stroke: #3b82f6;
+  stroke-width: 1.5;
+}
+
+.transformer-diagram .diagram-node-muted rect {
+  stroke: #33415f;
+}
+
+.transformer-diagram .diagram-node-stack rect {
+  stroke: #60a5fa;
+}
+
+.transformer-diagram .diagram-inner {
+  fill: #0b1220;
+  stroke: #33415f;
+  stroke-width: 1;
+}
+
+.transformer-diagram .diagram-title {
+  fill: #e8eef7;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-sub {
+  fill: #9fb0c9;
+  font-size: 9px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-inner-title {
+  fill: #b8c5da;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-warn {
+  fill: #f87171;
+  font-size: 8px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.transformer-diagram .diagram-arrow {
+  stroke: #5b8def;
+  stroke-width: 2;
+  fill: none;
+}
+
+.transformer-diagram .diagram-inner-arrow {
+  stroke: #33415f;
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.transformer-diagram .diagram-stack-badge text {
+  fill: #6b7c96;
+  font-size: 9px;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.diagram-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 8px;
+  color: #9fb0c9;
+  margin: 0;
+}
+
+.diagram-input-label input {
+  padding: 0.2rem 0.35rem;
+  font-size: 11px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.diagram-input-inline input {
+  text-align: center;
+}
+
+.diagram-input-compact input {
+  padding: 0.15rem 0.25rem;
+  font-size: 10px;
+}
+
+.diagram-params {
+  margin: 0.75rem 0 0;
+}
+
 .hint {
   color: #9fb0c9;
   font-size: 0.85rem;
