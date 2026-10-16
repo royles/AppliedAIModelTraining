@@ -56,7 +56,7 @@ def mount_gateway_spa(app: FastAPI) -> bool:
     @app.get("/{spa_path:path}", include_in_schema=False)
     async def spa_fallback(spa_path: str) -> FileResponse:
         blocked_prefixes = ("api/", "v1/", "assets/")
-        blocked_exact = {"api", "v1", "assets", "docs", "redoc", "openapi.json"}
+        blocked_exact = {"v1", "assets"}
         if spa_path in blocked_exact or any(spa_path.startswith(p) for p in blocked_prefixes):
             raise HTTPException(status_code=404, detail="Not found")
         return _spa_index_response()

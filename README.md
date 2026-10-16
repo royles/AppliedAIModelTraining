@@ -60,7 +60,8 @@ Only use `python3 scripts/build_ui.py` on a machine with Node when changing `fro
 
 All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system Python (`PLATFORM_PYTHON` to override). `start.py` runs `pip install -r backend/requirements.txt` automatically when `uvicorn` / FastAPI are missing (set `PLATFORM_SKIP_DEP_CHECK=1` to skip).
 
-- API (direct, session only): http://127.0.0.1:8000/docs and http://127.0.0.1:8000/api/…
+- API browser docs (Swagger): **http://127.0.0.1:8000/api** (same on the Application URL)
+- API (direct, session only): http://127.0.0.1:8000/api/health, …
 - **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (served in-process by `ui_gateway`, same routes as port 8000)
 - **UX** binds **`CDSW_APP_PORT`**; **API** binds **`PLATFORM_API_PORT`** (default `8000`) on `127.0.0.1` only
 
