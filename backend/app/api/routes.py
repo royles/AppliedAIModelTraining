@@ -176,13 +176,19 @@ def estimate_architecture(architecture: TransformerArchitectureConfig) -> Archit
     )
 
 
-@router.get("/experiments", response_model=list[ExperimentRead])
-def list_experiments(db: Session = Depends(get_db)) -> list[Experiment]:
+def _list_projects(db: Session) -> list[Experiment]:
     return list(db.scalars(select(Experiment).order_by(Experiment.created_at.desc())))
 
 
-@router.post("/experiments", response_model=ExperimentRead)
-def create_experiment(payload: ExperimentCreate, db: Session = Depends(get_db)) -> Experiment:
+@router.get("/experiments", response_model=list[ExperimentRead], include_in_schema=False)
+@router.get("/projects", response_model=list[ExperimentRead])
+def list_projects(db: Session = Depends(get_db)) -> list[Experiment]:
+    return _list_projects(db)
+
+
+@router.post("/experiments", response_model=ExperimentRead, include_in_schema=False)
+@router.post("/projects", response_model=ExperimentRead)
+def create_project(payload: ExperimentCreate, db: Session = Depends(get_db)) -> Experiment:
     exp = Experiment(name=payload.name, description=payload.description)
     db.add(exp)
     db.commit()
@@ -208,7 +214,7 @@ def get_job(job_id: int, db: Session = Depends(get_db)) -> TrainingJobRead:
 def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> TrainingJob:
     exp = db.get(Experiment, payload.experiment_id)
     if not exp:
-        raise HTTPException(status_code=404, detail="Experiment not found")
+        raise HTTPException(status_code=404, detail="Project not found")
 
     cfg = _build_config(payload)
     job = TrainingJob(

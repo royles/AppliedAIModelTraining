@@ -48,14 +48,14 @@ def main() -> int:
     print("== Health ==")
     pretty(request_json("GET", "/api/health"))
 
-    print("== Create experiment ==")
+    print("== Create project ==")
     exp = request_json(
         "POST",
-        "/api/experiments",
+        "/api/projects",
         {"name": "CAI smoke", "description": "automated test"},
     )
     exp_id = exp["id"]
-    print(f"experiment_id={exp_id}")
+    print(f"project_id={exp_id}")
 
     print("== Submit training job (scratch_gpt2_tiny, 15 steps) ==")
     job = request_json(

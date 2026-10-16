@@ -17,7 +17,7 @@ export type RecipeContext = {
   jobWorkers: number;
   jobGpus: number;
   dataset: TrainingDatasetConfig;
-  selectedExp: number | null;
+  selectedProjectId: number | null;
   jobName: string;
   openaiModelId: string;
   paramEstimate: number | null;
@@ -45,12 +45,12 @@ function corpusChars(ctx: RecipeContext): number {
 export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
   const steps: Omit<RecipeStep, "waitingOn">[] = [
     {
-      id: "experiment",
-      title: "Experiment",
+      id: "project",
+      title: "Project",
       dependsOn: [],
-      requirement: "Select an experiment to group runs (create one if empty).",
-      volumetrics: "1 experiment record in SQLite.",
-      done: ctx.selectedExp !== null,
+      requirement: "Select a project to group model tasks (create one if empty).",
+      volumetrics: "One project record in the platform database.",
+      done: ctx.selectedProjectId !== null,
     },
     {
       id: "mode",

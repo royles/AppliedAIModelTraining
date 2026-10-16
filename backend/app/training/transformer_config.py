@@ -234,11 +234,11 @@ TRANSFORMER_PRESETS: dict[str, TransformerPreset] = {
             task_type="causal_lm",
             tokenizer=TokenizerBuildConfig(
                 mode="train_bpe_from_dataset",
-                vocab_size=8192,
+                vocab_size=2048,
             ),
             architecture=TransformerArchitectureConfig(
                 family="gpt2",
-                vocab_size=8192,
+                vocab_size=2048,
                 hidden_size=256,
                 num_hidden_layers=4,
                 num_attention_heads=4,
@@ -254,9 +254,9 @@ TRANSFORMER_PRESETS: dict[str, TransformerPreset] = {
             weight_decay=0.1,
             lr_scheduler_type="cosine",
             dataset=TrainingDatasetConfig(
-                source="builtin",
-                builtin_name="platform_demo",
-                repeat=40,
+                source="text_file",
+                path="starter_corpus.txt",
+                repeat=1,
             ),
         ),
     ),

@@ -2,7 +2,7 @@
 
 A small model-training control plane with:
 
-- **SQLite** state (`experiments`, `training_jobs`, `worker_groups`)
+- **SQLite** state (`projects` / `experiments` table, `training_jobs`, `worker_groups`)
 - **FastAPI** REST API (`backend/`)
 - **React** dashboard (`frontend/`)
 - **Ray Train** fine-tuning for transformer models
@@ -65,7 +65,7 @@ All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system 
 - **Application URL** (CAI): same host as the dashboard — **`<application-root>/api/…`** and **`<application-root>/v1/…`** (served in-process by `ui_gateway`, same routes as port 8000)
 - **UX** binds **`CDSW_APP_PORT`**; **API** binds **`PLATFORM_API_PORT`** (default `8000`) on `127.0.0.1` only
 
-Create an experiment and start a training job from the UI, or via `POST /api/jobs`.
+Create a project and start a training job from the UI, or via `POST /api/jobs`.
 
 Ray and CDSW worker defaults are editable in the UI and persisted in SQLite (`GET`/`PUT` `/api/platform/settings`).
 
@@ -92,7 +92,7 @@ python3 scripts/start.py
 
 On CAI, `start.py` runs the **API on :8000** (background) and the **UX gateway in the foreground on `CDSW_APP_PORT`**. The browser only needs the Application URL; the UI proxies API calls to port 8000 inside the session.
 
-3. Run the smoke test (creates experiment → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
+3. Run the smoke test (creates project → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 
 ```bash
 python3 scripts/cai_smoke_test.py

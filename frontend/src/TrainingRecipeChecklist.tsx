@@ -19,7 +19,7 @@ type Props = {
   jobWorkers: number;
   jobGpus: number;
   dataset: TrainingDatasetConfig;
-  selectedExp: number | null;
+  selectedExp: number | null; // project id
   jobName: string;
   openaiModelId: string;
   paramEstimate: number | null;
@@ -109,7 +109,7 @@ export function TrainingRecipeChecklist(props: Props) {
       jobWorkers,
       jobGpus,
       dataset,
-      selectedExp,
+      selectedProjectId: selectedExp,
       jobName,
       openaiModelId,
       paramEstimate,
