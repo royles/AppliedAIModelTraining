@@ -156,3 +156,5 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `RAY_TRAIN_NUM_WORKERS` | Max Ray Train workers per job (overrides auto cap when &gt; 0) |
 | `PLATFORM_PYTHON` | Override interpreter for start/install (default: current `python3`) |
 | `PLATFORM_SKIP_DEP_CHECK` | Set `1` to skip automatic `pip install` in `start.py` |
+| `PLATFORM_UVICORN_LOG_LEVEL` | Uvicorn console level (default `error`; use `info` when debugging) |
+| `PLATFORM_ACCESS_LOG` | Set `1` to re-enable HTTP access lines (`GET /api/jobs …`) in the terminal |

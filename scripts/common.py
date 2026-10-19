@@ -638,7 +638,8 @@ def _uvicorn_argv(app_target: str, port: str | int) -> list[str]:
             f"uvicorn is not installed for {platform_python()}. "
             "Run: python3 scripts/install.py"
         )
-    return [
+    log_level = os.environ.get("PLATFORM_UVICORN_LOG_LEVEL", "error").strip().lower()
+    argv = [
         platform_python(),
         "-m",
         "uvicorn",
@@ -647,7 +648,13 @@ def _uvicorn_argv(app_target: str, port: str | int) -> list[str]:
         BIND_HOST,
         "--port",
         str(port),
+        "--log-level",
+        log_level,
+        "--no-access-log",
     ]
+    if os.environ.get("PLATFORM_ACCESS_LOG", "").lower() in ("1", "true", "yes"):
+        argv = [a for a in argv if a != "--no-access-log"]
+    return argv
 
 
 def run_ui_gateway_foreground(ui: str | int, api: str | int) -> int:
