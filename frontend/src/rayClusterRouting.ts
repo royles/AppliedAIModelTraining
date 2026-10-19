@@ -35,7 +35,7 @@ export type LayoutBounds = {
   workerRowBottom: number;
 };
 
-const STUB = 8;
+const STUB = 10;
 
 function pathFromPoints(points: [number, number][]): string {
   if (points.length === 0) {
@@ -46,6 +46,10 @@ function pathFromPoints(points: [number, number][]): string {
       i === 0 ? `M ${p[0].toFixed(1)} ${p[1].toFixed(1)}` : `L ${p[0].toFixed(1)} ${p[1].toFixed(1)}`,
     )
     .join(" ");
+}
+
+function sourceMidY(a: LinkAnchor): number {
+  return (a.sourceTop + a.sourceBottom) / 2;
 }
 
 function corridorY(bounds: LayoutBounds, lane: number): number {
@@ -59,46 +63,35 @@ function gutterY(bounds: LayoutBounds, lane: number): number {
   return mid + (lane % 2 === 0 ? spread : -spread);
 }
 
+/** Horizontal lane just above worker cards (never through card bodies). */
 function workerCorridorY(bounds: LayoutBounds, lane: number): number {
-  return Math.min(
-    bounds.workerRowBottom - 10 - lane,
-    bounds.workerRowTop + 14 + lane * 2,
-  );
+  return Math.max(bounds.gutterBottom + 4 + lane, bounds.workerRowTop - 12 - lane * 2);
 }
 
 function routeSameRow(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
-  const dropY = a.targetTop;
   const isWorker = a.sourceRow === "worker";
+  const sy = sourceMidY(a);
+  const enterY = a.targetTop;
 
   if (a.ex >= a.sx) {
     const yC = isWorker ? workerCorridorY(bounds, lane) : corridorY(bounds, lane);
-    const pts: [number, number][] = [
-      [a.sx, a.sourceTop],
-      [a.sx + STUB, a.sourceTop],
+    return [
+      [a.sx, sy],
+      [a.sx + STUB, sy],
       [a.sx + STUB, yC],
       [a.tx, yC],
-      [a.tx, dropY],
+      [a.tx, enterY],
     ];
-    if (Math.abs(a.ex - a.tx) > 2) {
-      pts.push([a.ex, dropY]);
-    }
-    return pts;
   }
 
-  const yLow = isWorker
-    ? bounds.workerRowBottom - 8 - lane
-    : gutterY(bounds, lane);
-  const pts: [number, number][] = [
-    [a.sx, a.sourceTop],
-    [a.sx + STUB, a.sourceTop],
+  const yLow = isWorker ? bounds.workerRowBottom - 8 - lane : gutterY(bounds, lane);
+  return [
+    [a.sx, sy],
+    [a.sx + STUB, sy],
     [a.sx + STUB, yLow],
     [a.tx, yLow],
-    [a.tx, dropY],
+    [a.tx, enterY],
   ];
-  if (Math.abs(a.ex - a.tx) > 2) {
-    pts.push([a.ex, dropY]);
-  }
-  return pts;
 }
 
 function routeControlToWorker(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
@@ -108,7 +101,6 @@ function routeControlToWorker(a: LinkAnchor, bounds: LayoutBounds, lane: number)
     [a.scx, yG],
     [a.tx, yG],
     [a.tx, a.targetTop],
-    [a.ex, a.targetTop],
   ];
 }
 
@@ -119,7 +111,6 @@ function routeWorkerToControl(a: LinkAnchor, bounds: LayoutBounds, lane: number)
     [a.scx, yG],
     [a.tx, yG],
     [a.tx, a.targetBottom],
-    [a.ex, a.targetBottom],
   ];
 }
 

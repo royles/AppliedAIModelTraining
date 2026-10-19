@@ -32,7 +32,9 @@ describe("routeClusterLinks", () => {
       ],
       bounds,
     );
-    expect(paths[0].d).toContain("M 100.0 40.0");
+    expect(paths[0].d).toContain("M 100.0 75.0");
+    expect(paths[0].d).toMatch(/L 210\.0 40\.0$/);
+    expect(paths[0].d).not.toMatch(/L 198\.0 40\.0/);
   });
 
   it("routes control to worker through the gutter", () => {
@@ -81,6 +83,7 @@ describe("routeClusterLinks", () => {
       bounds,
     );
     expect(paths[0].d).not.toMatch(/20\.0/);
-    expect(paths[0].d).toMatch(/140\.0/);
+    expect(paths[0].d).toMatch(/L 210\.0 140\.0$/);
+    expect(paths[0].d).not.toMatch(/L 198\.0 140\.0/);
   });
 });
