@@ -79,7 +79,9 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
     if (!logs || !serialLogText) return;
     if (serialLogText !== lastSerialTextRef.current) {
       if (scrollStickRef.current) {
-        scrollLogToBottom(serialLogRef.current);
+        requestAnimationFrame(() => {
+          scrollLogToBottom(serialLogRef.current);
+        });
       }
       lastSerialTextRef.current = serialLogText;
     }
@@ -87,13 +89,10 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
 
   return (
     <div className="task-detail">
-      <header className="task-detail-top">
+      <header className="task-detail-toolbar">
         <button type="button" className="btn-secondary task-detail-back" onClick={onBack}>
           ← Tasks
         </button>
-
-        <TaskCard job={job} variant="detail" onOpenRegistry={onOpenRegistry} />
-
         <div className="task-detail-actions">
           {job.status === "failed" && (
             <button
@@ -129,7 +128,21 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
 
       {error && <div className="banner error">{error}</div>}
 
-      <section className="card log-panel log-panel-run">
+      <div className="task-detail-summary-row">
+        <TaskCard job={job} variant="detail" onOpenRegistry={onOpenRegistry} />
+
+        <section className="card task-detail-log-panel" aria-labelledby="task-run-log-title">
+          <h3 id="task-run-log-title" className="task-detail-log-title">
+            Provisioning &amp; training log
+          </h3>
+          <p className="hint">Framework and training output in time order</p>
+          <div className="log-stream log-stream-serial" ref={serialLogRef}>
+            <pre>{serialLogText || (logs ? "No log entries yet." : "Loading…")}</pre>
+          </div>
+        </section>
+      </div>
+
+      <section className="card log-panel log-panel-run log-panel-cluster">
         <h3>Framework &amp; Ray cluster</h3>
         <p className="hint">
           Control and Train on the top row; Ray workers on the bottom. Links use the band above and the corridor
@@ -142,11 +155,6 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
             loading={!logs}
             cdswEngines={job.num_workers}
           />
-        </div>
-        <h4 className="task-run-log-title">Provisioning &amp; training log</h4>
-        <p className="hint">Framework and training output in time order</p>
-        <div className="log-stream log-stream-serial" ref={serialLogRef}>
-          <pre>{serialLogText || (logs ? "No log entries yet." : "Loading…")}</pre>
         </div>
       </section>
     </div>

@@ -551,15 +551,6 @@ body {
   min-height: 0;
 }
 
-.task-detail-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  flex-shrink: 0;
-}
-
 .task-detail-back {
   flex-shrink: 0;
 }
@@ -568,9 +559,77 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  flex-shrink: 0;
+}
+
+.task-detail-summary-row {
+  display: grid;
+  grid-template-columns: minmax(15rem, 22rem) minmax(0, 1fr);
   gap: 1rem;
+  align-items: stretch;
   margin-bottom: 1rem;
   flex-shrink: 0;
+  min-height: 17rem;
+  max-height: min(40vh, 26rem);
+}
+
+.task-detail-summary-row .task-card-detail {
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.task-detail-summary-row .task-card-main-static {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.task-detail-log-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
+  margin: 0;
+}
+
+.task-detail-log-title {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.task-detail-log-panel .hint {
+  margin: 0 0 0.35rem;
+  flex-shrink: 0;
+}
+
+.task-detail-log-panel .log-stream-serial {
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  overflow: auto;
+}
+
+.log-panel-cluster {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .task-detail-summary-row {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .task-detail-log-panel .log-stream-serial {
+    min-height: 12rem;
+    max-height: min(36vh, 22rem);
+  }
 }
 
 .task-detail-title-wrap {
@@ -1278,17 +1337,6 @@ body {
   flex-direction: column;
 }
 
-.log-panel-run .log-stream-serial {
-  flex: 1;
-  min-height: 14rem;
-  margin-top: 0.35rem;
-}
-
-.task-run-log-title {
-  margin: 0.85rem 0 0.15rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-}
 
 .ray-cluster-legend-summary {
   flex: 1 1 12rem;
