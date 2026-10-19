@@ -31,6 +31,19 @@ def main() -> int:
     if not shutil.which("npm"):
         ok, message = ensure_prebuilt_ui_or_npm()
         print(message)
+        if frontend_dist_stale():
+            print(
+                "\nCannot rebuild UI on this machine (npm not installed).",
+                file=sys.stderr,
+            )
+            print(
+                "  On CAI/CDSW: git pull origin main  — production UI lives in frontend/dist.",
+                file=sys.stderr,
+            )
+            print(
+                "  Off CAI: run npm run build in frontend/, commit dist, or use a machine with Node.",
+                file=sys.stderr,
+            )
         return 0 if ok else 1
 
     if frontend_dist_ready() and ui_bundle_has_sidebar_ux():

@@ -130,9 +130,13 @@ def main() -> int:
         print(ui_message)
 
     if not args.dev_ui and frontend_dist_stale():
+        if shutil.which("npm"):
+            fix = "python3 scripts/build_ui.py --force   or   python3 scripts/start.py --rebuild-ui"
+        else:
+            fix = "git pull origin main  (build_ui.py cannot compile without npm on this machine)"
         print(
-            "WARNING: frontend/dist is older than frontend/src — you may be serving a stale UX.\n"
-            "  Fix: python3 scripts/build_ui.py   or   python3 scripts/start.py --rebuild-ui",
+            "WARNING: frontend/dist does not match frontend/src (see .ui-build-stamp).\n"
+            f"  Fix: {fix}",
             file=sys.stderr,
         )
     elif not args.dev_ui:

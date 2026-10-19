@@ -50,13 +50,9 @@ def frontend_dist_ready() -> bool:
     return FRONTEND_DIST.is_dir() and (FRONTEND_DIST / "index.html").is_file()
 
 
-def frontend_dist_stale() -> bool:
-    """True when source or tooling changed since the last production build."""
-    if not frontend_dist_ready():
-        return True
-    dist_mtime = (FRONTEND_DIST / "index.html").stat().st_mtime
+def _frontend_watch_paths() -> tuple[Path, ...]:
     frontend_dir = REPO_ROOT / "frontend"
-    watch_roots = (
+    return (
         frontend_dir / "src",
         frontend_dir / "index.html",
         frontend_dir / "package.json",
@@ -64,7 +60,52 @@ def frontend_dist_stale() -> bool:
         frontend_dir / "vite.config.ts",
         frontend_dir / "tsconfig.json",
     )
-    for root in watch_roots:
+
+
+def compute_frontend_src_fingerprint() -> str:
+    """Stable hash of UI inputs (git-friendly; avoids false stale warnings from mtimes on CAI)."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for root in _frontend_watch_paths():
+        if not root.exists():
+            continue
+        paths = [root] if root.is_file() else sorted(root.rglob("*"))
+        for path in paths:
+            if not path.is_file():
+                continue
+            if path.suffix in {".map"}:
+                continue
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            digest.update(rel.encode("utf-8"))
+            digest.update(str(path.stat().st_size).encode("utf-8"))
+            with path.open("rb") as fp:
+                while chunk := fp.read(65536):
+                    digest.update(chunk)
+    return digest.hexdigest()[:24]
+
+
+def _read_stamp_fingerprint() -> str | None:
+    stamp = FRONTEND_DIST / ".ui-build-stamp"
+    if not stamp.is_file():
+        return None
+    for line in stamp.read_text(encoding="utf-8").splitlines():
+        if line.startswith("src_fingerprint="):
+            return line.split("=", 1)[1].strip() or None
+    return None
+
+
+def frontend_dist_stale() -> bool:
+    """True when UI sources changed since the last stamped production build."""
+    if not frontend_dist_ready():
+        return True
+    current = compute_frontend_src_fingerprint()
+    stamped = _read_stamp_fingerprint()
+    if stamped:
+        return stamped != current
+    # Legacy bundles without fingerprint: fall back to mtime (may false-positive on CAI).
+    dist_mtime = (FRONTEND_DIST / "index.html").stat().st_mtime
+    for root in _frontend_watch_paths():
         if not root.exists():
             continue
         if root.is_file():
@@ -88,8 +129,16 @@ def write_ui_build_stamp() -> None:
     if not frontend_dist_ready():
         return
     stamp = FRONTEND_DIST / ".ui-build-stamp"
+    js_name = ""
+    assets = FRONTEND_DIST / "assets"
+    if assets.is_dir():
+        for js_path in sorted(assets.glob("index-*.js")):
+            js_name = js_path.name
+            break
     stamp.write_text(
-        f"built_at={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n",
+        f"built_at={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
+        f"src_fingerprint={compute_frontend_src_fingerprint()}\n"
+        f"bundle_js={js_name}\n",
         encoding="utf-8",
     )
 
@@ -126,9 +175,16 @@ def ensure_prebuilt_ui_or_npm() -> tuple[bool, str]:
             "Run `git pull origin main` (dist is committed) or copy frontend/dist from a dev machine.",
         )
     if ui_bundle_has_sidebar_ux():
+        if frontend_dist_stale():
+            return (
+                True,
+                "Using prebuilt frontend/dist (no npm on this machine). "
+                "Sources differ from stamp — run `git pull origin main` for the latest "
+                "committed bundle; `build_ui.py` cannot compile here without Node.",
+            )
         return True, "Using prebuilt frontend/dist (no npm required)."
     if shutil.which("npm"):
-        return False, "frontend/dist is present but outdated; run: python3 scripts/build_ui.py"
+        return False, "frontend/dist is present but outdated; run: python3 scripts/build_ui.py --force"
     return (
         False,
         "frontend/dist is outdated and npm is not available. "
