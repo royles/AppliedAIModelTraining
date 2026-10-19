@@ -302,12 +302,8 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
           {tierOrder.map((tier) => {
             const nodes = tiers.get(tier);
             if (!nodes?.length) return null;
-            const dense = nodes.length > 2 && (tier === "tier-workers" || tier === "tier-train");
             return (
-              <div
-                key={tier}
-                className={`ray-cluster-tier ${tier}${dense ? " ray-cluster-tier-dense" : ""}`}
-              >
+              <div key={tier} className={`ray-cluster-tier ${tier}`}>
                 {nodes.map((node) => (
                   <NodeCard key={node.id} node={node} />
                 ))}
