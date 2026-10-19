@@ -14,11 +14,32 @@ export function formatLogLines(lines: { ts: string; message: string }[]): string
 }
 
 /** Framework provisioning then training — one chronological stream for the task detail log. */
+const RAY_TRAIN_NOISE = [
+  /Failed to query Ray Train Controller actor state/i,
+  /`ray\.train\.report` has not been called by all \d+ workers/i,
+  /RAY_TRAIN_COLLECTIVE_WARN_INTERVAL_S/,
+  /following ranks to join the `ray\.train\.report` call/i,
+];
+
+function isNoiseLogLine(line: string): boolean {
+  const text = line.trim();
+  if (!text) return true;
+  if (/^\(PlacementGroupCleaner pid=\d+\)\s*$/i.test(text)) return true;
+  if (/^\(SynchronizationActor pid=\d+\)\s*$/i.test(text)) return true;
+  return RAY_TRAIN_NOISE.some((re) => re.test(text));
+}
+
+export function isRayTrainNoiseMessage(message: string): boolean {
+  const lines = message.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return true;
+  return lines.every((line) => isNoiseLogLine(line));
+}
+
 export function mergeSerialJobLogs(
   framework: { ts: string; message: string }[],
   training: { ts: string; message: string }[],
 ): { ts: string; message: string }[] {
-  const merged = [...framework, ...training];
+  const merged = [...framework, ...training].filter((line) => !isRayTrainNoiseMessage(line.message));
   merged.sort((a, b) => {
     const t = a.ts.localeCompare(b.ts);
     if (t !== 0) return t;

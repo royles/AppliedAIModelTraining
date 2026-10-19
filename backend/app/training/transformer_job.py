@@ -203,6 +203,10 @@ def _train_loop(config: dict[str, Any]) -> None:
                 return
         append_training_log_file(job_id, message)
 
+    from app.services.ray_log_noise import apply_ray_train_log_filters
+
+    apply_ray_train_log_filters()
+
     try:
         ctx = ray.train.get_context()
         rank = ctx.get_world_rank()
@@ -313,25 +317,28 @@ def _train_loop(config: dict[str, Any]) -> None:
                 steps_this_pass += 1
                 loss_val = float(loss.item() * accum)
                 lr_val = scheduler.get_last_lr()[0]
-                if rank == 0 and _should_log_step(step):
-                    ray.train.report(
-                        {
-                            "train_loss": loss_val,
-                            "step": step,
-                            "lr": lr_val,
-                            "epoch": dataset_pass,
-                        }
-                    )
-                    _log_training(
-                        train_step_line(
-                            step,
-                            max_steps,
-                            loss_val,
-                            lr_val,
-                            dataset_pass,
-                            spe,
+                if _should_log_step(step):
+                    if rank == 0:
+                        ray.train.report(
+                            {
+                                "train_loss": loss_val,
+                                "step": step,
+                                "lr": lr_val,
+                                "epoch": dataset_pass,
+                            }
                         )
-                    )
+                        _log_training(
+                            train_step_line(
+                                step,
+                                max_steps,
+                                loss_val,
+                                lr_val,
+                                dataset_pass,
+                                spe,
+                            )
+                        )
+                    else:
+                        ray.train.report({})
                 if rank == 0 and not warmup_logged and step >= warmup_steps:
                     warmup_logged = True
                     _log_training(train_warmup_done_line(step))

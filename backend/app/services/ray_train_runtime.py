@@ -15,6 +15,9 @@ def apply_ray_train_runtime_env() -> None:
     Does not override variables the user already set.
     """
     from app.services.ray_head_options import state_api_reachable
+    from app.services.ray_log_noise import apply_ray_train_log_filters
+
+    apply_ray_train_log_filters()
 
     if not state_api_reachable():
         import logging
@@ -30,6 +33,8 @@ def apply_ray_train_runtime_env() -> None:
         # CDSW workers often need several minutes for pip + ray start --block.
         "RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S": "600",
         "RAY_TRAIN_HEALTH_CHECK_INTERVAL_S": "5",
+        # Reduce collective wait warnings if a rank is slow to report (we report on all ranks).
+        "RAY_TRAIN_COLLECTIVE_WARN_INTERVAL_S": "600",
     }
     if cdsw_available():
         defaults["RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S"] = "900"
