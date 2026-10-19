@@ -162,3 +162,39 @@ class PlatformSettingsRead(BaseModel):
 class PlatformSettingsUpdate(BaseModel):
     ray: RaySettings | None = None
     cdsw_workers: CdswWorkerSettings | None = None
+
+
+class RegistryLifecycleInfo(BaseModel):
+    state: str
+    guidance: str
+    transitions_to: list[str]
+
+
+class RegistryModelRead(BaseModel):
+    id: int
+    job_id: int
+    job_name: str | None = None
+    openai_model_id: str
+    display_name: str | None
+    description: str | None
+    lifecycle_state: str
+    task_type: str
+    base_model: str
+    artifact_path: str
+    created_at_unix: int
+    updated_at: datetime
+    parent_model_id: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    benchmark: dict[str, Any] | None = None
+    model_card_markdown: str | None = None
+
+
+class RegistryModelUpdate(BaseModel):
+    display_name: str | None = None
+    description: str | None = None
+    benchmark: dict[str, Any] | None = None
+    model_card_markdown: str | None = None
+
+
+class RegistryTransitionRequest(BaseModel):
+    lifecycle_state: str

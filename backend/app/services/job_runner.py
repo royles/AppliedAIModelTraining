@@ -305,14 +305,17 @@ def run_training_job(job_id: int) -> None:
             and Path(result["artifact_dir"]).is_dir()
         ):
             model_id = cfg.openai_model_id or default_openai_model_id(job.id, job.name)
+            metrics = result.get("metrics") if isinstance(result.get("metrics"), dict) else None
             register_trained_model(
                 db,
-                job_id=job.id,
+                job=job,
                 openai_model_id=model_id,
                 artifact_path=result["artifact_dir"],
                 base_model=train_config["model_name"],
                 task_type=cfg.task_type,
                 architecture_json=cfg.architecture.model_dump_json(),
+                init_mode=cfg.init_mode,
+                training_metrics=metrics,
             )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Training job %s failed", job_id)

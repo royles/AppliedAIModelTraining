@@ -7,6 +7,7 @@ A small model-training control plane with:
 - **React** dashboard (`frontend/`)
 - **Ray Train** fine-tuning for transformer models
 - **Cloudera CDSW / CML workers** integration to launch GPU Ray workers elastically
+- **Model registry** with lifecycle states, auto metadata, and Hugging Face–style model cards ([docs/MODEL_REGISTRY.md](docs/MODEL_REGISTRY.md))
 
 ## Building from scratch
 

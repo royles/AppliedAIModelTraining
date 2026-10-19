@@ -14,6 +14,7 @@ from app.inference.schemas_openai import (
     ModelCard,
     ModelListResponse,
 )
+from app.services.model_lifecycle import SERVING_STATES, STATE_RETIRED
 from app.services.model_registry import get_model_by_openai_id, list_models
 
 router = APIRouter()
@@ -31,6 +32,8 @@ def list_openai_models(db: Session = Depends(get_db)) -> ModelListResponse:
             )
             for m in records
             if m.task_type == "causal_lm"
+            and m.lifecycle_state in SERVING_STATES
+            and m.lifecycle_state != STATE_RETIRED
         ]
     )
 
@@ -57,6 +60,19 @@ def create_chat_completion(
         raise HTTPException(
             status_code=400,
             detail="Only causal_lm models support chat completions",
+        )
+    if record.lifecycle_state == STATE_RETIRED:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model '{payload.model}' is retired",
+        )
+    if record.lifecycle_state not in SERVING_STATES:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Model '{payload.model}' is in state '{record.lifecycle_state}'. "
+                "Promote it in the Model Registry before serving."
+            ),
         )
 
     messages = [m.model_dump() for m in payload.messages]

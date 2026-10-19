@@ -8,6 +8,7 @@ import {
   type TokenizerBuildConfig,
   type TrainingJob,
 } from "./api";
+import { ModelRegistryPanel } from "./ModelRegistryPanel";
 import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { TaskCardGrid } from "./TaskCardGrid";
@@ -26,7 +27,7 @@ import {
   DEFAULT_VOCAB_SIZE,
 } from "./modelTaskDefaults";
 
-type NavView = "tasks" | "framework" | "model-tasks";
+type NavView = "tasks" | "registry" | "framework" | "model-tasks";
 
 export default function App() {
   const [nav, setNav] = useState<NavView>("tasks");
@@ -261,6 +262,13 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={nav === "registry" ? "active" : ""}
+            onClick={() => goNav("registry")}
+          >
+            Model registry
+          </button>
+          <button
+            type="button"
             className={nav === "framework" ? "active" : ""}
             onClick={() => goNav("framework")}
           >
@@ -311,6 +319,8 @@ export default function App() {
             </header>
             <TaskCardGrid jobs={jobs} onSelect={openTask} onDelete={deleteTask} />
           </>
+        ) : nav === "registry" ? (
+          <ModelRegistryPanel />
         ) : nav === "framework" ? (
           <div className="settings-page">
             <header className="main-panel-header">

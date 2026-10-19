@@ -101,3 +101,15 @@ class TrainedModel(Base):
     task_type: Mapped[str] = mapped_column(String(32), nullable=False)
     architecture_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at_unix: Mapped[int] = mapped_column(Integer, nullable=False)
+    lifecycle_state: Mapped[str] = mapped_column(String(32), default="trained")
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_card_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
+    benchmark_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("trained_models.id"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )

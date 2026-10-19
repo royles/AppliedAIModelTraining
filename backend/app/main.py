@@ -8,10 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from app.api.openai_routes import router as openai_router
+from app.api.registry_routes import router as registry_router
 from app.api.routes import router
 from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import SessionLocal, init_db
 from app.services.job_lifecycle import reconcile_stale_jobs
+from app.services.model_registry import backfill_registry_entries
 from app.services.platform_settings import sync_platform_ray_head_from_session
 from app.middleware.path_prefix import PathPrefixMiddleware
 from app.static_ui import mount_static_ui
@@ -26,6 +28,7 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         sync_platform_ray_head_from_session(db)
+        backfill_registry_entries(db)
         reconcile_stale_jobs(
             db,
             reason=(
@@ -62,6 +65,7 @@ def create_app() -> FastAPI:
         return RedirectResponse(url="/api", status_code=307)
 
     app.include_router(router, prefix="/api")
+    app.include_router(registry_router, prefix="/api")
     app.include_router(openai_router, prefix="/v1")
     # UX is served on CDSW_APP_PORT via app.ui_gateway; optional combined mode for local dev.
     if os.environ.get("PLATFORM_EMBED_UI", "").lower() in ("1", "true", "yes"):

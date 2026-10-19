@@ -37,6 +37,23 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _sqlite_add_column_if_missing("training_jobs", "config_json", "config_json TEXT")
     _sqlite_add_column_if_missing("training_jobs", "log_json", "log_json TEXT")
+    for col, ddl in (
+        ("lifecycle_state", "lifecycle_state VARCHAR(32) DEFAULT 'trained'"),
+        ("display_name", "display_name VARCHAR(255)"),
+        ("description", "description TEXT"),
+        ("metadata_json", "metadata_json TEXT"),
+        ("model_card_markdown", "model_card_markdown TEXT"),
+        ("benchmark_json", "benchmark_json TEXT"),
+        ("parent_model_id", "parent_model_id INTEGER"),
+        ("updated_at", "updated_at DATETIME"),
+    ):
+        _sqlite_add_column_if_missing("trained_models", col, ddl)
+    with engine.connect() as conn:
+        conn.exec_driver_sql(
+            "UPDATE trained_models SET lifecycle_state = 'trained' "
+            "WHERE lifecycle_state IS NULL OR lifecycle_state = ''"
+        )
+        conn.commit()
 
 
 def get_db() -> Generator[Session, None, None]:

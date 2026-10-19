@@ -141,6 +141,31 @@ export type JobLogs = {
   metrics: Record<string, unknown> | null;
 };
 
+export type RegistryLifecycleInfo = {
+  state: string;
+  guidance: string;
+  transitions_to: string[];
+};
+
+export type RegistryModel = {
+  id: number;
+  job_id: number;
+  job_name: string | null;
+  openai_model_id: string;
+  display_name: string | null;
+  description: string | null;
+  lifecycle_state: string;
+  task_type: string;
+  base_model: string;
+  artifact_path: string;
+  created_at_unix: number;
+  updated_at: string;
+  parent_model_id: number | null;
+  metadata: Record<string, unknown>;
+  benchmark: Record<string, unknown> | null;
+  model_card_markdown: string | null;
+};
+
 /** Resolve API paths against the current page URL (works behind CAI path prefixes). */
 export function resolveApiUrl(path: string): string {
   const relative = path.startsWith("/") ? path.slice(1) : path;
@@ -252,4 +277,12 @@ export const api = {
       `/api/jobs/${jobId}/scale`,
       { method: "POST", body: JSON.stringify({ target_workers }) },
     ),
+  listRegistryModels: () => request<RegistryModel[]>("/api/registry/models"),
+  getRegistryModel: (id: number) => request<RegistryModel>(`/api/registry/models/${id}`),
+  registryLifecycle: () => request<RegistryLifecycleInfo[]>("/api/registry/lifecycle"),
+  transitionRegistryModel: (id: number, lifecycle_state: string) =>
+    request<RegistryModel>(`/api/registry/models/${id}/transition`, {
+      method: "POST",
+      body: JSON.stringify({ lifecycle_state }),
+    }),
 };
