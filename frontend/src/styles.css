@@ -600,17 +600,36 @@ body {
   min-height: 0;
 }
 
-.log-panel-framework .log-ray-status {
-  flex: 0 1 36%;
-  min-height: 12rem;
-  margin-bottom: 0.25rem;
+.framework-ray-row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 1.35fr);
+  gap: 0.75rem;
+  flex: 0 1 auto;
+  min-height: 18rem;
+  max-height: 46vh;
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 900px) {
+  .framework-ray-row {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+}
+
+.log-panel-framework .framework-ray-row .log-ray-status {
+  min-height: 16rem;
+  max-height: 46vh;
+  overflow: auto;
+  margin-top: 0;
+}
+
+.log-panel-framework .ray-status-column {
+  min-width: 0;
 }
 
 .log-panel-framework .ray-cluster-panel {
-  flex: 0 1 52%;
-  min-height: 22rem;
-  max-height: 42vh;
-  overflow: auto;
+  min-width: 0;
 }
 
 .ray-status-panel {
@@ -1150,8 +1169,9 @@ body {
 }
 
 .log-panel-framework .log-stream-framework {
-  flex: 1 1 64%;
-  min-height: 16rem;
+  flex: 1 1 auto;
+  min-height: 14rem;
+  margin-top: 0.65rem;
 }
 
 .log-panel-training .log-stream-training {

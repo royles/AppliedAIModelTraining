@@ -164,9 +164,18 @@ def project_root() -> Path:
                 return p.resolve()
     return Path.cwd().resolve()
 
+def ray_importable(py: str) -> bool:
+    return (
+        subprocess.call(
+            [py, "-c", "import ray"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        == 0
+    )
+
 def ensure_ray(py: str, root: Path) -> None:
-    import importlib.util
-    if importlib.util.find_spec("ray") is not None:
+    if ray_importable(py):
         return
     req = root / "backend" / "requirements.txt"
     env = {{**os.environ, "PIP_USER": "0"}}
@@ -177,14 +186,28 @@ def ensure_ray(py: str, root: Path) -> None:
 
 def pick_python(root: Path) -> str:
     venv_py = root / ".venv" / "bin" / "python"
+    candidates: list[str] = []
     if venv_py.is_file():
-        return str(venv_py)
-    return sys.executable
+        candidates.append(str(venv_py))
+    if sys.executable not in candidates:
+        candidates.append(sys.executable)
+    for candidate in candidates:
+        if ray_importable(candidate):
+            return candidate
+    return candidates[0]
 
 root = project_root()
 os.chdir(root)
 py = pick_python(root)
 ensure_ray(py, root)
+if not ray_importable(py):
+    alt = sys.executable
+    if alt != py and ray_importable(alt):
+        print(f"[platform] WARN: {{py}} has no ray; using {{alt}}", flush=True)
+        py = alt
+    else:
+        print(f"[platform] ERROR: cannot import ray in {{py}} (or {{alt}})", flush=True)
+        raise SystemExit(1)
 
 def worker_node_ip() -> str:
     for key in ("CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
