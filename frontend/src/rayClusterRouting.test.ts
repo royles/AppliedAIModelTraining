@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { routeClusterLinks } from "./rayClusterRouting";
 
 const bounds = {
+  linkBandTop: 8,
   linkBandBottom: 32,
   controlRowTop: 36,
   controlRowBottom: 120,
@@ -12,7 +13,7 @@ const bounds = {
 };
 
 describe("routeClusterLinks", () => {
-  it("routes same-row links in the top band", () => {
+  it("routes same-row control links through the link band via top centers", () => {
     const paths = routeClusterLinks(
       [
         {
@@ -32,9 +33,10 @@ describe("routeClusterLinks", () => {
       ],
       bounds,
     );
-    expect(paths[0].d).toContain("M 100.0 75.0");
+    expect(paths[0].d).toContain("M 80.0 40.0");
     expect(paths[0].d).toMatch(/L 210\.0 40\.0$/);
-    expect(paths[0].d).not.toMatch(/L 198\.0 40\.0/);
+    expect(paths[0].d).not.toMatch(/L 198\.0/);
+    expect(paths[0].d).not.toMatch(/L 100\.0/);
   });
 
   it("routes control to worker through the gutter", () => {
@@ -62,7 +64,7 @@ describe("routeClusterLinks", () => {
     expect(paths[0].d).toMatch(/126\.0/);
   });
 
-  it("keeps worker same-row links in the worker row", () => {
+  it("keeps worker same-row links above worker cards", () => {
     const paths = routeClusterLinks(
       [
         {
@@ -83,7 +85,7 @@ describe("routeClusterLinks", () => {
       bounds,
     );
     expect(paths[0].d).not.toMatch(/20\.0/);
+    expect(paths[0].d).toContain("M 80.0 140.0");
     expect(paths[0].d).toMatch(/L 210\.0 140\.0$/);
-    expect(paths[0].d).not.toMatch(/L 198\.0 140\.0/);
   });
 });

@@ -7,7 +7,7 @@ export type LinkAnchor = {
   healthy: boolean;
   sourceRow: NodeRow;
   targetRow: NodeRow;
-  /** Source right edge (same-row) or center x (cross-row exit) */
+  /** Source right edge (legacy measure) */
   sx: number;
   scx: number;
   sourceTop: number;
@@ -25,17 +25,17 @@ export type RoutedLink = {
 };
 
 export type LayoutBounds = {
+  linkBandTop: number;
   linkBandBottom: number;
   controlRowTop: number;
   controlRowBottom: number;
-  /** Vertical band between control and worker rows (links run here). */
   gutterTop: number;
   gutterBottom: number;
   workerRowTop: number;
   workerRowBottom: number;
 };
 
-const STUB = 10;
+const LINK_PAD = 3;
 
 function pathFromPoints(points: [number, number][]): string {
   if (points.length === 0) {
@@ -48,54 +48,54 @@ function pathFromPoints(points: [number, number][]): string {
     .join(" ");
 }
 
-function sourceMidY(a: LinkAnchor): number {
-  return (a.sourceTop + a.sourceBottom) / 2;
+/** Horizontal lane in the top link band (strictly above control cards). */
+function controlCorridorY(bounds: LayoutBounds, lane: number): number {
+  const mid = (bounds.linkBandTop + bounds.linkBandBottom) / 2;
+  const maxY = bounds.controlRowTop - LINK_PAD - lane;
+  return Math.min(mid + lane * 1.5, maxY);
 }
 
-function corridorY(bounds: LayoutBounds, lane: number): number {
-  return Math.max(8 + lane, bounds.linkBandBottom - 12 - lane);
-}
-
-function gutterY(bounds: LayoutBounds, lane: number): number {
+/** Lane in the gutter between control and worker rows. */
+function gutterCorridorY(bounds: LayoutBounds, lane: number): number {
   const mid = (bounds.gutterTop + bounds.gutterBottom) / 2;
-  const half = Math.max(4, (bounds.gutterBottom - bounds.gutterTop) / 2 - 2);
+  const half = Math.max(3, (bounds.gutterBottom - bounds.gutterTop) / 2 - LINK_PAD);
   const spread = Math.min(half, lane * 1.25);
   return mid + (lane % 2 === 0 ? spread : -spread);
 }
 
-/** Horizontal lane just above worker cards (never through card bodies). */
-function workerCorridorY(bounds: LayoutBounds, lane: number): number {
-  return Math.max(bounds.gutterBottom + 4 + lane, bounds.workerRowTop - 12 - lane * 2);
+/** Lane in the gap above worker cards (below gutter). */
+function workerApproachY(bounds: LayoutBounds, lane: number): number {
+  const maxY = bounds.workerRowTop - LINK_PAD - lane;
+  const minY = bounds.gutterBottom + LINK_PAD + lane;
+  return Math.max(minY, Math.min(maxY, (minY + maxY) / 2));
 }
 
 function routeSameRow(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
   const isWorker = a.sourceRow === "worker";
-  const sy = sourceMidY(a);
+  const exitY = a.sourceTop;
   const enterY = a.targetTop;
 
-  if (a.ex >= a.sx) {
-    const yC = isWorker ? workerCorridorY(bounds, lane) : corridorY(bounds, lane);
+  if (a.tx >= a.scx) {
+    const yC = isWorker ? workerApproachY(bounds, lane) : controlCorridorY(bounds, lane);
     return [
-      [a.sx, sy],
-      [a.sx + STUB, sy],
-      [a.sx + STUB, yC],
+      [a.scx, exitY],
+      [a.scx, yC],
       [a.tx, yC],
       [a.tx, enterY],
     ];
   }
 
-  const yLow = isWorker ? bounds.workerRowBottom - 8 - lane : gutterY(bounds, lane);
+  const yC = isWorker ? bounds.workerRowBottom + LINK_PAD + lane : gutterCorridorY(bounds, lane);
   return [
-    [a.sx, sy],
-    [a.sx + STUB, sy],
-    [a.sx + STUB, yLow],
-    [a.tx, yLow],
+    [a.scx, exitY],
+    [a.scx, yC],
+    [a.tx, yC],
     [a.tx, enterY],
   ];
 }
 
 function routeControlToWorker(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
-  const yG = gutterY(bounds, lane);
+  const yG = gutterCorridorY(bounds, lane);
   return [
     [a.scx, a.sourceBottom],
     [a.scx, yG],
@@ -105,7 +105,7 @@ function routeControlToWorker(a: LinkAnchor, bounds: LayoutBounds, lane: number)
 }
 
 function routeWorkerToControl(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
-  const yG = gutterY(bounds, lane);
+  const yG = gutterCorridorY(bounds, lane);
   return [
     [a.scx, a.sourceTop],
     [a.scx, yG],

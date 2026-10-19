@@ -188,9 +188,9 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       const controlRow = canvasEl.querySelector(".ray-cluster-row-control .ray-cluster-row-nodes");
       const workerRow = canvasEl.querySelector(".ray-cluster-row-workers .ray-cluster-row-nodes");
 
-      const linkBandBottom = linkBand
-        ? linkBand.getBoundingClientRect().bottom - canvasBox.top
-        : 32;
+      const linkBandRect = linkBand?.getBoundingClientRect();
+      const linkBandTop = linkBandRect ? linkBandRect.top - canvasBox.top : 0;
+      const linkBandBottom = linkBandRect ? linkBandRect.bottom - canvasBox.top : 32;
 
       const controlRect = controlRow?.getBoundingClientRect();
       const workerRect = workerRow?.getBoundingClientRect();
@@ -205,6 +205,7 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       const gutterBottom = gutterRect ? gutterRect.bottom - canvasBox.top : workerRowTop;
 
       const bounds: LayoutBounds = {
+        linkBandTop,
         linkBandBottom,
         controlRowTop,
         controlRowBottom,
