@@ -19,6 +19,7 @@ from common import (
     cd_repo,
     ensure_prebuilt_ui_or_npm,
     frontend_dist_ready,
+    frontend_dist_stale,
     ui_bundle_has_sidebar_ux,
     write_ui_build_stamp,
 )
