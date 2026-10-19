@@ -1,6 +1,5 @@
 import type { TrainingJob } from "./api";
-import { jobArchitectureSummary, jobDatasetSummary, jobInitMode } from "./jobUtils";
-import { ModelInferenceLinks } from "./ModelInferenceLinks";
+import { TaskCard } from "./TaskCard";
 import { confirmDeleteTask } from "./taskDelete";
 
 type Props = {
@@ -22,30 +21,8 @@ export function TaskCardGrid({ jobs, onSelect, onDelete }: Props) {
   return (
     <div className="task-card-grid">
       {jobs.map((job) => (
-        <article key={job.id} className="task-card">
-          <button
-            type="button"
-            className="task-card-main"
-            onClick={() => onSelect(job.id)}
-          >
-            <div className="task-card-head">
-              <span className="task-card-id">#{job.id}</span>
-              <span className={`pill ${job.status}`}>{job.status}</span>
-            </div>
-            <h3 className="task-card-title">{job.name}</h3>
-            <ul className="task-card-kv">
-              <li><span>Mode</span><span>{jobInitMode(job)}</span></li>
-            <li><span>Dataset</span><span>{jobDatasetSummary(job)}</span></li>
-              <li><span>Architecture</span><span>{jobArchitectureSummary(job)}</span></li>
-              <li><span>Workers</span><span>{job.num_workers} · GPU/worker {job.gpus_per_worker}</span></li>
-              <li><span>Steps</span><span>{job.max_steps}</span></li>
-              <li><span>Batch</span><span>{job.batch_size}</span></li>
-              <li><span>LR</span><span>{job.learning_rate}</span></li>
-              <li><span>Ray</span><span><code>{job.ray_address ?? "—"}</code></span></li>
-            </ul>
-            <span className="task-card-cta">View logs →</span>
-            <ModelInferenceLinks job={job} compact />
-          </button>
+        <div key={job.id} className="task-card-wrap">
+          <TaskCard job={job} onSelect={() => onSelect(job.id)} />
           <button
             type="button"
             className="btn-danger task-card-delete"
@@ -57,7 +34,7 @@ export function TaskCardGrid({ jobs, onSelect, onDelete }: Props) {
           >
             Delete
           </button>
-        </article>
+        </div>
       ))}
     </div>
   );

@@ -39,6 +39,11 @@ export type RayClusterTopology = {
 
 export type DistributedTrainingStatus = {
   backend: string;
+  collective_backend?: string | null;
+  nccl_defaults_enabled?: boolean;
+  mode_label?: string;
+  multi_train_ranks?: boolean;
+  multi_engine_cluster?: boolean;
   status: string;
   active: boolean;
   multi_worker: boolean;

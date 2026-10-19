@@ -1,5 +1,4 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { DistributedTrainingStrip } from "./DistributedTrainingStrip";
 import type { RayClusterComponent, RayClusterLink } from "./rayClusterTypes";
 import { parseDistributed, parseTopology } from "./rayClusterTypes";
 
@@ -7,6 +6,7 @@ type Props = {
   status: Record<string, unknown> | null | undefined;
   jobStatus: string;
   loading?: boolean;
+  cdswEngines?: number;
 };
 
 const ROLE_ORDER: Record<string, number> = {
@@ -35,6 +35,23 @@ function tierForRole(role: string): string {
   return ROLE_TIER[role] ?? "tier-workers";
 }
 
+function clusterAlerts(
+  status: Record<string, unknown> | null | undefined,
+  topologyNote?: string,
+): string[] {
+  const out: string[] = [];
+  for (const key of ["cluster_error", "note"]) {
+    const v = status?.[key];
+    if (typeof v === "string" && v.trim()) {
+      out.push(v.trim());
+    }
+  }
+  if (topologyNote?.trim()) {
+    out.push(topologyNote.trim());
+  }
+  return out;
+}
+
 function NodeCard({ node }: { node: RayClusterComponent }) {
   const roleClass = node.role.replace(/_/g, "-");
   return (
@@ -50,10 +67,10 @@ function NodeCard({ node }: { node: RayClusterComponent }) {
       </header>
       <h6 className="ray-node-title">{node.title}</h6>
       <p className="ray-node-sub">{node.subtitle}</p>
-      <code className="ray-node-host">{node.host}</code>
+      {node.host ? <code className="ray-node-host">{node.host}</code> : null}
       {node.metrics.length > 0 && (
         <ul className="ray-node-metrics">
-          {node.metrics.slice(0, 5).map((m) => (
+          {node.metrics.slice(0, 6).map((m) => (
             <li key={m.key}>
               <span>{m.label}</span>
               <strong>{m.display}</strong>
@@ -88,14 +105,80 @@ function linesEqual(a: Line[], b: Line[]): boolean {
   return true;
 }
 
-export function RayClusterMap({ status, jobStatus, loading }: Props) {
+function enrichComponents(
+  components: RayClusterComponent[],
+  distributed: ReturnType<typeof parseDistributed>,
+): RayClusterComponent[] {
+  if (!distributed) {
+    return components;
+  }
+  const cfg = distributed.configured;
+  const obs = distributed.observed;
+  const modeLabel =
+    (distributed as { mode_label?: string }).mode_label ??
+    distributed.summary;
+
+  return components.map((c) => {
+    if (c.id !== "train-controller") {
+      return c;
+    }
+    const extra = [
+      {
+        key: "mode",
+        label: "Scale",
+        value: 0,
+        display:
+          modeLabel ||
+          (cfg.ray_train_workers > 1
+            ? `${cfg.ray_train_workers} Train ranks`
+            : cfg.cdsw_worker_engines > 1
+              ? `${cfg.cdsw_worker_engines} engines · 1 Train rank`
+              : "Single Train rank"),
+        unit: "text",
+      },
+      {
+        key: "backend",
+        label: "Backend",
+        value: 0,
+        display: distributed.backend ?? "—",
+        unit: "text",
+      },
+      {
+        key: "ranks",
+        label: "Ranks live",
+        value: obs.ranks_live,
+        display: `${obs.ranks_live}/${obs.world_size || cfg.ray_train_workers || "?"}`,
+        unit: "count",
+      },
+    ];
+    if (distributed.collective_backend) {
+      extra.push({
+        key: "collective",
+        label: "Collective",
+        value: 0,
+        display: String(distributed.collective_backend),
+        unit: "text",
+      });
+    }
+    const keys = new Set(c.metrics.map((m) => m.key));
+    const merged = [...c.metrics, ...extra.filter((e) => !keys.has(e.key))];
+    return { ...c, metrics: merged };
+  });
+}
+
+export function RayClusterMap({ status, loading, cdswEngines }: Props) {
   const topology = useMemo(() => parseTopology(status), [status]);
   const distributed = useMemo(() => parseDistributed(status), [status]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
 
-  const components = topology?.components ?? [];
+  const components = useMemo(
+    () => enrichComponents(topology?.components ?? [], distributed),
+    [topology, distributed],
+  );
   const links = topology?.links ?? EMPTY_LINKS;
+  const summary = topology?.summary;
+  const alerts = clusterAlerts(status, topology?.note);
 
   const tiers = useMemo(() => {
     const grouped = new Map<string, RayClusterComponent[]>();
@@ -127,10 +210,10 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
         const a = fromEl.getBoundingClientRect();
         const b = toEl.getBoundingClientRect();
         next.push({
-          x1: a.left + a.width / 2 - rootBox.left,
-          y1: a.bottom - rootBox.top,
-          x2: b.left + b.width / 2 - rootBox.left,
-          y2: b.top - rootBox.top,
+          x1: a.right - rootBox.left,
+          y1: a.top + a.height / 2 - rootBox.top,
+          x2: b.left - rootBox.left,
+          y2: b.top + b.height / 2 - rootBox.top,
           healthy: link.healthy,
           key: `${link.from}-${link.to}-${link.kind}`,
         });
@@ -147,24 +230,30 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
     return <p className="hint">Loading cluster map…</p>;
   }
 
+  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-train", "tier-workers"];
+
   if (!topology || components.length === 0) {
     return (
       <div className="ray-cluster-map empty">
-        <DistributedTrainingStrip distributed={distributed} jobStatus={jobStatus} />
-        <p className="hint">Cluster topology unavailable — start Ray and open a running task.</p>
+        <p className="hint">
+          Cluster map unavailable — start Ray and open a running task.
+          {cdswEngines && cdswEngines > 0 ? ` (${cdswEngines} CDSW engine(s) configured.)` : ""}
+        </p>
       </div>
     );
   }
 
-  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-train", "tier-workers"];
-
   return (
     <div className="ray-cluster-map" ref={containerRef}>
-      <DistributedTrainingStrip distributed={distributed} jobStatus={jobStatus} />
+      {alerts.length > 0 && (
+        <ul className="ray-cluster-alerts">
+          {alerts.map((msg, i) => (
+            <li key={i}>{msg}</li>
+          ))}
+        </ul>
+      )}
 
-      {topology.note && <p className="hint ray-cluster-note">{topology.note}</p>}
-
-      <div className="ray-cluster-canvas">
+      <div className="ray-cluster-canvas ray-cluster-canvas-ltr">
         <svg className="ray-cluster-svg" aria-hidden>
           {lines.map((ln) => (
             <line
@@ -192,9 +281,19 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
       </div>
 
       <footer className="ray-cluster-legend">
-        <span><i className="legend-line ok" /> Healthy link</span>
-        <span><i className="legend-line bad" /> Issue / pending</span>
-        <span>GCS {topology.gcs_reachable ? "reachable" : "unreachable"}</span>
+        <span><i className="legend-line ok" /> Healthy</span>
+        <span><i className="legend-line bad" /> Issue</span>
+        <span>GCS {topology.gcs_reachable ? "up" : "down"}</span>
+        {summary && (
+          <>
+            <span>Nodes {summary.alive_nodes ?? 0} alive</span>
+            <span>
+              CPU {summary.used_cpu ?? 0}/{summary.total_cpu ?? 0} · GPU{" "}
+              {summary.used_gpu ?? 0}/{summary.total_gpu ?? 0}
+            </span>
+          </>
+        )}
+        {distributed?.summary && <span className="ray-cluster-legend-summary">{distributed.summary}</span>}
       </footer>
     </div>
   );

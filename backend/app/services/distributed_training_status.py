@@ -122,8 +122,12 @@ def build_distributed_training_status(
         world_size = int(ranks[0].get("world_size") or len(ranks))
 
     configured_train = max(1, int(ray_train_workers or 1))
+    cdsw_engines = max(0, int(num_cdsw_workers or 0))
     ranks_live = len(ranks)
-    multi_worker = world_size > 1 or configured_train > 1
+    multi_train_ranks = world_size > 1 or configured_train > 1
+    multi_engine_cluster = cdsw_engines > 1
+    # Legacy flag: true only when TorchTrainer runs multiple ranks (not CDSW engine count).
+    multi_worker = multi_train_ranks
     all_ranks_reported = world_size > 0 and ranks_live >= world_size
 
     running = job_status in ("provisioning", "running", "queued")
@@ -160,9 +164,11 @@ def build_distributed_training_status(
         "status": status_label,
         "active": active,
         "multi_worker": multi_worker,
-        "multi_node": multi_worker and (num_cdsw_workers > 0 or world_size > 1),
+        "multi_train_ranks": multi_train_ranks,
+        "multi_engine_cluster": multi_engine_cluster,
+        "multi_node": multi_train_ranks and (cdsw_engines > 0 or world_size > 1),
         "configured": {
-            "cdsw_worker_engines": num_cdsw_workers,
+            "cdsw_worker_engines": cdsw_engines,
             "ray_train_workers": configured_train,
             "gpus_per_worker": gpus_per_worker,
         },
@@ -177,10 +183,32 @@ def build_distributed_training_status(
             world_size=world_size,
             ranks_live=ranks_live,
             configured_train=configured_train,
-            num_cdsw_workers=num_cdsw_workers,
-            multi_worker=multi_worker,
+            num_cdsw_workers=cdsw_engines,
+            multi_train_ranks=multi_train_ranks,
+            multi_engine_cluster=multi_engine_cluster,
+        ),
+        "mode_label": _mode_label(
+            configured_train=configured_train,
+            world_size=world_size,
+            cdsw_engines=cdsw_engines,
+            multi_train_ranks=multi_train_ranks,
         ),
     }
+
+
+def _mode_label(
+    *,
+    configured_train: int,
+    world_size: int,
+    cdsw_engines: int,
+    multi_train_ranks: bool,
+) -> str:
+    train_n = world_size if world_size > 0 else configured_train
+    if multi_train_ranks:
+        return f"Distributed Train · {train_n} ranks"
+    if cdsw_engines > 1:
+        return f"{cdsw_engines} CDSW engines · 1 Train rank"
+    return "Single Train rank"
 
 
 def _summary_text(
@@ -190,15 +218,21 @@ def _summary_text(
     ranks_live: int,
     configured_train: int,
     num_cdsw_workers: int,
-    multi_worker: bool,
+    multi_train_ranks: bool,
+    multi_engine_cluster: bool,
 ) -> str:
     if status_label == "distributed_active":
-        if multi_worker:
+        if multi_train_ranks:
             return (
                 f"Distributed training is running: {ranks_live}/{world_size} Ray Train "
                 f"worker ranks active (TorchTrainer, CDSW engines={num_cdsw_workers})."
             )
-        return f"Training active on 1 Ray Train worker (world size {world_size})."
+        if multi_engine_cluster:
+            return (
+                f"Training on 1 Ray Train rank across a {num_cdsw_workers}-engine Ray cluster "
+                f"(CDSW workers provide GPUs; TorchTrainer world size {world_size or 1})."
+            )
+        return f"Training active on 1 Ray Train worker (world size {world_size or 1})."
     if status_label == "partial":
         return (
             f"Training starting: {ranks_live}/{max(world_size, configured_train)} "

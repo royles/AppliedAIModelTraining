@@ -13,6 +13,20 @@ export function formatLogLines(lines: { ts: string; message: string }[]): string
   return lines.map((l) => formatLogEntry(l.ts, l.message)).join("\n");
 }
 
+/** Framework provisioning then training — one chronological stream for the task detail log. */
+export function mergeSerialJobLogs(
+  framework: { ts: string; message: string }[],
+  training: { ts: string; message: string }[],
+): { ts: string; message: string }[] {
+  const merged = [...framework, ...training];
+  merged.sort((a, b) => {
+    const t = a.ts.localeCompare(b.ts);
+    if (t !== 0) return t;
+    return a.message.localeCompare(b.message);
+  });
+  return merged;
+}
+
 /** Box-drawing chars in framework banners should share the same column on every row. */
 export function boxColumnAligned(formatted: string, boxStartColumn: number): boolean {
   const rows = formatted.split("\n");

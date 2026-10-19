@@ -28,6 +28,16 @@ export type RayStatusDashboard = {
   messages: RayStatusField[];
 };
 
+/** Nested blobs rendered only in the cluster diagram — never as raw JSON in the UI. */
+export const RAY_STATUS_NESTED_KEYS = new Set([
+  "topology",
+  "distributed",
+  "metrics",
+  "cluster_resources",
+  "cluster_resources_available",
+  "cluster_resources_used",
+]);
+
 const TOP_LEVEL_ORDER = [
   "job_ray_address",
   "initialized",
@@ -63,7 +73,10 @@ function formatScalar(value: unknown): string {
   if (typeof value === "string") {
     return value;
   }
-  return JSON.stringify(value);
+  if (typeof value === "object") {
+    return "—";
+  }
+  return String(value);
 }
 
 function parseNumeric(value: unknown): number | null {
@@ -176,7 +189,7 @@ export function rayStatusToDashboard(
   }
 
   const extraKeys = Object.keys(status)
-    .filter((k) => k !== "cluster_resources" && !seen.has(k))
+    .filter((k) => !RAY_STATUS_NESTED_KEYS.has(k) && !seen.has(k))
     .sort();
   for (const key of extraKeys) {
     const raw = status[key];

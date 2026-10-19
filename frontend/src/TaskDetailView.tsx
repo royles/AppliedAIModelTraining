@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
-import { jobArchitectureSummary, jobInitMode, trainingJobListFieldsEqual } from "./jobUtils";
-import { ModelInferenceLinks } from "./ModelInferenceLinks";
+import { trainingJobListFieldsEqual } from "./jobUtils";
+import { TaskCard } from "./TaskCard";
 import { confirmDeleteTask } from "./taskDelete";
-import { formatLogLines } from "./logFormat";
+import { formatLogLines, mergeSerialJobLogs } from "./logFormat";
 import { RayClusterMap } from "./RayClusterMap";
-import { RayStatusPanel } from "./RayStatusPanel";
 import { rayStatusFingerprint } from "./rayStatusFields";
 
 type Props = {
@@ -33,22 +32,22 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
-  const frameworkLogRef = useRef<HTMLDivElement>(null);
-  const trainingLogRef = useRef<HTMLDivElement>(null);
-  const lastFrameworkTextRef = useRef("");
-  const lastTrainingTextRef = useRef("");
-  const scrollStickRef = useRef({ framework: true, training: true });
+  const serialLogRef = useRef<HTMLDivElement>(null);
+  const lastSerialTextRef = useRef("");
+  const scrollStickRef = useRef(true);
   const onJobUpdatedRef = useRef(onJobUpdated);
   onJobUpdatedRef.current = onJobUpdated;
   const jobRef = useRef(job);
   jobRef.current = job;
 
+  const serialLogText = useMemo(() => {
+    if (!logs) return "";
+    return formatLogLines(mergeSerialJobLogs(logs.framework, logs.training));
+  }, [logs]);
+
   const loadLogs = useCallback(async () => {
     try {
-      scrollStickRef.current = {
-        framework: !frameworkLogRef.current || isNearBottom(frameworkLogRef.current),
-        training: !trainingLogRef.current || isNearBottom(trainingLogRef.current),
-      };
+      scrollStickRef.current = !serialLogRef.current || isNearBottom(serialLogRef.current);
       const [data, freshJob] = await Promise.all([
         api.getJobLogs(job.id),
         api.getJob(job.id),
@@ -72,42 +71,29 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
   const rayStatusKey = logs ? rayStatusFingerprint(logs.ray_status) : "";
 
   useEffect(() => {
-    lastFrameworkTextRef.current = "";
-    lastTrainingTextRef.current = "";
-    scrollStickRef.current = { framework: true, training: true };
+    lastSerialTextRef.current = "";
+    scrollStickRef.current = true;
   }, [job.id]);
 
   useEffect(() => {
-    if (!logs) return;
-
-    const frameworkText = formatLogLines(logs.framework);
-    const trainingText = formatLogLines(logs.training);
-
-    if (frameworkText !== lastFrameworkTextRef.current) {
-      if (scrollStickRef.current.framework) {
-        scrollLogToBottom(frameworkLogRef.current);
+    if (!logs || !serialLogText) return;
+    if (serialLogText !== lastSerialTextRef.current) {
+      if (scrollStickRef.current) {
+        scrollLogToBottom(serialLogRef.current);
       }
-      lastFrameworkTextRef.current = frameworkText;
+      lastSerialTextRef.current = serialLogText;
     }
-
-    if (trainingText !== lastTrainingTextRef.current) {
-      if (scrollStickRef.current.training) {
-        scrollLogToBottom(trainingLogRef.current);
-      }
-      lastTrainingTextRef.current = trainingText;
-    }
-  }, [logs, rayStatusKey]);
+  }, [logs, rayStatusKey, serialLogText]);
 
   return (
     <div className="task-detail">
-      <div className="task-detail-toolbar">
-        <button type="button" className="btn-secondary" onClick={onBack}>
-          ← All tasks
+      <header className="task-detail-top">
+        <button type="button" className="btn-secondary task-detail-back" onClick={onBack}>
+          ← Tasks
         </button>
-        <div className="task-detail-title-wrap">
-          <h2>{job.name}</h2>
-          <span className={`pill ${job.status}`}>{job.status}</span>
-        </div>
+
+        <TaskCard job={job} variant="detail" onOpenRegistry={onOpenRegistry} />
+
         <div className="task-detail-actions">
           {job.status === "failed" && (
             <button
@@ -124,7 +110,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
                 void onRestart(job.id, resume).finally(() => setRestarting(false));
               }}
             >
-              {restarting ? "Restarting…" : "Restart task"}
+              {restarting ? "Restarting…" : "Restart"}
             </button>
           )}
           <button
@@ -136,64 +122,30 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
               }
             }}
           >
-            Delete task
+            Delete
           </button>
         </div>
-      </div>
-
-      <article className="card task-detail-summary">
-        <ul className="kv">
-          <li><span>Task id</span><span>#{job.id}</span></li>
-          <li><span>Init</span><span>{jobInitMode(job)}</span></li>
-          <li><span>Architecture</span><span>{jobArchitectureSummary(job)}</span></li>
-          <li><span>Workers / GPU</span><span>{job.num_workers} / {job.gpus_per_worker}</span></li>
-          <li><span>Max steps</span><span>{job.max_steps}</span></li>
-          <li><span>Ray</span><span><code>{job.ray_address ?? "local"}</code></span></li>
-          {job.error_message && (
-            <li className="task-error">
-              <span>Error</span>
-              <span>{job.error_message}</span>
-            </li>
-          )}
-        </ul>
-      </article>
-
-      <ModelInferenceLinks job={job} onOpenRegistry={onOpenRegistry} />
+      </header>
 
       {error && <div className="banner error">{error}</div>}
 
-      <div className="log-split">
-        <section className="card log-panel log-panel-framework">
-          <h3>Framework &amp; Ray status</h3>
-          <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 5s)</p>
-          <div className="framework-ray-row">
-            <div className="log-ray-status ray-status-column">
-              <RayStatusPanel
-                status={logs?.ray_status}
-                loading={!logs}
-                jobWorkers={job.num_workers}
-              />
-            </div>
-            <div className="log-ray-status ray-cluster-panel">
-              <RayClusterMap
-                status={logs?.ray_status}
-                jobStatus={job.status}
-                loading={!logs}
-              />
-            </div>
-          </div>
-          <div className="log-stream log-stream-framework" ref={frameworkLogRef}>
-            <pre>{formatLogLines(logs?.framework ?? [])}</pre>
-          </div>
-        </section>
-        <section className="card log-panel log-panel-training">
-          <h3>Training steps</h3>
-          <p className="hint">Loss, learning rate, and checkpoint steps from the train loop</p>
-          <div className="log-stream log-stream-training" ref={trainingLogRef}>
-            <pre>{formatLogLines(logs?.training ?? [])}</pre>
-          </div>
-        </section>
-      </div>
+      <section className="card log-panel log-panel-run">
+        <h3>Framework &amp; Ray cluster</h3>
+        <p className="hint">Left-to-right: driver → head → Train → workers (updates every 5s)</p>
+        <div className="log-ray-status ray-cluster-panel ray-cluster-panel-full">
+          <RayClusterMap
+            status={logs?.ray_status}
+            jobStatus={job.status}
+            loading={!logs}
+            cdswEngines={job.num_workers}
+          />
+        </div>
+        <h4 className="task-run-log-title">Provisioning &amp; training log</h4>
+        <p className="hint">Framework and training output in time order</p>
+        <div className="log-stream log-stream-serial" ref={serialLogRef}>
+          <pre>{serialLogText || (logs ? "No log entries yet." : "Loading…")}</pre>
+        </div>
+      </section>
     </div>
   );
 }
