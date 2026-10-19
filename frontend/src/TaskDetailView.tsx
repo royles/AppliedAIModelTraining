@@ -10,6 +10,7 @@ type Props = {
   onDelete: (jobId: number) => void | Promise<void>;
   onRestart: (jobId: number, resume: boolean) => void | Promise<void>;
   onJobUpdated?: (job: TrainingJob) => void;
+  onOpenRegistry?: () => void;
 };
 
 function formatLogLines(lines: { ts: string; message: string }[]): string {
@@ -29,7 +30,7 @@ function scrollLogToBottom(el: HTMLDivElement | null) {
   }
 }
 
-export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated }: Props) {
+export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated, onOpenRegistry }: Props) {
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
@@ -165,7 +166,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated 
         </ul>
       </article>
 
-      <ModelInferenceLinks job={job} />
+      <ModelInferenceLinks job={job} onOpenRegistry={onOpenRegistry} />
 
       {error && <div className="banner error">{error}</div>}
 

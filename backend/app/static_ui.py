@@ -45,11 +45,21 @@ def read_ui_build_info() -> dict[str, str]:
     css_match = re.search(r'/assets/(index-[^"\']+\.css)', html)
     stamp_path = dist / ".ui-build-stamp"
     stamp = stamp_path.read_text(encoding="utf-8").strip() if stamp_path.is_file() else ""
+    js_name = js_match.group(1) if js_match else ""
+    features: dict[str, bool] = {}
+    if js_name:
+        js_path = dist / "assets" / js_name
+        try:
+            bundle = js_path.read_text(encoding="utf-8", errors="ignore")
+            features["model_registry"] = "Model registry" in bundle and "/api/registry" in bundle
+        except OSError:
+            features["model_registry"] = False
     info = {
         "status": "ready",
-        "js": js_match.group(1) if js_match else "",
+        "js": js_name,
         "css": css_match.group(1) if css_match else "",
         "stamp": stamp,
+        "features": features,
     }
     return info
 

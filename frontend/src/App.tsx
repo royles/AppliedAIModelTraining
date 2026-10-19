@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   type Project,
+  type RegistryModel,
   type TransformerArchitecture,
   type TransformerPreset,
   type TrainingDatasetConfig,
@@ -59,6 +60,8 @@ export default function App() {
   const [dataset, setDataset] = useState<TrainingDatasetConfig>(DEFAULT_DATASET);
   const [error, setError] = useState<string | null>(null);
   const [uiBuildLabel, setUiBuildLabel] = useState<string | null>(null);
+  const [registryModels, setRegistryModels] = useState<RegistryModel[]>([]);
+  const [registryUiMissing, setRegistryUiMissing] = useState(false);
 
   const selectedPreset = presets.find((p) => p.name === preset);
   const selectedJob = useMemo(
@@ -76,6 +79,7 @@ export default function App() {
       setProjects(exps);
       setJobs(j);
       setPresets(pr);
+      api.listRegistryModels().then(setRegistryModels).catch(() => setRegistryModels([]));
       if (selectedExp === null && exps.length > 0) {
         setSelectedExp(exps[0].id);
       }
@@ -93,8 +97,11 @@ export default function App() {
     api.uiBuildInfo().then((info) => {
       if (info.status === "ready" && info.js) {
         setUiBuildLabel(info.js.replace(/^index-/, "").replace(/\.js$/, ""));
+        const features = info.features as { model_registry?: boolean } | undefined;
+        setRegistryUiMissing(features?.model_registry === false);
       }
     }).catch(() => setUiBuildLabel(null));
+    api.listRegistryModels().then(setRegistryModels).catch(() => setRegistryModels([]));
   }, []);
 
   useEffect(() => {
@@ -220,6 +227,11 @@ export default function App() {
     setSelectedJobId(null);
   }
 
+  function openRegistry() {
+    setSelectedJobId(null);
+    setNav("registry");
+  }
+
   async function restartTask(jobId: number, resume: boolean) {
     try {
       const updated = await api.restartJob(jobId, { resume });
@@ -266,6 +278,7 @@ export default function App() {
             onClick={() => goNav("registry")}
           >
             Model registry
+            {registryModels.length > 0 ? ` (${registryModels.length})` : ""}
           </button>
           <button
             type="button"
@@ -297,6 +310,13 @@ export default function App() {
         </header>
 
         {error && <div className="banner error">{error}</div>}
+        {registryUiMissing && (
+          <div className="banner warn">
+            This UI bundle is missing the Model registry panel. Run{" "}
+            <code>git pull origin main</code> and restart <code>scripts/start.py</code>, then hard-refresh
+            the browser.
+          </div>
+        )}
 
         {selectedJob && selectedJobId !== null ? (
           <TaskDetailView
@@ -310,12 +330,19 @@ export default function App() {
             onJobUpdated={(fresh) => {
               setJobs((prev) => prev.map((j) => (j.id === fresh.id ? fresh : j)));
             }}
+            onOpenRegistry={openRegistry}
           />
         ) : nav === "tasks" ? (
           <>
             <header className="main-panel-header">
               <h2>Model task runs</h2>
-              <p className="hint">Click a card to open live framework and training logs.</p>
+              <p className="hint">
+                Click a card to open live framework and training logs. Trained models appear in{" "}
+                <button type="button" className="link-button" onClick={openRegistry}>
+                  Model registry
+                </button>
+                .
+              </p>
             </header>
             <TaskCardGrid jobs={jobs} onSelect={openTask} onDelete={deleteTask} />
           </>

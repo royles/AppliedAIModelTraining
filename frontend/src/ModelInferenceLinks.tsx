@@ -4,9 +4,10 @@ import { resolveApiUrl } from "./api";
 type Props = {
   job: TrainingJob;
   compact?: boolean;
+  onOpenRegistry?: () => void;
 };
 
-export function ModelInferenceLinks({ job, compact = false }: Props) {
+export function ModelInferenceLinks({ job, compact = false, onOpenRegistry }: Props) {
   if (job.status !== "succeeded" || !job.openai_model_id) {
     return null;
   }
@@ -57,6 +58,13 @@ export function ModelInferenceLinks({ job, compact = false }: Props) {
           <span className="hint"> — try POST /v1/chat/completions interactively</span>
         </li>
       </ul>
+      {onOpenRegistry && (
+        <p>
+          <button type="button" className="btn-secondary" onClick={onOpenRegistry}>
+            Open Model registry (lifecycle &amp; model card)
+          </button>
+        </p>
+      )}
       <details className="inference-curl">
         <summary>Example curl</summary>
         <pre>

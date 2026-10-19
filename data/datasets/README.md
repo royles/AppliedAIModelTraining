@@ -9,7 +9,7 @@ Use enough raw text (see the UI guidance for minimum characters vs vocab size).
 
 | File | Purpose |
 |------|---------|
-| `starter_corpus.txt` | Default causal-LM corpus (~52k chars). User/Assistant lines about training, Ray, BPE, and this platform. Used by the **scratch_gpt2_tiny** preset and Model Tasks defaults. |
+| `starter_corpus.txt` | Default causal-LM corpus (~52k chars). Verbose User/Assistant paragraphs (blank line between turns) about training, Ray, BPE, and this platform—no bracket suffixes. Used by the **scratch_gpt2_tiny** preset and Model Tasks defaults. |
 | `example_causal.jsonl` | Small JSONL sample for file-based dataset configuration. |
 
 Regenerate `starter_corpus.txt` after editing seeds:

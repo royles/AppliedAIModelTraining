@@ -211,7 +211,13 @@ export const api = {
       body: JSON.stringify(body),
     }),
   uiBuildInfo: () =>
-    request<{ status: string; js?: string; css?: string; stamp?: string }>("/api/ui/build-info"),
+    request<{
+      status: string;
+      js?: string;
+      css?: string;
+      stamp?: string;
+      features?: { model_registry?: boolean };
+    }>("/api/ui/build-info"),
   listPresets: () => request<TransformerPreset[]>("/api/transformer/presets"),
   listDatasetFiles: () =>
     request<{ path: string; kind: string; size_bytes: string }[]>("/api/training/datasets/files"),
