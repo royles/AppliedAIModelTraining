@@ -537,6 +537,8 @@ def start_ray_head() -> None:
             "Dashboard (optional): RAY_INCLUDE_DASHBOARD=1 after installing ray[default].",
             file=sys.stderr,
         )
+        return
+    os.environ["RAY_ADDRESS"] = "127.0.0.1:6379"
 
 
 def start_background_process(

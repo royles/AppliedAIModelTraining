@@ -23,6 +23,11 @@ from app.services.platform_settings import (
     worker_pool_kwargs,
 )
 from app.services.job_log import append_job_log
+from app.services.log_flair import framework_banner, framework_line
+from app.services.ray_cluster_watch import (
+    log_cdsw_worker_api_status,
+    log_cdsw_worker_ids,
+)
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
@@ -59,12 +64,19 @@ def run_training_job(job_id: int) -> None:
         if not job:
             return
         _update_job(db, job_id, status="provisioning")
-        append_job_log(db, job_id, "framework", "Job queued; starting provisioning.")
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            framework_banner("Model task provisioning"),
+        )
+        append_job_log(db, job_id, "framework", framework_line("queue", "Job queued"))
 
         cfg = resolve_job_config(job)
         artifact_dir = str((REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve())
         Path(artifact_dir).mkdir(parents=True, exist_ok=True)
         train_config = cfg.to_train_dict(job_id=job_id, artifact_dir=artifact_dir)
+        train_config["job_epochs"] = job.epochs
 
         def framework_log(msg: str) -> None:
             append_job_log(db, job_id, "framework", msg)
@@ -100,18 +112,24 @@ def run_training_job(job_id: int) -> None:
                 db,
                 job_id,
                 "framework",
-                f"Launching {job.num_workers} CDSW worker(s) for Ray head {head}.",
+                framework_line(
+                    "worker",
+                    f"Launching {job.num_workers} CDSW engine(s) toward master {head}",
+                ),
             )
             launched = pool.launch(job.num_workers, head)
             worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
             worker_group.status = "running"
             db.commit()
-            append_job_log(
+            log_cdsw_worker_ids(db, job_id, launched.worker_ids, head)
+            log_cdsw_worker_api_status(
                 db,
                 job_id,
-                "framework",
-                f"Workers launched: {launched.worker_ids}",
+                pool.list_workers_safe if pool.is_remote else None,
+                launched.worker_ids,
             )
+            train_config["expected_cdsw_worker_nodes"] = job.num_workers
+            train_config["ray_head_address"] = head
 
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
@@ -136,7 +154,10 @@ def run_training_job(job_id: int) -> None:
                 db,
                 job_id,
                 "framework",
-                f"Capping Ray Train workers from {job.num_workers} to {train_workers}.",
+                framework_line(
+                    "warn",
+                    f"Capping Ray Train workers {job.num_workers} -> {train_workers}",
+                ),
             )
             logger.warning(
                 "Capping Ray Train workers from %s to %s (small container / "
@@ -155,7 +176,12 @@ def run_training_job(job_id: int) -> None:
             db,
             job_id,
             "framework",
-            f"Training starting (Ray={ray_addr or 'local'}, train_workers={train_workers}, gpu={use_gpu}).",
+            framework_line(
+                "train",
+                f"Train start ray={ray_addr or 'local'} workers={train_workers} "
+                f"gpu={use_gpu} max_steps={train_config.get('max_steps')} "
+                f"epochs={job.epochs}",
+            ),
         )
         if is_low_memory_container() and train_config.get("per_device_train_batch_size", 4) > 2:
             train_config = {
@@ -169,7 +195,12 @@ def run_training_job(job_id: int) -> None:
                 train_config["per_device_train_batch_size"],
             )
 
-        append_job_log(db, job_id, "framework", "Ray Train job submitted.")
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            framework_line("train", "Ray Train job submitted to master"),
+        )
         result = run_transformer_training(
             ray_address=ray_addr,
             num_workers=train_workers,
@@ -180,7 +211,10 @@ def run_training_job(job_id: int) -> None:
             db,
             job_id,
             "framework",
-            f"Training finished. Metrics: {json.dumps(result.get('metrics', {}))}",
+            framework_line(
+                "done",
+                f"Training finished metrics={json.dumps(result.get('metrics', {}))}",
+            ),
         )
         _update_job(
             db,
@@ -208,7 +242,7 @@ def run_training_job(job_id: int) -> None:
             )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Training job %s failed", job_id)
-        append_job_log(db, job_id, "framework", f"Job failed: {exc}")
+        append_job_log(db, job_id, "framework", framework_line("fail", f"Job failed: {exc}"))
         _update_job(db, job_id, status="failed", error_message=str(exc))
     finally:
         if pool is not None:

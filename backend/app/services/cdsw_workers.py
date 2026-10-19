@@ -150,8 +150,11 @@ py = sys.executable
 root = project_root()
 os.chdir(root)
 ensure_ray(py, root)
+print(f"[platform] CDSW worker connecting to Ray head (master) at {{HEAD}}", flush=True)
 cmd = [py, "-m", "ray.scripts.scripts", "start", "--block", f"--address={{HEAD}}"]
-raise SystemExit(subprocess.call(cmd))
+rc = subprocess.call(cmd)
+print(f"[platform] ray start --block exited with code {{rc}}", flush=True)
+raise SystemExit(rc)
 '''
 
 
@@ -238,6 +241,15 @@ class CdswRayWorkerPool:
         self._launched = LaunchedWorkers(worker_ids=worker_ids, raw=raw)
         logger.info("Launched %s CDSW workers for Ray head %s", count, head_address)
         return self._launched
+
+    def list_workers_safe(self) -> list[dict[str, Any]]:
+        if self._client is None:
+            return []
+        try:
+            return self._client.list_workers()
+        except Exception:  # noqa: BLE001
+            logger.exception("list_workers failed")
+            return []
 
     def scale(self, target: int, head_address: str) -> LaunchedWorkers:
         current = len(self._launched.worker_ids) if self._launched else 0

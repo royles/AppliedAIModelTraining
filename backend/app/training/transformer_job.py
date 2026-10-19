@@ -149,7 +149,9 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     accum = config.get("gradient_accumulation_steps", 1)
     max_grad_norm = config["max_grad_norm"]
-    log_every = config.get("logging_steps", 5)
+    log_every = max(1, int(config.get("logging_steps", 5)))
+    warmup_steps = max(1, int(max_steps * config.get("warmup_ratio", 0.03)))
+    job_epochs = int(config.get("job_epochs") or 1)
 
     step = 0
     micro = 0
@@ -158,26 +160,69 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     job_id = int(config.get("job_id") or 0)
     from app.services.job_log import append_training_log_file
+    from app.services.log_flair import (
+        steps_per_epoch,
+        train_epoch_end_line,
+        train_epoch_start_line,
+        train_finished_line,
+        train_save_line,
+        train_step_line,
+        train_warmup_done_line,
+        train_worker_ready_line,
+        training_line,
+    )
 
-    def _log_training(message: str) -> None:
+    def _log_training(message: str, *, all_ranks: bool = False) -> None:
         if job_id <= 0:
             return
         try:
             import ray as _ray
 
-            if _ray.train.get_context().get_world_rank() != 0:
+            if not all_ranks and _ray.train.get_context().get_world_rank() != 0:
                 return
         except Exception:  # noqa: BLE001
-            pass
+            if not all_ranks:
+                return
         append_training_log_file(job_id, message)
 
+    try:
+        ctx = ray.train.get_context()
+        rank = ctx.get_world_rank()
+        world_size = ctx.get_world_size()
+    except Exception:  # noqa: BLE001
+        rank, world_size = 0, 1
+
+    spe = steps_per_epoch(len(texts), batch_size)
     ds = config.get("dataset") or {}
     _log_training(
-        f"Worker ready: task={task} batch={batch_size} max_steps={max_steps} "
-        f"device={device} dataset_source={ds.get('source', 'builtin')} examples={len(texts)}"
+        train_worker_ready_line(rank, world_size, str(device), len(texts), max_steps),
+        all_ranks=True,
     )
+    if rank == 0:
+        _log_training(
+            training_line(
+                "info",
+                f"task={task} batch={batch_size} seq={max_len} "
+                f"dataset={ds.get('source', 'builtin')} steps/epoch~{spe} "
+                f"target_epochs={job_epochs} warmup_steps={warmup_steps}",
+            )
+        )
+
+    def _should_log_step(s: int) -> bool:
+        if s == 1 or s >= max_steps:
+            return True
+        if max_steps <= 200:
+            return True
+        return s % log_every == 0
+
+    dataset_pass = 0
+    warmup_logged = False
 
     while step < max_steps:
+        dataset_pass += 1
+        if rank == 0:
+            _log_training(train_epoch_start_line(dataset_pass))
+        steps_this_pass = 0
         for batch in loader:
             if task == "causal_lm":
                 input_ids, attention_mask = batch
@@ -216,29 +261,44 @@ def _train_loop(config: dict[str, Any]) -> None:
                 scheduler.step()
                 optimizer.zero_grad()
                 step += 1
-                if step % log_every == 0:
-                    loss_val = float(loss.item() * accum)
-                    lr_val = scheduler.get_last_lr()[0]
+                steps_this_pass += 1
+                loss_val = float(loss.item() * accum)
+                lr_val = scheduler.get_last_lr()[0]
+                if rank == 0 and _should_log_step(step):
                     ray.train.report(
                         {
                             "train_loss": loss_val,
                             "step": step,
                             "lr": lr_val,
+                            "epoch": dataset_pass,
                         }
                     )
                     _log_training(
-                        f"step={step}/{max_steps} train_loss={loss_val:.4f} lr={lr_val:.2e}"
+                        train_step_line(
+                            step,
+                            max_steps,
+                            loss_val,
+                            lr_val,
+                            dataset_pass,
+                            spe,
+                        )
                     )
+                if rank == 0 and not warmup_logged and step >= warmup_steps:
+                    warmup_logged = True
+                    _log_training(train_warmup_done_line(step))
                 if step >= max_steps:
                     break
+        if rank == 0 and steps_this_pass > 0:
+            _log_training(train_epoch_end_line(dataset_pass, steps_this_pass))
         if step >= max_steps:
             break
 
-    ctx = ray.train.get_context()
-    if ctx.get_world_rank() == 0 and task == "causal_lm":
-        _log_training("Saving model artifacts.")
+    if rank == 0:
+        _log_training(train_finished_line(step))
+    if rank == 0 and task == "causal_lm":
+        _log_training(train_save_line("Writing model + tokenizer to artifact_dir…"))
         _save_artifacts(model, tokenizer, artifact_dir, config)
-        _log_training("Artifacts saved.")
+        _log_training(train_save_line("Artifacts saved."))
 
 
 def run_transformer_training(
@@ -253,6 +313,9 @@ def run_transformer_training(
     from ray.train.torch import TorchTrainer
 
     job_id = int(train_config.get("job_id") or 0)
+
+    from app.services.log_flair import framework_line
+    from app.services.ray_cluster_watch import log_ray_nodes_snapshot, wait_for_ray_nodes
 
     def _framework(msg: str) -> None:
         if job_id <= 0:
@@ -270,23 +333,33 @@ def run_transformer_training(
             pass
 
     if ray_address:
-        _framework(f"Connecting driver to Ray at {ray_address}…")
+        _framework(framework_line("ray", f"Driver connecting to master at {ray_address}"))
         if not ray.is_initialized():
             ray.init(address=ray_address, ignore_reinit_error=True)
     else:
-        _framework("Starting local Ray runtime for training…")
+        _framework(framework_line("ray", "Starting local Ray runtime"))
         if not ray.is_initialized():
             ray.init(ignore_reinit_error=True)
 
-    try:
-        nodes = len(ray.nodes())
-        resources = ray.cluster_resources()
-        _framework(
-            f"Ray connected: {nodes} node(s), cluster GPUs={resources.get('GPU', 0)}, "
-            f"CPUs={resources.get('CPU', 0)}."
+    log_ray_nodes_snapshot(_framework, "Driver view")
+    expected_cdsw = int(train_config.get("expected_cdsw_worker_nodes") or 0)
+    if expected_cdsw > 0:
+        wait_for_ray_nodes(
+            _framework,
+            min_alive=1 + expected_cdsw,
+            timeout_sec=600.0,
         )
-    except Exception as exc:  # noqa: BLE001
-        _framework(f"Ray connected (cluster stats unavailable: {exc}).")
+    else:
+        try:
+            resources = ray.cluster_resources()
+            _framework(
+                framework_line(
+                    "ray",
+                    f"Cluster GPUs={resources.get('GPU', 0)} CPUs={resources.get('CPU', 0)}",
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            _framework(framework_line("warn", f"Cluster stats unavailable: {exc}"))
 
     scaling = ScalingConfig(
         num_workers=num_workers,
@@ -299,11 +372,13 @@ def run_transformer_training(
         scaling_config=scaling,
     )
     _framework(
-        f"Ray Train scheduling {num_workers} worker(s) "
-        f"(use_gpu={use_gpu}); first training metrics appear after the worker starts."
+        framework_line(
+            "train",
+            f"Scheduling {num_workers} Ray Train worker(s) on master gpu={use_gpu}",
+        )
     )
     result = trainer.fit()
-    _framework("Ray Train run finished; collecting metrics.")
+    _framework(framework_line("done", "Ray Train run complete; collecting metrics"))
     artifact = train_config.get("artifact_dir")
     return {
         "metrics": result.metrics,
