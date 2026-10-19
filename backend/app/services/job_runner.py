@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -131,15 +132,40 @@ def run_training_job(job_id: int) -> None:
             train_config["expected_cdsw_worker_nodes"] = job.num_workers
             train_config["ray_head_address"] = head
 
+        from app.services.cdsw_workers import wait_for_gcs_port
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
-        ray_addr = resolve_ray_address(head)
-        if head:
-            ray_addr = ray_driver_init_address(head) or ray_addr
+        worker_head = head
+        ray_addr = ray_driver_init_address(head) if head else resolve_ray_address(None)
         if head and ray_addr is None:
             from app.services.cdsw_workers import ray_client_address
 
             ray_addr = ray_client_address(head)
+
+        if head and ray_addr and ray_addr.startswith("127.0.0.1:"):
+            port = int(ray_addr.split(":")[1])
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    f"Waiting for Ray GCS on {ray_addr} (workers use head {worker_head})…",
+                ),
+            )
+            if not wait_for_gcs_port("127.0.0.1", port, timeout_sec=180.0):
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "fail",
+                        "Ray GCS not reachable on localhost:6379 — run scripts/start.py "
+                        "or check start-user.log for ray start --head",
+                    ),
+                )
+                raise RuntimeError("Ray GCS not available on 127.0.0.1:6379")
+            os.environ["RAY_ADDRESS"] = ray_addr
 
         use_gpu = job.gpus_per_worker > 0
         if platform.ray_local_mode and not pool.is_remote:
@@ -178,8 +204,8 @@ def run_training_job(job_id: int) -> None:
             "framework",
             framework_line(
                 "train",
-                f"Train start ray={ray_addr or 'local'} workers={train_workers} "
-                f"gpu={use_gpu} max_steps={train_config.get('max_steps')} "
+                f"Train start driver={ray_addr or 'local'} worker_head={worker_head or 'n/a'} "
+                f"workers={train_workers} gpu={use_gpu} max_steps={train_config.get('max_steps')} "
                 f"epochs={job.epochs}",
             ),
         )

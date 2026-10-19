@@ -333,7 +333,23 @@ def run_transformer_training(
             pass
 
     if ray_address:
-        _framework(framework_line("ray", f"Driver connecting to master at {ray_address}"))
+        os.environ["RAY_ADDRESS"] = ray_address
+        worker_head = train_config.get("ray_head_address")
+        if worker_head and worker_head != ray_address:
+            _framework(
+                framework_line(
+                    "ray",
+                    f"Driver connecting via {ray_address} (CDSW workers join {worker_head})",
+                )
+            )
+        else:
+            _framework(framework_line("ray", f"Driver connecting to Ray at {ray_address}"))
+        from app.services.cdsw_workers import wait_for_gcs_port
+
+        host, _, port_s = ray_address.partition(":")
+        port = int(port_s or "6379")
+        if not wait_for_gcs_port(host, port, timeout_sec=60.0):
+            raise RuntimeError(f"Ray GCS not reachable at {ray_address} before ray.init")
         if not ray.is_initialized():
             ray.init(address=ray_address, ignore_reinit_error=True)
     else:

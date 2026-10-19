@@ -95,10 +95,11 @@ def ray_driver_init_address(head: str | None) -> str | None:
     Address for ray.init() from the CDSW session driver (same pod as the head).
 
     Remote worker engines must still use the session IP in build_worker_start_code.
-    Connecting via 127.0.0.1 avoids Ray observability pubsub timeouts to the pod IP.
+    Always use loopback when the head is this session's pod IP (do not require GCS to
+    already be up — that check caused fallback to the pod IP and pubsub timeouts).
     """
     if not head:
-        return None
+        return os.environ.get("RAY_ADDRESS") or None
     host, _, port = head.partition(":")
     port = port or "6379"
     try:
@@ -106,9 +107,32 @@ def ray_driver_init_address(head: str | None) -> str | None:
     except ValueError:
         return head
     session_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
-    if session_ip and host == session_ip and _local_gcs_reachable(port_i):
+    if session_ip and host == session_ip:
         return f"127.0.0.1:{port_i}"
+    if host in ("127.0.0.1", "localhost"):
+        return f"{host}:{port_i}"
     return head
+
+
+def wait_for_gcs_port(
+    host: str,
+    port: int = 6379,
+    *,
+    timeout_sec: float = 180.0,
+    poll_sec: float = 2.0,
+) -> bool:
+    """Block until Ray GCS accepts TCP connections (returns False on timeout)."""
+    import socket
+    import time
+
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=2.0):
+                return True
+        except OSError:
+            time.sleep(poll_sec)
+    return False
 
 
 def build_worker_start_code(head_address: str) -> str:
