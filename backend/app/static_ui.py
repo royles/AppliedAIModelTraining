@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import REPO_ROOT
+from app.platform_version import read_platform_version
 
 
 def frontend_dist_dir() -> Path:
@@ -56,6 +57,7 @@ def read_ui_build_info() -> dict[str, str]:
             features["model_registry"] = False
     info = {
         "status": "ready",
+        "platform_version": read_platform_version(),
         "js": js_name,
         "css": css_match.group(1) if css_match else "",
         "stamp": stamp,

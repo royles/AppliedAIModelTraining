@@ -213,6 +213,7 @@ export const api = {
   uiBuildInfo: () =>
     request<{
       status: string;
+      platform_version?: string;
       js?: string;
       css?: string;
       stamp?: string;

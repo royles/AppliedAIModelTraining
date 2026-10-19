@@ -125,6 +125,20 @@ def read_ui_build_label() -> str | None:
     return None
 
 
+def read_platform_version() -> str:
+    version_file = REPO_ROOT / "VERSION"
+    if not version_file.is_file():
+        return "1.1.0.0"
+    import re
+
+    pat = re.compile(r"^(\d+\.\d+\.\d+\.\d+)\s*$")
+    for raw in version_file.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if pat.match(line):
+            return line
+    return "1.1.0.0"
+
+
 def write_ui_build_stamp() -> None:
     if not frontend_dist_ready():
         return
@@ -136,6 +150,7 @@ def write_ui_build_stamp() -> None:
             js_name = js_path.name
             break
     stamp.write_text(
+        f"platform_version={read_platform_version()}\n"
         f"built_at={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
         f"src_fingerprint={compute_frontend_src_fingerprint()}\n"
         f"bundle_js={js_name}\n",

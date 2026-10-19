@@ -44,6 +44,10 @@ On Cloudera Machine Learning, the session pod runs the API and Ray head; additio
 
 Locally, workers are simulated and Ray runs in-process on CPU.
 
+## Platform version
+
+Release id **`x.y.z.b`** lives in [`VERSION`](VERSION) (start `1.1.0.0`). Bump rules: major = breaking, minor = new features, patch = minor changes, bugfix = fixes only. See [docs/VERSIONING.md](docs/VERSIONING.md). Shown in the UI sidebar as **Platform x.y.z.b**.
+
 ## Development
 
 ```bash

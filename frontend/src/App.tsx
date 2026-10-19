@@ -59,7 +59,8 @@ export default function App() {
   const [maxSteps, setMaxSteps] = useState(DEFAULT_MAX_STEPS);
   const [dataset, setDataset] = useState<TrainingDatasetConfig>(DEFAULT_DATASET);
   const [error, setError] = useState<string | null>(null);
-  const [uiBuildLabel, setUiBuildLabel] = useState<string | null>(null);
+  const [platformVersion, setPlatformVersion] = useState<string | null>(null);
+  const [uiBundleId, setUiBundleId] = useState<string | null>(null);
   const [registryModels, setRegistryModels] = useState<RegistryModel[]>([]);
   const [registryUiMissing, setRegistryUiMissing] = useState(false);
 
@@ -95,12 +96,18 @@ export default function App() {
       setJobGpus(s.cdsw_workers.gpus_per_worker);
     });
     api.uiBuildInfo().then((info) => {
-      if (info.status === "ready" && info.js) {
-        setUiBuildLabel(info.js.replace(/^index-/, "").replace(/\.js$/, ""));
+      if (info.status === "ready") {
+        setPlatformVersion(info.platform_version ?? null);
+        if (info.js) {
+          setUiBundleId(info.js.replace(/^index-/, "").replace(/\.js$/, ""));
+        }
         const features = info.features as { model_registry?: boolean } | undefined;
         setRegistryUiMissing(features?.model_registry === false);
       }
-    }).catch(() => setUiBuildLabel(null));
+    }).catch(() => {
+      setPlatformVersion(null);
+      setUiBundleId(null);
+    });
     api.listRegistryModels().then(setRegistryModels).catch(() => setRegistryModels([]));
   }, []);
 
@@ -295,9 +302,16 @@ export default function App() {
             Model Tasks
           </button>
         </nav>
-        {uiBuildLabel && (
-          <p className="hint sidebar-ui-build" title="UI bundle id from /api/ui/build-info">
-            UI build {uiBuildLabel.slice(0, 8)}
+        {platformVersion && (
+          <p
+            className="hint sidebar-ui-build"
+            title={
+              uiBundleId
+                ? `Platform release ${platformVersion} · asset bundle ${uiBundleId} (cache hash)`
+                : `Platform release ${platformVersion}`
+            }
+          >
+            Platform {platformVersion}
           </p>
         )}
       </aside>

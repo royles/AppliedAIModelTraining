@@ -1,0 +1,10 @@
+# Platform release: MAJOR.MINOR.PATCH.BUGFIX (x.y.z.b)
+#
+# Bump rules:
+#   x — breaking change / compatibility break (API, DB, inference contract)
+#   y — net new user-facing feature (new panel, registry, major workflow)
+#   z — minor code or config change (copy, defaults, non-breaking API)
+#   b — bug fix only
+#
+# Start: 1.1.0.0
+1.1.0.0
