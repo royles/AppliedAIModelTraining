@@ -179,6 +179,16 @@ def run_training_job(job_id: int) -> None:
             from app.services.cdsw_workers import ray_client_address
 
             ray_addr = ray_client_address(head)
+        if head and worker_head and ray_addr and ray_addr != worker_head:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    f"Driver Ray address {ray_addr} (workers join {worker_head})",
+                ),
+            )
 
         if head and ray_addr and ray_addr.startswith("127.0.0.1:"):
             port = int(ray_addr.split(":")[1])

@@ -95,22 +95,40 @@ def ray_driver_init_address(head: str | None) -> str | None:
     Address for ray.init() from the CDSW session driver (same pod as the head).
 
     Remote worker engines must still use the session IP in build_worker_start_code.
-    Always use loopback when the head is this session's pod IP (do not require GCS to
-    already be up — that check caused fallback to the pod IP and pubsub timeouts).
+    The driver must not dial the pod/container IP from inside the same pod (Ray GCS /
+    observability pubsub time out). Platform settings may store the worker-facing
+    head as 100.x.x.x while CDSW_IP_ADDRESS is unset in the API process.
     """
     if not head:
-        return os.environ.get("RAY_ADDRESS") or None
+        env = os.environ.get("RAY_ADDRESS")
+        if env and cdsw_available():
+            return ray_driver_init_address(env) or env
+        return env
     host, _, port = head.partition(":")
     port = port or "6379"
     try:
         port_i = int(port)
     except ValueError:
         return head
-    session_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
-    if session_ip and host == session_ip:
-        return f"127.0.0.1:{port_i}"
+
+    loopback = f"127.0.0.1:{port_i}"
     if host in ("127.0.0.1", "localhost"):
-        return f"{host}:{port_i}"
+        return loopback
+
+    session_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
+    ray_head = os.environ.get("RAY_HEAD_ADDRESS") or ""
+    ray_head_host = ray_head.partition(":")[0] if ray_head else ""
+
+    # CAI/CML: training driver always runs in the session pod next to the Ray head.
+    if cdsw_available():
+        return loopback
+
+    if session_ip and host == session_ip:
+        return loopback
+    if ray_head_host and host == ray_head_host:
+        return loopback
+    if _local_gcs_reachable(port_i):
+        return loopback
     return head
 
 
