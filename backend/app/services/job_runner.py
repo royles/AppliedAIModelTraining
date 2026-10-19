@@ -289,17 +289,6 @@ def run_training_job(job_id: int) -> None:
             "framework",
             framework_line("train", "Ray Train job submitted to master"),
         )
-        append_job_log(
-            db,
-            job_id,
-            "framework",
-            framework_line(
-                "info",
-                "PlacementGroupCleaner 'State API' warnings are usually benign while "
-                "workers start; if training fails, open CDSW worker logs and "
-                "ray_process_exit.log on the worker engine.",
-            ),
-        )
         result = run_transformer_training(
             ray_address=ray_addr,
             num_workers=train_workers,

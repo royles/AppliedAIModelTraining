@@ -139,7 +139,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 ### Ray worker / Train log messages
 
 - **`ModuleNotFoundError: No module named 'ray'`** on a worker engine — worker bootstrap runs `ray` in the project `.venv` when present; it pip-installs `backend/requirements.txt` into **that** interpreter (not the session-only check). First join can take several minutes. If install fails, run `python3 scripts/install.py` on the session, ensure workers can reach PyPI, or remove a broken `.venv` on the project so workers fall back to engine Python.
-- **`PlacementGroupCleaner … Failed to query Ray Train Controller`** — often a follow-on after a Ray Train worker crashed (check framework/training logs for the real error). Otherwise transient while the head or workers are still starting. Confirm workers show `ray start --block` running and the head is reachable on port `6379`.
+- **`PlacementGroupCleaner … Failed to query Ray Train Controller`** — Ray Train v2 polls the **State API** (Ray dashboard HTTP server). If the head was started with `--include-dashboard=false`, you will see this until the API is up. **Fix:** `ray stop`, then restart `scripts/start.py` (new sessions auto-enable the dashboard when `ray[default]` is installed). Set `RAY_INCLUDE_DASHBOARD=0` only if you intentionally disable it. If training still fails, check framework logs for a crashed Train worker and confirm workers run `ray start --block` against port `6379`.
 - **`vocab_size` validation (must be >= 1024)`** — fixed: BPE may produce a smaller vocab than the target; architecture `vocab_size` is set to the trained tokenizer length (e.g. 884). Pull latest `main` if you still see the old limit.
 - **`Failed to connect to the observability pubsub at address …:6379`** — the training driver could not reach Ray GCS quickly (often when using the pod IP from the same session). Restart the app after `git pull` (driver uses `127.0.0.1:6379` on CAI). If it repeats, confirm `ray start --head` is running and port `6379` is open on localhost.
 
@@ -156,7 +156,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `PLATFORM_API_PORT` | FastAPI backend port (default `8000`) |
 | `PLATFORM_API_UPSTREAM` | Set on the UI gateway (default `http://127.0.0.1:8000`) |
 | `RAY_SKIP_HEAD` | Set to `1` to skip `ray start --head` in `start.py` |
-| `RAY_INCLUDE_DASHBOARD` | Set to `1` to enable Ray dashboard (needs `ray[default]` deps; off by default on CAI) |
+| `RAY_INCLUDE_DASHBOARD` | Default **on** when `ray[default]` is installed; set `0` to disable dashboard/State API |
 | `DEFAULT_WORKER_MEMORY_GB` | CDSW worker RAM (GiB); default `16` |
 | `DEFAULT_WORKER_CPU` | CDSW worker CPUs; default `4` |
 | `DEFAULT_GPUS_PER_WORKER` | Default GPU count for workers; default `1` |

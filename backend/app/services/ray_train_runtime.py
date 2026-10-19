@@ -14,6 +14,18 @@ def apply_ray_train_runtime_env() -> None:
 
     Does not override variables the user already set.
     """
+    from app.services.ray_head_options import state_api_reachable
+
+    if not state_api_reachable():
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Ray State API is not reachable (dashboard/API server). "
+            "PlacementGroupCleaner may log warnings until the head is restarted with "
+            "the API enabled (default when ray[default] is installed). "
+            "Run: ray stop, then restart scripts/start.py."
+        )
+
     defaults: dict[str, str] = {
         # CDSW workers often need several minutes for pip + ray start --block.
         "RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S": "600",

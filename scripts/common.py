@@ -597,6 +597,18 @@ def print_cai_memory_hints() -> None:
     )
 
 
+def _ray_head_options():
+    backend = REPO_ROOT / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from app.services.ray_head_options import (
+        ray_start_include_dashboard,
+        state_api_reachable,
+    )
+
+    return ray_start_include_dashboard, state_api_reachable
+
+
 def start_ray_head() -> None:
     ip = cai_session_ip()
     if not ip:
@@ -606,22 +618,26 @@ def start_ray_head() -> None:
         return
 
     os.environ["RAY_HEAD_ADDRESS"] = f"{ip}:6379"
+    include_dashboard_fn, state_api_reachable = _ray_head_options()
 
     if _ray_port_open(6379):
         print("Ray head already listening on :6379")
         os.environ["RAY_ADDRESS"] = "127.0.0.1:6379"
+        if not state_api_reachable():
+            print(
+                "WARNING: Ray GCS is up but the API server (State API) is not reachable on "
+                ":8265. Ray Train may log PlacementGroupCleaner warnings until you "
+                "`ray stop` and restart this app (dashboard starts automatically when "
+                "ray[default] is installed). Or set RAY_INCLUDE_DASHBOARD=1 before start.",
+                file=sys.stderr,
+            )
         return
 
-    include_dashboard = os.environ.get("RAY_INCLUDE_DASHBOARD", "").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    include_dashboard = include_dashboard_fn()
     ray_args = ["start", "--head", "--port=6379"]
     if include_dashboard:
         ray_args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
     else:
-        # CAI images often lack ray[default] dashboard deps; training only needs the GCS port.
         ray_args.append("--include-dashboard=false")
 
     print(f"CAI session at {ip}; starting Ray head (dashboard={include_dashboard})...")
@@ -639,7 +655,8 @@ def start_ray_head() -> None:
         print(
             "Warning: Ray head did not start. Training may use local Ray or workers "
             "once the cluster is up. To skip this step: RAY_SKIP_HEAD=1. "
-            "Dashboard (optional): RAY_INCLUDE_DASHBOARD=1 after installing ray[default].",
+            "Install ray[default] (see backend/requirements.txt) or set RAY_INCLUDE_DASHBOARD=0 "
+            "only if you accept Ray Train State API warnings.",
             file=sys.stderr,
         )
         return
