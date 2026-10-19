@@ -901,6 +901,8 @@ body {
   flex-direction: column;
   gap: 0.65rem;
   position: relative;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .distributed-strip {
@@ -1069,9 +1071,10 @@ body {
 .ray-cluster-viewport {
   width: 100%;
   max-width: 100%;
+  height: auto;
+  max-height: none;
   overflow-x: auto;
-  overflow-y: hidden;
-  min-height: 8rem;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1106,7 +1109,7 @@ body {
   width: max-content;
   min-width: 100%;
   max-width: none;
-  min-height: 8rem;
+  min-height: 0;
   padding: 0.15rem 0.5rem 0.5rem;
   box-sizing: border-box;
 }
@@ -1255,11 +1258,17 @@ body {
 
 .log-panel-run .log-ray-status.ray-cluster-panel-full {
   flex: 0 0 auto;
-  min-height: unset;
+  height: auto;
+  max-height: none;
+  min-height: auto;
   overflow-x: auto;
   overflow-y: visible;
   width: 100%;
   max-width: 100%;
+}
+
+.log-panel-run .log-ray-status.ray-cluster-panel-full .ray-cluster-map {
+  min-height: 0;
 }
 
 .log-panel-run {

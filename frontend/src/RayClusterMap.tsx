@@ -152,7 +152,6 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [routes, setRoutes] = useState<RoutedLink[]>([]);
-  const [diagramHeight, setDiagramHeight] = useState(0);
 
   const components = useMemo(
     () => enrichComponents(topology?.components ?? [], distributed),
@@ -241,10 +240,6 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
 
       const next = links.length > 0 ? routeClusterLinks(anchors, bounds) : [];
       setRoutes((prev) => (routedLinksEqual(prev, next) ? prev : next));
-
-      const naturalH = canvasEl.getBoundingClientRect().height || canvasEl.scrollHeight;
-      const height = Math.ceil(naturalH) + 2;
-      setDiagramHeight((prev) => (prev === height ? prev : height));
     };
 
     measure();
@@ -279,10 +274,7 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
         </ul>
       )}
 
-      <div
-        className="ray-cluster-viewport"
-        style={{ height: diagramHeight > 0 ? `${diagramHeight}px` : undefined }}
-      >
+      <div className="ray-cluster-viewport">
         <div ref={canvasRef} className="ray-cluster-canvas ray-cluster-canvas-grid">
           <svg className="ray-cluster-svg ray-cluster-svg-overlay" aria-hidden>
             {routes.map((ln) => (
