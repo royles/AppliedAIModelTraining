@@ -27,6 +27,25 @@ def cd_repo() -> None:
     os.chdir(REPO_ROOT)
 
 
+def ensure_bundled_datasets() -> None:
+    """Create data/datasets/starter_corpus.txt when missing (CAI git pull / fresh clones)."""
+    datasets_dir = REPO_ROOT / "data" / "datasets"
+    datasets_dir.mkdir(parents=True, exist_ok=True)
+    starter = datasets_dir / "starter_corpus.txt"
+    if starter.is_file() and starter.stat().st_size >= 10_000:
+        return
+    generator = REPO_ROOT / "scripts" / "generate_starter_corpus.py"
+    if not generator.is_file():
+        print(
+            f"WARNING: {starter} missing and {generator} not found; "
+            "dataset preview may fail until you git pull or add a corpus file.",
+            file=sys.stderr,
+        )
+        return
+    print(f"Generating bundled starter corpus at {starter}…")
+    run([sys.executable, str(generator)], cwd=REPO_ROOT)
+
+
 def frontend_dist_ready() -> bool:
     return FRONTEND_DIST.is_dir() and (FRONTEND_DIST / "index.html").is_file()
 

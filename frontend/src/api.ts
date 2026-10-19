@@ -154,7 +154,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(text || res.statusText);
+    let message = text || res.statusText;
+    try {
+      const body = JSON.parse(text) as { detail?: string | { msg?: string }[] };
+      if (typeof body.detail === "string") {
+        message = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        message = body.detail.map((d) => d.msg ?? JSON.stringify(d)).join("; ");
+      }
+    } catch {
+      /* keep raw text */
+    }
+    throw new Error(message);
   }
   try {
     return JSON.parse(text) as T;

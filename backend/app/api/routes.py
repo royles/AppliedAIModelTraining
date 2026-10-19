@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,13 +31,21 @@ from app.services.model_registry import get_trained_model_for_job, openai_model_
 from app.services.platform_settings import get_platform_settings, update_platform_settings
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.dataset_config import TrainingDatasetConfig
-from app.training.dataset_loader import BUILTIN_DATASET_CATALOG, list_dataset_files, load_training_samples
+from app.config import REPO_ROOT
+from app.training.dataset_loader import (
+    BUILTIN_DATASET_CATALOG,
+    DATASETS_ROOT,
+    list_dataset_files,
+    load_training_samples,
+)
 from app.training.from_scratch import from_scratch_resource_guidance
 from app.static_ui import read_ui_build_info
 from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -106,6 +115,7 @@ def health() -> HealthResponse:
     import ray
 
     runtime = "initialized" if ray.is_initialized() else "not_initialized"
+    starter = (REPO_ROOT / "data" / "datasets" / "starter_corpus.txt").resolve()
     return HealthResponse(
         status="ok",
         ray_runtime=runtime,
@@ -114,6 +124,10 @@ def health() -> HealthResponse:
             "ray_head": cdsw_workers.ray_head_address(),
             "docs": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html",
             "memory": memory_guidance_for_health(),
+            "repo_root": str(REPO_ROOT.resolve()),
+            "datasets_root": str(DATASETS_ROOT),
+            "starter_corpus_exists": starter.is_file(),
+            "starter_corpus_path": str(starter),
         },
     )
 
@@ -151,6 +165,17 @@ def dataset_preview(
         ) from exc
     except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "dataset preview failed source=%s path=%s task_type=%s",
+            dataset.source,
+            dataset.path,
+            task_type,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dataset preview failed: {type(exc).__name__}: {exc}",
+        ) from exc
     total_chars = sum(len(t) for t in texts)
     return {
         "examples": len(texts),

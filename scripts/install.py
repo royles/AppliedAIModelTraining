@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (
     REPO_ROOT,
     cd_repo,
+    ensure_bundled_datasets,
     frontend_dist_ready,
     frontend_dist_stale,
     pip_install,
@@ -106,6 +107,7 @@ def main() -> int:
     cd_repo()
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
+    ensure_bundled_datasets()
 
     install_python_deps()
 

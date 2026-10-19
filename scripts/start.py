@@ -28,6 +28,7 @@ from common import (
     ensure_api_running,
     ensure_runtime_ready,
     frontend_dist_ready,
+    ensure_bundled_datasets,
     ensure_prebuilt_ui_or_npm,
     frontend_dist_stale,
     read_ui_build_label,
@@ -76,6 +77,7 @@ def main() -> int:
 
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     (REPO_ROOT / "backend" / "data").mkdir(parents=True, exist_ok=True)
+    ensure_bundled_datasets()
 
     code = ensure_runtime_ready()
     if code != 0:

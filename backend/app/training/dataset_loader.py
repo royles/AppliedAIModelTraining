@@ -52,7 +52,13 @@ def _resolve_dataset_path(rel_path: str) -> Path:
 
 
 def _load_text_file(path: Path) -> list[str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"Dataset file must be UTF-8 text: {path.name} ({exc})",
+        ) from exc
+    lines = raw.splitlines()
     return [ln.strip() for ln in lines if ln.strip()]
 
 
