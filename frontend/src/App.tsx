@@ -14,6 +14,7 @@ import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { TaskCardGrid } from "./TaskCardGrid";
 import { TaskDetailView } from "./TaskDetailView";
+import { trainingJobListFieldsEqual } from "./jobUtils";
 import {
   DEFAULT_DATASET,
   DEFAULT_HEADS,
@@ -179,6 +180,16 @@ export default function App() {
     setTokenizer((t) => ({ ...t, vocab_size: n }));
   }
 
+  const handleJobUpdated = useCallback((fresh: TrainingJob) => {
+    setJobs((prev) => {
+      const existing = prev.find((j) => j.id === fresh.id);
+      if (existing && trainingJobListFieldsEqual(existing, fresh)) {
+        return prev;
+      }
+      return prev.map((j) => (j.id === fresh.id ? fresh : j));
+    });
+  }, []);
+
   async function onCreateProject() {
     await api.createProject({ name: projectName });
     setProjectName("");
@@ -341,9 +352,7 @@ export default function App() {
             }}
             onDelete={deleteTask}
             onRestart={restartTask}
-            onJobUpdated={(fresh) => {
-              setJobs((prev) => prev.map((j) => (j.id === fresh.id ? fresh : j)));
-            }}
+            onJobUpdated={handleJobUpdated}
             onOpenRegistry={openRegistry}
           />
         ) : nav === "tasks" ? (

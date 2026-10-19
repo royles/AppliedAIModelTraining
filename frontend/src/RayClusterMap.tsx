@@ -65,6 +65,27 @@ function NodeCard({ node }: { node: RayClusterComponent }) {
 
 type Line = { x1: number; y1: number; x2: number; y2: number; healthy: boolean; key: string };
 
+function linesEqual(a: Line[], b: Line[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.key !== y.key ||
+      x.healthy !== y.healthy ||
+      Math.abs(x.x1 - y.x1) > 0.5 ||
+      Math.abs(x.y1 - y.y1) > 0.5 ||
+      Math.abs(x.x2 - y.x2) > 0.5 ||
+      Math.abs(x.y2 - y.y2) > 0.5
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function RayClusterMap({ status, jobStatus, loading }: Props) {
   const topology = useMemo(() => parseTopology(status), [status]);
   const distributed = useMemo(() => parseDistributed(status), [status]);
@@ -112,7 +133,7 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
           key: `${link.from}-${link.to}-${link.kind}`,
         });
       }
-      setLines(next);
+      setLines((prev) => (linesEqual(prev, next) ? prev : next));
     };
     measure();
     const ro = new ResizeObserver(measure);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
-import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
+import { jobArchitectureSummary, jobInitMode, trainingJobListFieldsEqual } from "./jobUtils";
 import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 import { formatLogLines } from "./logFormat";
@@ -37,6 +37,10 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
   const lastFrameworkTextRef = useRef("");
   const lastTrainingTextRef = useRef("");
   const scrollStickRef = useRef({ framework: true, training: true });
+  const onJobUpdatedRef = useRef(onJobUpdated);
+  onJobUpdatedRef.current = onJobUpdated;
+  const jobRef = useRef(job);
+  jobRef.current = job;
 
   const loadLogs = useCallback(async () => {
     try {
@@ -49,12 +53,14 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
         api.getJob(job.id),
       ]);
       setLogs(data);
-      onJobUpdated?.(freshJob);
+      if (!trainingJobListFieldsEqual(jobRef.current, freshJob)) {
+        onJobUpdatedRef.current?.(freshJob);
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [job.id, onJobUpdated]);
+  }, [job.id]);
 
   useEffect(() => {
     loadLogs();

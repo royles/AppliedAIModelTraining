@@ -36,3 +36,14 @@ export function jobArchitectureSummary(job: TrainingJob): string {
   if (!arch) return job.model_name;
   return `d=${arch.hidden_size} · L=${arch.num_hidden_layers} · H=${arch.num_attention_heads}`;
 }
+
+/** Fields polled from task detail that affect the task list card. */
+export function trainingJobListFieldsEqual(a: TrainingJob, b: TrainingJob): boolean {
+  return (
+    a.status === b.status &&
+    a.error_message === b.error_message &&
+    a.metrics_json === b.metrics_json &&
+    a.openai_model_id === b.openai_model_id &&
+    a.updated_at === b.updated_at
+  );
+}
