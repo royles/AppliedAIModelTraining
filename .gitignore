@@ -2,6 +2,7 @@
 data/*
 !data/datasets/
 !data/datasets/**
+backend/data/
 __pycache__/
 *.pyc
 node_modules/
