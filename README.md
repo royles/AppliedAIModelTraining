@@ -138,7 +138,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 
 ### Ray worker / Train log messages
 
-- **`ModuleNotFoundError: No module named 'ray'`** on a worker engine — run `python3 scripts/install.py` on the **session** (system Python), then launch workers again. New worker bootstrap code installs `backend/requirements.txt` on first start if Ray is missing.
+- **`ModuleNotFoundError: No module named 'ray'`** on a worker engine — worker bootstrap runs `ray` in the project `.venv` when present; it pip-installs `backend/requirements.txt` into **that** interpreter (not the session-only check). First join can take several minutes. If install fails, run `python3 scripts/install.py` on the session, ensure workers can reach PyPI, or remove a broken `.venv` on the project so workers fall back to engine Python.
 - **`PlacementGroupCleaner … Failed to query Ray Train Controller`** — often a follow-on after a Ray Train worker crashed (check framework/training logs for the real error). Otherwise transient while the head or workers are still starting. Confirm workers show `ray start --block` running and the head is reachable on port `6379`.
 - **`vocab_size` validation (must be >= 1024)`** — fixed: BPE may produce a smaller vocab than the target; architecture `vocab_size` is set to the trained tokenizer length (e.g. 884). Pull latest `main` if you still see the old limit.
 - **`Failed to connect to the observability pubsub at address …:6379`** — the training driver could not reach Ray GCS quickly (often when using the pod IP from the same session). Restart the app after `git pull` (driver uses `127.0.0.1:6379` on CAI). If it repeats, confirm `ray start --head` is running and port `6379` is open on localhost.
