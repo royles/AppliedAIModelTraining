@@ -209,6 +209,22 @@ def _train_loop(config: dict[str, Any]) -> None:
         train_worker_ready_line(rank, world_size, str(device), len(texts), max_steps),
         all_ranks=True,
     )
+    try:
+        import socket
+
+        from app.services.distributed_training_status import update_distributed_rank
+
+        artifact_dir = config.get("artifact_dir")
+        if artifact_dir:
+            update_distributed_rank(
+                str(artifact_dir),
+                rank=rank,
+                world_size=world_size,
+                device=str(device),
+                host=socket.gethostname(),
+            )
+    except Exception:  # noqa: BLE001
+        pass
     if rank == 0:
         _log_training(
             training_line(

@@ -4,7 +4,7 @@ import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
 import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 import { formatLogLines } from "./logFormat";
-import { RayStatusPanel } from "./RayStatusPanel";
+import { RayClusterMap } from "./RayClusterMap";
 import { rayStatusFingerprint } from "./rayStatusFields";
 
 type Props = {
@@ -159,11 +159,11 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
         <section className="card log-panel log-panel-framework">
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 5s)</p>
-          <div className="log-ray-status">
-            <RayStatusPanel
+          <div className="log-ray-status ray-cluster-panel">
+            <RayClusterMap
               status={logs?.ray_status}
+              jobStatus={job.status}
               loading={!logs}
-              jobWorkers={job.num_workers}
             />
           </div>
           <div className="log-stream log-stream-framework" ref={frameworkLogRef}>

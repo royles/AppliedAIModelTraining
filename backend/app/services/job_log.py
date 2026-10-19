@@ -11,6 +11,13 @@ from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
 from app.models import TrainingJob
+from app.resource_hints import effective_ray_train_workers
+from app.services.distributed_training_status import build_distributed_training_status
+from app.services.platform_settings import ensure_platform_settings
+from app.services.ray_cluster_topology import (
+    build_ray_cluster_topology,
+    merge_topology_into_ray_status,
+)
 
 LogChannel = Literal["framework", "training"]
 
@@ -99,11 +106,91 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
         )
     ray_status = ray_status_snapshot()
     ray_status["job_ray_address"] = job.ray_address
-    if job.status in ("provisioning", "running") and not ray_status.get("initialized"):
-        ray_status["note"] = (
-            "Status reflects the web API process. Training connects to Ray in a "
-            "background thread; see framework logs after 'Ray Train job submitted'."
+
+    expected_workers = job.num_workers or 0
+    cdsw_ids: list[str] = []
+    if job.worker_group and job.worker_group.worker_ids_json:
+        try:
+            parsed = json.loads(job.worker_group.worker_ids_json)
+            if isinstance(parsed, list):
+                cdsw_ids = [str(x) for x in parsed]
+        except json.JSONDecodeError:
+            cdsw_ids = []
+
+    topology = build_ray_cluster_topology(
+        ray_address=job.ray_address,
+        job_status=job.status,
+        expected_worker_nodes=expected_workers,
+        cdsw_worker_ids=cdsw_ids,
+    )
+    ray_status = merge_topology_into_ray_status(ray_status, topology)
+
+    platform = ensure_platform_settings(db)
+    effective_train_workers = effective_ray_train_workers(
+        max(1, job.num_workers),
+        platform.ray_train_num_workers,
+    )
+    ray_status["distributed"] = build_distributed_training_status(
+        job_id=job_id,
+        job_status=job.status,
+        num_cdsw_workers=expected_workers,
+        ray_train_workers=effective_train_workers,
+        gpus_per_worker=job.gpus_per_worker,
+        training_log=training,
+    )
+    topology["distributed"] = ray_status["distributed"]
+    for rank_info in ray_status["distributed"].get("ranks") or []:
+        if not isinstance(rank_info, dict):
+            continue
+        rid = int(rank_info.get("rank", 0))
+        comp_id = f"train-rank-{rid}"
+        topology["components"].append(
+            {
+                "id": comp_id,
+                "role": "train_worker",
+                "title": f"Train rank {rank_info.get('display_rank', rid + 1)}",
+                "subtitle": str(rank_info.get("device") or "device"),
+                "healthy": True,
+                "host": str(rank_info.get("host") or ""),
+                "metrics": [
+                    {
+                        "key": "device",
+                        "label": "Device",
+                        "value": 0,
+                        "display": str(rank_info.get("device") or "—"),
+                        "unit": "text",
+                    },
+                    {
+                        "key": "world",
+                        "label": "World size",
+                        "value": float(rank_info.get("world_size") or 0),
+                        "display": str(rank_info.get("world_size") or "—"),
+                        "unit": "count",
+                    },
+                ],
+            }
         )
+        topology["links"].append(
+            {
+                "from": "train-controller",
+                "to": comp_id,
+                "healthy": True,
+                "kind": "distributed_train",
+                "detail": "Ray Train worker process",
+            }
+        )
+    ray_status["topology"] = topology
+
+    if job.status in ("provisioning", "running") and not ray_status.get("initialized"):
+        if not topology.get("gcs_reachable"):
+            ray_status["note"] = (
+                "Cannot reach Ray GCS from the UI snapshot. Confirm scripts/start.py "
+                "started the head and the job ray_address is set."
+            )
+        elif not ray_status.get("note"):
+            ray_status["note"] = (
+                "Live cluster map below connects to the job Ray address each refresh."
+            )
 
     return {
         "job_id": job_id,

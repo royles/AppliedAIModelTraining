@@ -1,0 +1,178 @@
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { DistributedTrainingStrip } from "./DistributedTrainingStrip";
+import type { RayClusterComponent } from "./rayClusterTypes";
+import { parseDistributed, parseTopology } from "./rayClusterTypes";
+
+type Props = {
+  status: Record<string, unknown> | null | undefined;
+  jobStatus: string;
+  loading?: boolean;
+};
+
+const ROLE_ORDER: Record<string, number> = {
+  driver: 0,
+  master: 1,
+  controller: 2,
+  train_worker: 3,
+  worker: 4,
+  worker_pending: 5,
+  worker_dead: 6,
+};
+
+const ROLE_TIER: Record<string, string> = {
+  driver: "tier-driver",
+  master: "tier-head",
+  controller: "tier-controller",
+  train_worker: "tier-train",
+  worker: "tier-workers",
+  worker_pending: "tier-workers",
+  worker_dead: "tier-workers",
+};
+
+function tierForRole(role: string): string {
+  return ROLE_TIER[role] ?? "tier-workers";
+}
+
+function NodeCard({ node }: { node: RayClusterComponent }) {
+  const roleClass = node.role.replace(/_/g, "-");
+  return (
+    <article
+      className={`ray-node-card ${node.healthy ? "healthy" : "unhealthy"} role-${roleClass}`}
+      data-node-id={node.id}
+    >
+      <header className="ray-node-card-head">
+        <span className="ray-node-role">{node.role.replace(/_/g, " ")}</span>
+        <span className={`ray-node-health ${node.healthy ? "up" : "down"}`}>
+          {node.healthy ? "●" : "○"}
+        </span>
+      </header>
+      <h6 className="ray-node-title">{node.title}</h6>
+      <p className="ray-node-sub">{node.subtitle}</p>
+      <code className="ray-node-host">{node.host}</code>
+      {node.metrics.length > 0 && (
+        <ul className="ray-node-metrics">
+          {node.metrics.slice(0, 5).map((m) => (
+            <li key={m.key}>
+              <span>{m.label}</span>
+              <strong>{m.display}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+type Line = { x1: number; y1: number; x2: number; y2: number; healthy: boolean; key: string };
+
+export function RayClusterMap({ status, jobStatus, loading }: Props) {
+  const topology = useMemo(() => parseTopology(status), [status]);
+  const distributed = useMemo(() => parseDistributed(status), [status]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [lines, setLines] = useState<Line[]>([]);
+
+  const components = topology?.components ?? [];
+  const links = topology?.links ?? [];
+
+  const tiers = useMemo(() => {
+    const grouped = new Map<string, RayClusterComponent[]>();
+    for (const c of components) {
+      const tier = tierForRole(c.role);
+      const list = grouped.get(tier) ?? [];
+      list.push(c);
+      grouped.set(tier, list);
+    }
+    for (const [, list] of grouped) {
+      list.sort((a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9));
+    }
+    return grouped;
+  }, [components]);
+
+  useLayoutEffect(() => {
+    const root = containerRef.current;
+    if (!root || links.length === 0) {
+      setLines([]);
+      return;
+    }
+    const measure = () => {
+      const rootBox = root.getBoundingClientRect();
+      const next: Line[] = [];
+      for (const link of links) {
+        const fromEl = root.querySelector(`[data-node-id="${link.from}"]`);
+        const toEl = root.querySelector(`[data-node-id="${link.to}"]`);
+        if (!fromEl || !toEl) continue;
+        const a = fromEl.getBoundingClientRect();
+        const b = toEl.getBoundingClientRect();
+        next.push({
+          x1: a.left + a.width / 2 - rootBox.left,
+          y1: a.bottom - rootBox.top,
+          x2: b.left + b.width / 2 - rootBox.left,
+          y2: b.top - rootBox.top,
+          healthy: link.healthy,
+          key: `${link.from}-${link.to}-${link.kind}`,
+        });
+      }
+      setLines(next);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [links, components, loading]);
+
+  if (loading && !topology) {
+    return <p className="hint">Loading cluster map…</p>;
+  }
+
+  if (!topology || components.length === 0) {
+    return (
+      <div className="ray-cluster-map empty">
+        <DistributedTrainingStrip distributed={distributed} jobStatus={jobStatus} />
+        <p className="hint">Cluster topology unavailable — start Ray and open a running task.</p>
+      </div>
+    );
+  }
+
+  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-train", "tier-workers"];
+
+  return (
+    <div className="ray-cluster-map" ref={containerRef}>
+      <DistributedTrainingStrip distributed={distributed} jobStatus={jobStatus} />
+
+      {topology.note && <p className="hint ray-cluster-note">{topology.note}</p>}
+
+      <div className="ray-cluster-canvas">
+        <svg className="ray-cluster-svg" aria-hidden>
+          {lines.map((ln) => (
+            <line
+              key={ln.key}
+              x1={ln.x1}
+              y1={ln.y1}
+              x2={ln.x2}
+              y2={ln.y2}
+              className={ln.healthy ? "link-ok" : "link-bad"}
+            />
+          ))}
+        </svg>
+
+        {tierOrder.map((tier) => {
+          const nodes = tiers.get(tier);
+          if (!nodes?.length) return null;
+          return (
+            <div key={tier} className={`ray-cluster-tier ${tier}`}>
+              {nodes.map((node) => (
+                <NodeCard key={node.id} node={node} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <footer className="ray-cluster-legend">
+        <span><i className="legend-line ok" /> Healthy link</span>
+        <span><i className="legend-line bad" /> Issue / pending</span>
+        <span>GCS {topology.gcs_reachable ? "reachable" : "unreachable"}</span>
+      </footer>
+    </div>
+  );
+}
