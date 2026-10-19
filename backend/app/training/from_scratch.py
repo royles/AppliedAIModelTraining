@@ -60,8 +60,18 @@ def prepare_from_scratch_training(
     existing_tok = artifact_dir / "tokenizer"
     if skip_tokenizer_if_present and existing_tok.is_dir():
         train_config["tokenizer_path"] = str(existing_tok)
+        from transformers import AutoTokenizer
+
+        tok = AutoTokenizer.from_pretrained(str(existing_tok))
+        arch = train_config.get("architecture")
+        arch_dict = dict(arch) if isinstance(arch, dict) else cfg.architecture.model_dump()
+        arch_dict["vocab_size"] = len(tok)
+        train_config["architecture"] = arch_dict
         if log:
-            log(f"Reusing saved tokenizer from {existing_tok} (resume).")
+            log(
+                f"Reusing saved tokenizer from {existing_tok} (resume), "
+                f"vocab_size={len(tok)}."
+            )
         return train_config
     texts, _ = load_training_samples(cfg.dataset.model_dump(), task_type=cfg.task_type)
 

@@ -24,9 +24,12 @@ class TransformerArchitectureConfig(BaseModel):
     )
     vocab_size: int = Field(
         default=50257,
-        ge=1024,
+        ge=256,
         le=256_000,
-        description="Embedding matrix rows; must cover tokenizer vocabulary size.",
+        description=(
+            "Embedding matrix rows; must be >= tokenizer length. "
+            "BPE on small corpora often yields vocab < target (e.g. 884 vs 2048)."
+        ),
     )
     hidden_size: int = Field(
         default=384,
