@@ -16,6 +16,8 @@ RECOMMENDED_WORKER_MEMORY_GB = 16.0
 RECOMMENDED_WORKER_MEMORY_GB_GPU = 32.0
 
 LOW_MEMORY_CONTAINER_GB = 6.0
+# Below this, Ray head + Train controller + API reliably OOM even with worker engines.
+MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB = 8.0
 
 
 def _read_cgroup_limit_bytes() -> int | None:
@@ -105,6 +107,33 @@ def log_worker_launch_memory(memory_gb: float, gpus: int) -> None:
         )
 
 
+def session_memory_too_small_for_ray_train() -> bool:
+    limit = container_memory_limit_gb()
+    return limit is not None and limit < MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB
+
+
+def ray_train_session_memory_error() -> str | None:
+    limit = container_memory_limit_gb()
+    if limit is None or limit >= MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:
+        return None
+    return (
+        f"Session container memory is ~{limit:.2f} GiB (limit {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB "
+        f"required for Ray head + Train). Upgrade the CAI session resource profile to >= "
+        f"{RECOMMENDED_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
+        f"Stale Ray Train jobs leak detached PlacementGroupCleaner actors on the head until Ray restarts."
+    )
+
+
+def ray_head_object_store_bytes() -> int | None:
+    """Cap object store on tiny session pods so GCS + dashboard + Python fit in cgroup."""
+    limit = container_memory_limit_gb()
+    if limit is None or limit >= LOW_MEMORY_CONTAINER_GB:
+        return None
+    # ~10% of cgroup, clamped 96–384 MiB
+    mb = max(96, min(384, int(limit * 1024 * 0.10)))
+    return mb * 1024 * 1024
+
+
 def memory_guidance_for_health() -> dict[str, float | str | bool]:
     limit = container_memory_limit_gb()
     return {
@@ -114,4 +143,6 @@ def memory_guidance_for_health() -> dict[str, float | str | bool]:
         "recommended_worker_memory_gb": RECOMMENDED_WORKER_MEMORY_GB,
         "recommended_worker_memory_gb_gpu": RECOMMENDED_WORKER_MEMORY_GB_GPU,
         "min_worker_memory_gb": MIN_WORKER_MEMORY_GB,
+        "min_session_memory_for_ray_train_gb": MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB,
+        "session_too_small_for_ray_train": session_memory_too_small_for_ray_train(),
     }

@@ -10,7 +10,11 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
-from app.resource_hints import effective_ray_train_workers, is_low_memory_container
+from app.resource_hints import (
+    effective_ray_train_workers,
+    is_low_memory_container,
+    ray_train_session_memory_error,
+)
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.cdsw_workers import (
@@ -218,6 +222,11 @@ def run_training_job(job_id: int) -> None:
         use_gpu = job.gpus_per_worker > 0
         if platform.ray_local_mode and not pool.is_remote:
             ray_addr = None
+
+        mem_err = ray_train_session_memory_error()
+        if mem_err and ray_addr:
+            append_job_log(db, job_id, "framework", framework_line("fail", mem_err))
+            raise RuntimeError(mem_err)
 
         cdsw_engines = job.num_workers if head and job.num_workers > 0 else 0
         train_workers = effective_ray_train_workers(

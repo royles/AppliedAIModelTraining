@@ -635,6 +635,15 @@ def start_ray_head() -> None:
 
     include_dashboard = include_dashboard_fn()
     ray_args = ["start", "--head", "--port=6379"]
+    backend = REPO_ROOT / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from app.resource_hints import ray_head_object_store_bytes  # noqa: PLC0415
+
+    obj_bytes = ray_head_object_store_bytes()
+    if obj_bytes is not None:
+        ray_args.append(f"--object-store-memory={obj_bytes}")
+        print(f"Small session: Ray object store capped at {obj_bytes // (1024 * 1024)} MiB")
     if include_dashboard:
         ray_args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
     else:
