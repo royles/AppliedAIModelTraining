@@ -192,20 +192,20 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       const canvas = canvasEl;
       const canvasBox = canvas.getBoundingClientRect();
       const viewport = root.querySelector(".ray-cluster-viewport") as HTMLElement | null;
-      const pad = 6;
+      const linkBand = canvas.querySelector(".ray-cluster-link-band") as HTMLElement | null;
+      const nodesRow = canvas.querySelector(".ray-cluster-nodes-row") as HTMLElement | null;
+      const pad = 4;
 
-      let minTop = Infinity;
-      let maxBottom = -Infinity;
-      root.querySelectorAll("[data-node-id]").forEach((el) => {
+      const linkBandBottom = linkBand
+        ? linkBand.getBoundingClientRect().bottom - canvasBox.top
+        : 36;
+      let minNodeTop = Infinity;
+      (nodesRow ?? canvas).querySelectorAll("[data-node-id]").forEach((el) => {
         const r = el.getBoundingClientRect();
-        const top = r.top - canvasBox.top;
-        const bottom = r.bottom - canvasBox.top;
-        minTop = Math.min(minTop, top);
-        maxBottom = Math.max(maxBottom, bottom);
+        minNodeTop = Math.min(minNodeTop, r.top - canvasBox.top);
       });
-      if (!Number.isFinite(minTop)) {
-        minTop = 0;
-        maxBottom = canvasBox.height;
+      if (!Number.isFinite(minNodeTop)) {
+        minNodeTop = linkBandBottom + 4;
       }
 
       const anchors = [];
@@ -219,13 +219,17 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
           key: `${link.from}-${link.to}-${link.kind}`,
           healthy: link.healthy,
           sx: a.right - canvasBox.left + pad,
-          sy: a.top + a.height / 2 - canvasBox.top,
+          sourceTop: a.top - canvasBox.top,
           ex: b.left - canvasBox.left - pad,
           ey: b.top + b.height / 2 - canvasBox.top,
+          tx: b.left + b.width / 2 - canvasBox.left,
+          targetTop: b.top - canvasBox.top,
         });
       }
       const next =
-        links.length > 0 ? routeClusterLinks(anchors, { minTop, maxBottom }) : [];
+        links.length > 0
+          ? routeClusterLinks(anchors, { linkBandBottom, minNodeTop })
+          : [];
       setRoutes((prev) => (routedLinksEqual(prev, next) ? prev : next));
 
       const naturalW = canvas.scrollWidth;
@@ -284,17 +288,20 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
             transformOrigin: "top left",
           }}
         >
-          <svg className="ray-cluster-svg" aria-hidden>
-            {routes.map((ln) => (
-              <path
-                key={ln.key}
-                d={ln.d}
-                fill="none"
-                className={ln.healthy ? "link-ok" : "link-bad"}
-              />
-            ))}
-          </svg>
+          <div className="ray-cluster-link-band" aria-hidden>
+            <svg className="ray-cluster-svg">
+              {routes.map((ln) => (
+                <path
+                  key={ln.key}
+                  d={ln.d}
+                  fill="none"
+                  className={ln.healthy ? "link-ok" : "link-bad"}
+                />
+              ))}
+            </svg>
+          </div>
 
+          <div className="ray-cluster-nodes-row">
           {flowNodes.map((node, index) => {
             const prev = flowNodes[index - 1];
             const gap =
@@ -312,6 +319,7 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
               </Fragment>
             );
           })}
+          </div>
         </div>
       </div>
 

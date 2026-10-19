@@ -3,10 +3,16 @@
 export type LinkAnchor = {
   key: string;
   healthy: boolean;
+  /** Source: right edge, top corner */
   sx: number;
-  sy: number;
+  sourceTop: number;
+  /** Target: left edge (for final hop along top border) */
   ex: number;
   ey: number;
+  /** Vertical drop column (target horizontal center) */
+  tx: number;
+  /** Target top edge (canvas coordinates) */
+  targetTop: number;
 };
 
 export type RoutedLink = {
@@ -15,62 +21,66 @@ export type RoutedLink = {
   d: string;
 };
 
-const STUB = 10;
+const STUB = 8;
+const CORRIDOR_ABOVE = 14;
 
 function pathFromPoints(points: [number, number][]): string {
   if (points.length === 0) {
     return "";
   }
   return points
-    .map((p, i) => (i === 0 ? `M ${p[0].toFixed(1)} ${p[1].toFixed(1)}` : `L ${p[0].toFixed(1)} ${p[1].toFixed(1)}`))
+    .map((p, i) =>
+      i === 0 ? `M ${p[0].toFixed(1)} ${p[1].toFixed(1)}` : `L ${p[0].toFixed(1)} ${p[1].toFixed(1)}`,
+    )
     .join(" ");
 }
 
 /**
- * Route via a horizontal corridor above (or below) all nodes, with per-link lane offsets.
+ * Route only through the link band and the gap above nodes — never through card interiors.
  */
 export function routeClusterLinks(
   anchors: LinkAnchor[],
-  bounds: { minTop: number; maxBottom: number },
+  bounds: { linkBandBottom: number; minNodeTop: number },
 ): RoutedLink[] {
   if (anchors.length === 0) {
     return [];
   }
 
-  const topCorridor = bounds.minTop - 20;
-  const bottomCorridor = bounds.maxBottom + 20;
-  const useTop = true;
-  const baseY = useTop ? topCorridor : bottomCorridor;
-
-  const laneStep = 7;
-  const laneCount = Math.max(1, Math.ceil(anchors.length / 3));
+  const laneStep = 3;
+  const maxLane = Math.min(12, Math.max(0, anchors.length - 1));
+  const corridorTop = 6;
 
   return anchors.map((a, index) => {
-    const lane = (index % laneCount) * laneStep - ((laneCount - 1) * laneStep) / 2;
-    const cy = baseY + lane;
-    const forward = a.ex >= a.sx;
+    const lane = maxLane > 0 ? (index % (maxLane + 1)) * laneStep : 0;
+    const yCorridor = Math.min(bounds.linkBandBottom - CORRIDOR_ABOVE - lane, bounds.minNodeTop - 6);
+    const yCorridorClamped = Math.max(corridorTop + lane, yCorridor);
+
+    const dropEndY = Math.min(a.targetTop, bounds.minNodeTop);
 
     let points: [number, number][];
-    if (forward) {
+    if (a.ex >= a.sx) {
       points = [
-        [a.sx, a.sy],
-        [a.sx + STUB, a.sy],
-        [a.sx + STUB, cy],
-        [a.ex - STUB, cy],
-        [a.ex - STUB, a.ey],
-        [a.ex, a.ey],
+        [a.sx, a.sourceTop],
+        [a.sx + STUB, a.sourceTop],
+        [a.sx + STUB, yCorridorClamped],
+        [a.tx, yCorridorClamped],
+        [a.tx, dropEndY],
       ];
+      if (Math.abs(a.ex - a.tx) > 2) {
+        points.push([a.ex, dropEndY]);
+      }
     } else {
-      // Rare reverse edge: dip below the row
-      const by = bottomCorridor + Math.abs(lane);
+      const yLow = bounds.minNodeTop + 24 + lane;
       points = [
-        [a.sx, a.sy],
-        [a.sx + STUB, a.sy],
-        [a.sx + STUB, by],
-        [a.ex - STUB, by],
-        [a.ex - STUB, a.ey],
-        [a.ex, a.ey],
+        [a.sx, a.sourceTop],
+        [a.sx + STUB, a.sourceTop],
+        [a.sx + STUB, yLow],
+        [a.tx, yLow],
+        [a.tx, dropEndY],
       ];
+      if (Math.abs(a.ex - a.tx) > 2) {
+        points.push([a.ex, dropEndY]);
+      }
     }
 
     return { key: a.key, healthy: a.healthy, d: pathFromPoints(points) };

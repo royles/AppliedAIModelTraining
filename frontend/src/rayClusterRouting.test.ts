@@ -9,12 +9,14 @@ describe("routeClusterLinks", () => {
           key: "a-b",
           healthy: true,
           sx: 100,
-          sy: 50,
-          ex: 200,
+          sourceTop: 44,
+          ex: 198,
           ey: 60,
+          tx: 210,
+          targetTop: 44,
         },
       ],
-      { minTop: 40, maxBottom: 120 },
+      { linkBandBottom: 36, minNodeTop: 44 },
     );
     expect(paths).toHaveLength(1);
     expect(paths[0].d).toMatch(/^M /);
