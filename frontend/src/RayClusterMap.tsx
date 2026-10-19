@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RayClusterComponent, RayClusterLink } from "./rayClusterTypes";
 import { routeClusterLinks, routedLinksEqual, type RoutedLink } from "./rayClusterRouting";
 import { parseDistributed, parseTopology } from "./rayClusterTypes";
@@ -14,10 +14,10 @@ const ROLE_ORDER: Record<string, number> = {
   driver: 0,
   master: 1,
   controller: 2,
-  train_worker: 3,
-  worker: 4,
-  worker_pending: 5,
-  worker_dead: 6,
+  worker: 3,
+  worker_pending: 4,
+  worker_dead: 5,
+  train_worker: 6,
 };
 
 const EMPTY_LINKS: RayClusterLink[] = [];
@@ -169,19 +169,17 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
   const summary = topology?.summary;
   const alerts = clusterAlerts(status, topology?.note);
 
-  const tiers = useMemo(() => {
-    const grouped = new Map<string, RayClusterComponent[]>();
-    for (const c of components) {
-      const tier = tierForRole(c.role);
-      const list = grouped.get(tier) ?? [];
-      list.push(c);
-      grouped.set(tier, list);
-    }
-    for (const [, list] of grouped) {
-      list.sort((a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9));
-    }
-    return grouped;
-  }, [components]);
+  const flowNodes = useMemo(
+    () =>
+      [...components].sort((a, b) => {
+        const byRole = (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9);
+        if (byRole !== 0) {
+          return byRole;
+        }
+        return a.id.localeCompare(b.id);
+      }),
+    [components],
+  );
 
   useLayoutEffect(() => {
     const root = containerRef.current;
@@ -253,8 +251,6 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
     return <p className="hint">Loading cluster map…</p>;
   }
 
-  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-workers", "tier-train"];
-
   if (!topology || components.length === 0) {
     return (
       <div className="ray-cluster-map empty">
@@ -299,15 +295,21 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
             ))}
           </svg>
 
-          {tierOrder.map((tier) => {
-            const nodes = tiers.get(tier);
-            if (!nodes?.length) return null;
+          {flowNodes.map((node, index) => {
+            const prev = flowNodes[index - 1];
+            const gap =
+              prev && tierForRole(prev.role) !== tierForRole(node.role) ? (
+                <div
+                  key={`gap-before-${node.id}`}
+                  className="ray-cluster-flow-gap"
+                  aria-hidden
+                />
+              ) : null;
             return (
-              <div key={tier} className={`ray-cluster-tier ${tier}`}>
-                {nodes.map((node) => (
-                  <NodeCard key={node.id} node={node} />
-                ))}
-              </div>
+              <Fragment key={node.id}>
+                {gap}
+                <NodeCard node={node} />
+              </Fragment>
             );
           })}
         </div>
