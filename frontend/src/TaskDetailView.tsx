@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
 import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
 import { ModelInferenceLinks } from "./ModelInferenceLinks";
@@ -15,9 +15,18 @@ function formatLogLines(lines: { ts: string; message: string }[]): string {
   return lines.map((l) => `[${l.ts}] ${l.message}`).join("\n");
 }
 
+function scrollLogToBottom(el: HTMLDivElement | null) {
+  if (el) {
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
 export function TaskDetailView({ job, onBack, onDelete }: Props) {
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const rayStatusLogRef = useRef<HTMLDivElement>(null);
+  const frameworkLogRef = useRef<HTMLDivElement>(null);
+  const trainingLogRef = useRef<HTMLDivElement>(null);
 
   const loadLogs = useCallback(async () => {
     try {
@@ -38,6 +47,12 @@ export function TaskDetailView({ job, onBack, onDelete }: Props) {
   const rayStatusText = logs
     ? JSON.stringify(logs.ray_status, null, 2)
     : "Loading Ray status…";
+
+  useEffect(() => {
+    scrollLogToBottom(rayStatusLogRef.current);
+    scrollLogToBottom(frameworkLogRef.current);
+    scrollLogToBottom(trainingLogRef.current);
+  }, [logs, rayStatusText]);
 
   return (
     <div className="task-detail">
@@ -81,18 +96,18 @@ export function TaskDetailView({ job, onBack, onDelete }: Props) {
         <section className="card log-panel">
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 3s)</p>
-          <div className="log-ray-status">
+          <div className="log-ray-status" ref={rayStatusLogRef}>
             <strong>Ray status</strong>
             <pre>{rayStatusText}</pre>
           </div>
-          <div className="log-stream">
+          <div className="log-stream" ref={frameworkLogRef}>
             <pre>{formatLogLines(logs?.framework ?? [])}</pre>
           </div>
         </section>
         <section className="card log-panel">
           <h3>Training steps</h3>
           <p className="hint">Loss, learning rate, and checkpoint steps from the train loop</p>
-          <div className="log-stream">
+          <div className="log-stream" ref={trainingLogRef}>
             <pre>{formatLogLines(logs?.training ?? [])}</pre>
           </div>
         </section>
