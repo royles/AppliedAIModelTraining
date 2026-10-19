@@ -9,6 +9,7 @@ from typing import Any
 
 from app.config import REPO_ROOT
 from app.training.dataset_config import TrainingDatasetConfig
+from app.training.text_normalize import normalize_training_text
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +52,40 @@ def _resolve_dataset_path(rel_path: str) -> Path:
     return full
 
 
-def _load_text_file(path: Path) -> list[str]:
+def _load_text_file(path: Path, *, task_type: str = "causal_lm") -> list[str]:
     try:
         raw = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError(
             f"Dataset file must be UTF-8 text: {path.name} ({exc})",
         ) from exc
-    lines = raw.splitlines()
-    return [ln.strip() for ln in lines if ln.strip()]
+    normalized = normalize_training_text(raw)
+    blocks = [b.strip() for b in normalized.split("\n\n") if b.strip()]
+    if len(blocks) > 1:
+        return blocks
+    if blocks and "\n" in blocks[0] and blocks[0].lstrip().startswith("User:"):
+        return blocks
+    lines = [ln.strip() for ln in normalized.splitlines() if ln.strip()]
+    if task_type == "causal_lm" and lines:
+        return _group_user_assistant_lines(lines)
+    return blocks or lines
+
+
+def _group_user_assistant_lines(lines: list[str]) -> list[str]:
+    """Pair User:/Assistant: lines into one training example per turn."""
+    samples: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("User:") and i + 1 < len(lines) and lines[i + 1].startswith(
+            "Assistant:"
+        ):
+            samples.append(f"{line}\n{lines[i + 1]}")
+            i += 2
+        else:
+            samples.append(line)
+            i += 1
+    return samples
 
 
 def _load_jsonl(path: Path, text_field: str, label_field: str | None) -> tuple[list[str], list[int] | None]:
@@ -123,7 +149,7 @@ def load_training_samples(
         labels = cfg.labels
     elif cfg.source == "text_file":
         path = _resolve_dataset_path(cfg.path or "")
-        texts = _load_text_file(path)
+        texts = _load_text_file(path, task_type=task_type)
     elif cfg.source == "jsonl_file":
         path = _resolve_dataset_path(cfg.path or "")
         texts, labels = _load_jsonl(path, cfg.text_field, cfg.label_field)

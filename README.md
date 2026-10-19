@@ -28,7 +28,7 @@ Presets: `GET /api/transformer/presets`. Parameter estimate: `POST /api/transfor
 
 Use `init_mode: pretrained` and `base_model` to fine-tune an existing Hugging Face checkpoint instead.
 
-**Chat quality (from-scratch):** Models trained on `starter_corpus.txt` learn lines like `User: … (on a laptop)` / `Assistant: …` with parenthetical tags. `/v1/chat/completions` maps OpenAI messages to that `User:` / `Assistant:` format. Odd `((()))` or “demo project” phrases usually mean a **tiny model + high temperature** regurgitating training suffixes—use `temperature` 0.2–0.7, more steps, or a larger corpus without repetitive parentheticals.
+**Chat quality (from-scratch):** `starter_corpus.txt` uses verbose `User:` / `Assistant:` paragraphs without bracket suffixes. Re-train after `git pull` if an older corpus taught parenthetical filler. Use `temperature` 0.2–0.7 for smoke tests; tiny models still need more steps and data for fluent answers.
 
 ## Architecture
 

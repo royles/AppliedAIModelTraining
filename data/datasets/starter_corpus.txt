@@ -1,536 +1,233 @@
-User: What is a causal language model? (on a laptop)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (on a laptop)
-User: How do I train from scratch on this platform? (on a laptop)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (on a laptop)
-User: Why use byte-level BPE? (on a laptop)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (on a laptop)
-User: What does Ray Train do here? (on a laptop)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (on a laptop)
-User: How do CDSW workers fit in? (on a laptop)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (on a laptop)
-User: What is LoRA fine-tuning? (on a laptop)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (on a laptop)
-User: Explain attention heads. (on a laptop)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (on a laptop)
-User: What is the feed-forward block? (on a laptop)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (on a laptop)
-User: How should I pick vocab size? (on a laptop)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (on a laptop)
-User: What learning rate works for scratch GPT-2? (on a laptop)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (on a laptop)
-User: What is max_steps? (on a laptop)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (on a laptop)
-User: Can I use Hugging Face datasets? (on a laptop)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (on a laptop)
-User: What is starter_corpus.txt? (on a laptop)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (on a laptop)
-User: How do I expose a model on /v1/chat/completions? (on a laptop)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (on a laptop)
-User: What is gradient checkpointing? (on a laptop)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (on a laptop)
-User: Why tie word embeddings? (on a laptop)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (on a laptop)
-User: What is warmup in the LR schedule? (on a laptop)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (on a laptop)
-User: How do I debug a failed Ray job? (on a laptop)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (on a laptop)
-User: What batch size should I use on CPU? (on a laptop)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (on a laptop)
-User: What is sequence classification mode? (on a laptop)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (on a laptop)
-User: What is a causal language model? (in a CDSW session)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (in a CDSW session)
-User: How do I train from scratch on this platform? (in a CDSW session)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (in a CDSW session)
-User: Why use byte-level BPE? (in a CDSW session)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (in a CDSW session)
-User: What does Ray Train do here? (in a CDSW session)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (in a CDSW session)
-User: How do CDSW workers fit in? (in a CDSW session)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (in a CDSW session)
-User: What is LoRA fine-tuning? (in a CDSW session)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (in a CDSW session)
-User: Explain attention heads. (in a CDSW session)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (in a CDSW session)
-User: What is the feed-forward block? (in a CDSW session)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (in a CDSW session)
-User: How should I pick vocab size? (in a CDSW session)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (in a CDSW session)
-User: What learning rate works for scratch GPT-2? (in a CDSW session)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (in a CDSW session)
-User: What is max_steps? (in a CDSW session)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (in a CDSW session)
-User: Can I use Hugging Face datasets? (in a CDSW session)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (in a CDSW session)
-User: What is starter_corpus.txt? (in a CDSW session)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (in a CDSW session)
-User: How do I expose a model on /v1/chat/completions? (in a CDSW session)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (in a CDSW session)
-User: What is gradient checkpointing? (in a CDSW session)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (in a CDSW session)
-User: Why tie word embeddings? (in a CDSW session)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (in a CDSW session)
-User: What is warmup in the LR schedule? (in a CDSW session)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (in a CDSW session)
-User: How do I debug a failed Ray job? (in a CDSW session)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (in a CDSW session)
-User: What batch size should I use on CPU? (in a CDSW session)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (in a CDSW session)
-User: What is sequence classification mode? (in a CDSW session)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (in a CDSW session)
-User: What is a causal language model? (with one GPU worker)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (with one GPU worker)
-User: How do I train from scratch on this platform? (with one GPU worker)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (with one GPU worker)
-User: Why use byte-level BPE? (with one GPU worker)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (with one GPU worker)
-User: What does Ray Train do here? (with one GPU worker)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (with one GPU worker)
-User: How do CDSW workers fit in? (with one GPU worker)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (with one GPU worker)
-User: What is LoRA fine-tuning? (with one GPU worker)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (with one GPU worker)
-User: Explain attention heads. (with one GPU worker)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (with one GPU worker)
-User: What is the feed-forward block? (with one GPU worker)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (with one GPU worker)
-User: How should I pick vocab size? (with one GPU worker)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (with one GPU worker)
-User: What learning rate works for scratch GPT-2? (with one GPU worker)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (with one GPU worker)
-User: What is max_steps? (with one GPU worker)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (with one GPU worker)
-User: Can I use Hugging Face datasets? (with one GPU worker)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (with one GPU worker)
-User: What is starter_corpus.txt? (with one GPU worker)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (with one GPU worker)
-User: How do I expose a model on /v1/chat/completions? (with one GPU worker)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (with one GPU worker)
-User: What is gradient checkpointing? (with one GPU worker)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (with one GPU worker)
-User: Why tie word embeddings? (with one GPU worker)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (with one GPU worker)
-User: What is warmup in the LR schedule? (with one GPU worker)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (with one GPU worker)
-User: How do I debug a failed Ray job? (with one GPU worker)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (with one GPU worker)
-User: What batch size should I use on CPU? (with one GPU worker)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (with one GPU worker)
-User: What is sequence classification mode? (with one GPU worker)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (with one GPU worker)
-User: What is a causal language model? (for a demo project)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (for a demo project)
-User: How do I train from scratch on this platform? (for a demo project)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (for a demo project)
-User: Why use byte-level BPE? (for a demo project)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (for a demo project)
-User: What does Ray Train do here? (for a demo project)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (for a demo project)
-User: How do CDSW workers fit in? (for a demo project)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (for a demo project)
-User: What is LoRA fine-tuning? (for a demo project)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (for a demo project)
-User: Explain attention heads. (for a demo project)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (for a demo project)
-User: What is the feed-forward block? (for a demo project)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (for a demo project)
-User: How should I pick vocab size? (for a demo project)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (for a demo project)
-User: What learning rate works for scratch GPT-2? (for a demo project)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (for a demo project)
-User: What is max_steps? (for a demo project)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (for a demo project)
-User: Can I use Hugging Face datasets? (for a demo project)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (for a demo project)
-User: What is starter_corpus.txt? (for a demo project)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (for a demo project)
-User: How do I expose a model on /v1/chat/completions? (for a demo project)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (for a demo project)
-User: What is gradient checkpointing? (for a demo project)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (for a demo project)
-User: Why tie word embeddings? (for a demo project)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (for a demo project)
-User: What is warmup in the LR schedule? (for a demo project)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (for a demo project)
-User: How do I debug a failed Ray job? (for a demo project)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (for a demo project)
-User: What batch size should I use on CPU? (for a demo project)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (for a demo project)
-User: What is sequence classification mode? (for a demo project)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (for a demo project)
-User: What is a causal language model? (before scaling out)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (before scaling out)
-User: How do I train from scratch on this platform? (before scaling out)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (before scaling out)
-User: Why use byte-level BPE? (before scaling out)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (before scaling out)
-User: What does Ray Train do here? (before scaling out)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (before scaling out)
-User: How do CDSW workers fit in? (before scaling out)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (before scaling out)
-User: What is LoRA fine-tuning? (before scaling out)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (before scaling out)
-User: Explain attention heads. (before scaling out)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (before scaling out)
-User: What is the feed-forward block? (before scaling out)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (before scaling out)
-User: How should I pick vocab size? (before scaling out)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (before scaling out)
-User: What learning rate works for scratch GPT-2? (before scaling out)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (before scaling out)
-User: What is max_steps? (before scaling out)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (before scaling out)
-User: Can I use Hugging Face datasets? (before scaling out)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (before scaling out)
-User: What is starter_corpus.txt? (before scaling out)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (before scaling out)
-User: How do I expose a model on /v1/chat/completions? (before scaling out)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (before scaling out)
-User: What is gradient checkpointing? (before scaling out)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (before scaling out)
-User: Why tie word embeddings? (before scaling out)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (before scaling out)
-User: What is warmup in the LR schedule? (before scaling out)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (before scaling out)
-User: How do I debug a failed Ray job? (before scaling out)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (before scaling out)
-User: What batch size should I use on CPU? (before scaling out)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (before scaling out)
-User: What is sequence classification mode? (before scaling out)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (before scaling out)
-User: What is a causal language model? (with gradient accumulation)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (with gradient accumulation)
-User: How do I train from scratch on this platform? (with gradient accumulation)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (with gradient accumulation)
-User: Why use byte-level BPE? (with gradient accumulation)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (with gradient accumulation)
-User: What does Ray Train do here? (with gradient accumulation)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (with gradient accumulation)
-User: How do CDSW workers fit in? (with gradient accumulation)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (with gradient accumulation)
-User: What is LoRA fine-tuning? (with gradient accumulation)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (with gradient accumulation)
-User: Explain attention heads. (with gradient accumulation)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (with gradient accumulation)
-User: What is the feed-forward block? (with gradient accumulation)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (with gradient accumulation)
-User: How should I pick vocab size? (with gradient accumulation)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (with gradient accumulation)
-User: What learning rate works for scratch GPT-2? (with gradient accumulation)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (with gradient accumulation)
-User: What is max_steps? (with gradient accumulation)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (with gradient accumulation)
-User: Can I use Hugging Face datasets? (with gradient accumulation)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (with gradient accumulation)
-User: What is starter_corpus.txt? (with gradient accumulation)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (with gradient accumulation)
-User: How do I expose a model on /v1/chat/completions? (with gradient accumulation)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (with gradient accumulation)
-User: What is gradient checkpointing? (with gradient accumulation)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (with gradient accumulation)
-User: Why tie word embeddings? (with gradient accumulation)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (with gradient accumulation)
-User: What is warmup in the LR schedule? (with gradient accumulation)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (with gradient accumulation)
-User: How do I debug a failed Ray job? (with gradient accumulation)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (with gradient accumulation)
-User: What batch size should I use on CPU? (with gradient accumulation)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (with gradient accumulation)
-User: What is sequence classification mode? (with gradient accumulation)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (with gradient accumulation)
-User: What is a causal language model? (using the tiny GPT-2 preset)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (using the tiny GPT-2 preset)
-User: How do I train from scratch on this platform? (using the tiny GPT-2 preset)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (using the tiny GPT-2 preset)
-User: Why use byte-level BPE? (using the tiny GPT-2 preset)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (using the tiny GPT-2 preset)
-User: What does Ray Train do here? (using the tiny GPT-2 preset)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (using the tiny GPT-2 preset)
-User: How do CDSW workers fit in? (using the tiny GPT-2 preset)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (using the tiny GPT-2 preset)
-User: What is LoRA fine-tuning? (using the tiny GPT-2 preset)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (using the tiny GPT-2 preset)
-User: Explain attention heads. (using the tiny GPT-2 preset)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (using the tiny GPT-2 preset)
-User: What is the feed-forward block? (using the tiny GPT-2 preset)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (using the tiny GPT-2 preset)
-User: How should I pick vocab size? (using the tiny GPT-2 preset)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (using the tiny GPT-2 preset)
-User: What learning rate works for scratch GPT-2? (using the tiny GPT-2 preset)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (using the tiny GPT-2 preset)
-User: What is max_steps? (using the tiny GPT-2 preset)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (using the tiny GPT-2 preset)
-User: Can I use Hugging Face datasets? (using the tiny GPT-2 preset)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (using the tiny GPT-2 preset)
-User: What is starter_corpus.txt? (using the tiny GPT-2 preset)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (using the tiny GPT-2 preset)
-User: How do I expose a model on /v1/chat/completions? (using the tiny GPT-2 preset)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (using the tiny GPT-2 preset)
-User: What is gradient checkpointing? (using the tiny GPT-2 preset)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (using the tiny GPT-2 preset)
-User: Why tie word embeddings? (using the tiny GPT-2 preset)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (using the tiny GPT-2 preset)
-User: What is warmup in the LR schedule? (using the tiny GPT-2 preset)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (using the tiny GPT-2 preset)
-User: How do I debug a failed Ray job? (using the tiny GPT-2 preset)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (using the tiny GPT-2 preset)
-User: What batch size should I use on CPU? (using the tiny GPT-2 preset)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (using the tiny GPT-2 preset)
-User: What is sequence classification mode? (using the tiny GPT-2 preset)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (using the tiny GPT-2 preset)
-User: What is a causal language model? (after confirming the recipe steps)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (after confirming the recipe steps)
-User: How do I train from scratch on this platform? (after confirming the recipe steps)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (after confirming the recipe steps)
-User: Why use byte-level BPE? (after confirming the recipe steps)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (after confirming the recipe steps)
-User: What does Ray Train do here? (after confirming the recipe steps)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (after confirming the recipe steps)
-User: How do CDSW workers fit in? (after confirming the recipe steps)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (after confirming the recipe steps)
-User: What is LoRA fine-tuning? (after confirming the recipe steps)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (after confirming the recipe steps)
-User: Explain attention heads. (after confirming the recipe steps)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (after confirming the recipe steps)
-User: What is the feed-forward block? (after confirming the recipe steps)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (after confirming the recipe steps)
-User: How should I pick vocab size? (after confirming the recipe steps)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (after confirming the recipe steps)
-User: What learning rate works for scratch GPT-2? (after confirming the recipe steps)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (after confirming the recipe steps)
-User: What is max_steps? (after confirming the recipe steps)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (after confirming the recipe steps)
-User: Can I use Hugging Face datasets? (after confirming the recipe steps)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (after confirming the recipe steps)
-User: What is starter_corpus.txt? (after confirming the recipe steps)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (after confirming the recipe steps)
-User: How do I expose a model on /v1/chat/completions? (after confirming the recipe steps)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (after confirming the recipe steps)
-User: What is gradient checkpointing? (after confirming the recipe steps)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (after confirming the recipe steps)
-User: Why tie word embeddings? (after confirming the recipe steps)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (after confirming the recipe steps)
-User: What is warmup in the LR schedule? (after confirming the recipe steps)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (after confirming the recipe steps)
-User: How do I debug a failed Ray job? (after confirming the recipe steps)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (after confirming the recipe steps)
-User: What batch size should I use on CPU? (after confirming the recipe steps)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (after confirming the recipe steps)
-User: What is sequence classification mode? (after confirming the recipe steps)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (after confirming the recipe steps)
-User: What is a causal language model? (with a JSONL file)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (with a JSONL file)
-User: How do I train from scratch on this platform? (with a JSONL file)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (with a JSONL file)
-User: Why use byte-level BPE? (with a JSONL file)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (with a JSONL file)
-User: What does Ray Train do here? (with a JSONL file)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (with a JSONL file)
-User: How do CDSW workers fit in? (with a JSONL file)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (with a JSONL file)
-User: What is LoRA fine-tuning? (with a JSONL file)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (with a JSONL file)
-User: Explain attention heads. (with a JSONL file)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (with a JSONL file)
-User: What is the feed-forward block? (with a JSONL file)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (with a JSONL file)
-User: How should I pick vocab size? (with a JSONL file)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (with a JSONL file)
-User: What learning rate works for scratch GPT-2? (with a JSONL file)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (with a JSONL file)
-User: What is max_steps? (with a JSONL file)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (with a JSONL file)
-User: Can I use Hugging Face datasets? (with a JSONL file)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (with a JSONL file)
-User: What is starter_corpus.txt? (with a JSONL file)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (with a JSONL file)
-User: How do I expose a model on /v1/chat/completions? (with a JSONL file)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (with a JSONL file)
-User: What is gradient checkpointing? (with a JSONL file)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (with a JSONL file)
-User: Why tie word embeddings? (with a JSONL file)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (with a JSONL file)
-User: What is warmup in the LR schedule? (with a JSONL file)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (with a JSONL file)
-User: How do I debug a failed Ray job? (with a JSONL file)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (with a JSONL file)
-User: What batch size should I use on CPU? (with a JSONL file)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (with a JSONL file)
-User: What is sequence classification mode? (with a JSONL file)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (with a JSONL file)
-User: What is a causal language model? (from inline text)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (from inline text)
-User: How do I train from scratch on this platform? (from inline text)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (from inline text)
-User: Why use byte-level BPE? (from inline text)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (from inline text)
-User: What does Ray Train do here? (from inline text)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (from inline text)
-User: How do CDSW workers fit in? (from inline text)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (from inline text)
-User: What is LoRA fine-tuning? (from inline text)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (from inline text)
-User: Explain attention heads. (from inline text)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (from inline text)
-User: What is the feed-forward block? (from inline text)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (from inline text)
-User: How should I pick vocab size? (from inline text)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (from inline text)
-User: What learning rate works for scratch GPT-2? (from inline text)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (from inline text)
-User: What is max_steps? (from inline text)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (from inline text)
-User: Can I use Hugging Face datasets? (from inline text)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (from inline text)
-User: What is starter_corpus.txt? (from inline text)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (from inline text)
-User: How do I expose a model on /v1/chat/completions? (from inline text)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (from inline text)
-User: What is gradient checkpointing? (from inline text)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (from inline text)
-User: Why tie word embeddings? (from inline text)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (from inline text)
-User: What is warmup in the LR schedule? (from inline text)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (from inline text)
-User: How do I debug a failed Ray job? (from inline text)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (from inline text)
-User: What batch size should I use on CPU? (from inline text)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (from inline text)
-User: What is sequence classification mode? (from inline text)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (from inline text)
-User: What is a causal language model? (on a laptop)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (on a laptop)
-User: How do I train from scratch on this platform? (on a laptop)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (on a laptop)
-User: Why use byte-level BPE? (on a laptop)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (on a laptop)
-User: What does Ray Train do here? (on a laptop)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (on a laptop)
-User: How do CDSW workers fit in? (on a laptop)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (on a laptop)
-User: What is LoRA fine-tuning? (on a laptop)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (on a laptop)
-User: Explain attention heads. (on a laptop)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (on a laptop)
-User: What is the feed-forward block? (on a laptop)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (on a laptop)
-User: How should I pick vocab size? (on a laptop)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (on a laptop)
-User: What learning rate works for scratch GPT-2? (on a laptop)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (on a laptop)
-User: What is max_steps? (on a laptop)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (on a laptop)
-User: Can I use Hugging Face datasets? (on a laptop)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (on a laptop)
-User: What is starter_corpus.txt? (on a laptop)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (on a laptop)
-User: How do I expose a model on /v1/chat/completions? (on a laptop)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (on a laptop)
-User: What is gradient checkpointing? (on a laptop)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (on a laptop)
-User: Why tie word embeddings? (on a laptop)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (on a laptop)
-User: What is warmup in the LR schedule? (on a laptop)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (on a laptop)
-User: How do I debug a failed Ray job? (on a laptop)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (on a laptop)
-User: What batch size should I use on CPU? (on a laptop)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (on a laptop)
-User: What is sequence classification mode? (on a laptop)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (on a laptop)
-User: What is a causal language model? (in a CDSW session)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (in a CDSW session)
-User: How do I train from scratch on this platform? (in a CDSW session)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (in a CDSW session)
-User: Why use byte-level BPE? (in a CDSW session)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (in a CDSW session)
-User: What does Ray Train do here? (in a CDSW session)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (in a CDSW session)
-User: How do CDSW workers fit in? (in a CDSW session)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (in a CDSW session)
-User: What is LoRA fine-tuning? (in a CDSW session)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (in a CDSW session)
-User: Explain attention heads. (in a CDSW session)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (in a CDSW session)
-User: What is the feed-forward block? (in a CDSW session)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (in a CDSW session)
-User: How should I pick vocab size? (in a CDSW session)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (in a CDSW session)
-User: What learning rate works for scratch GPT-2? (in a CDSW session)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (in a CDSW session)
-User: What is max_steps? (in a CDSW session)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (in a CDSW session)
-User: Can I use Hugging Face datasets? (in a CDSW session)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (in a CDSW session)
-User: What is starter_corpus.txt? (in a CDSW session)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (in a CDSW session)
-User: How do I expose a model on /v1/chat/completions? (in a CDSW session)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (in a CDSW session)
-User: What is gradient checkpointing? (in a CDSW session)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (in a CDSW session)
-User: Why tie word embeddings? (in a CDSW session)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (in a CDSW session)
-User: What is warmup in the LR schedule? (in a CDSW session)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (in a CDSW session)
-User: How do I debug a failed Ray job? (in a CDSW session)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (in a CDSW session)
-User: What batch size should I use on CPU? (in a CDSW session)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (in a CDSW session)
-User: What is sequence classification mode? (in a CDSW session)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (in a CDSW session)
-User: What is a causal language model? (with one GPU worker)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (with one GPU worker)
-User: How do I train from scratch on this platform? (with one GPU worker)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (with one GPU worker)
-User: Why use byte-level BPE? (with one GPU worker)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (with one GPU worker)
-User: What does Ray Train do here? (with one GPU worker)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (with one GPU worker)
-User: How do CDSW workers fit in? (with one GPU worker)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (with one GPU worker)
-User: What is LoRA fine-tuning? (with one GPU worker)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (with one GPU worker)
-User: Explain attention heads. (with one GPU worker)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (with one GPU worker)
-User: What is the feed-forward block? (with one GPU worker)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (with one GPU worker)
-User: How should I pick vocab size? (with one GPU worker)
-Assistant: Smaller vocabs train faster on tiny corpora; larger vocabs need more unique text to avoid empty merges. (with one GPU worker)
-User: What learning rate works for scratch GPT-2? (with one GPU worker)
-Assistant: Higher rates like 6e-4 are common for small random-init models; fine-tunes usually use 2e-5 to 5e-5. (with one GPU worker)
-User: What is max_steps? (with one GPU worker)
-Assistant: It caps optimizer steps for smoke tests; production runs use thousands to millions depending on data. (with one GPU worker)
-User: Can I use Hugging Face datasets? (with one GPU worker)
-Assistant: Yes—set source to Hugging Face, provide the dataset id, split, and text column in Model Tasks. (with one GPU worker)
-User: What is starter_corpus.txt? (with one GPU worker)
-Assistant: A bundled line-delimited chat corpus under data/datasets for local and CAI smoke training. (with one GPU worker)
-User: How do I expose a model on /v1/chat/completions? (with one GPU worker)
-Assistant: After training succeeds, register an OpenAI-compatible model id and call the platform inference routes. (with one GPU worker)
-User: What is gradient checkpointing? (with one GPU worker)
-Assistant: It recomputes activations during the backward pass to trade extra compute for lower GPU memory. (with one GPU worker)
-User: Why tie word embeddings? (with one GPU worker)
-Assistant: Sharing input and output embeddings reduces parameters for causal LMs when vocab matches the LM head. (with one GPU worker)
-User: What is warmup in the LR schedule? (with one GPU worker)
-Assistant: A short ramp from zero stabilizes early steps before cosine or linear decay. (with one GPU worker)
-User: How do I debug a failed Ray job? (with one GPU worker)
-Assistant: Open the task detail view: framework logs show Ray status; training logs show step loss and errors. (with one GPU worker)
-User: What batch size should I use on CPU? (with one GPU worker)
-Assistant: Start with per-device batch 2 and short sequences; increase when memory allows. (with one GPU worker)
-User: What is sequence classification mode? (with one GPU worker)
-Assistant: An encoder model like BERT attaches a classifier head for labels instead of next-token prediction. (with one GPU worker)
-User: What is a causal language model? (for a demo project)
-Assistant: It predicts the next token given all previous tokens, which is how chat assistants generate replies. (for a demo project)
-User: How do I train from scratch on this platform? (for a demo project)
-Assistant: Pick a text dataset, train a BPE tokenizer on that corpus, then initialize a small GPT-2 stack and run Ray Train. (for a demo project)
-User: Why use byte-level BPE? (for a demo project)
-Assistant: It builds subword units from raw bytes, handles punctuation and rare words, and scales to a target vocabulary size. (for a demo project)
-User: What does Ray Train do here? (for a demo project)
-Assistant: It launches distributed training workers, coordinates checkpoints, and streams metrics back to the driver. (for a demo project)
-User: How do CDSW workers fit in? (for a demo project)
-Assistant: They provision extra engines on Cloudera AI that join the Ray cluster as GPU or CPU workers for a job. (for a demo project)
-User: What is LoRA fine-tuning? (for a demo project)
-Assistant: Low-rank adapters train a thin set of matrices on top of a frozen base model, saving memory versus full updates. (for a demo project)
-User: Explain attention heads. (for a demo project)
-Assistant: Each head learns a different relationship pattern; hidden size must divide evenly by the head count. (for a demo project)
-User: What is the feed-forward block? (for a demo project)
-Assistant: After attention, a two-layer MLP expands hidden size to an inner dimension (often 4×) and projects back. (for a demo project)
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
+
+User: How should I format training text so chat inference behaves predictably?
+Assistant: Store multi-turn examples with explicit User and Assistant lines, ideally one complete exchange per paragraph with a blank line between examples. Avoid repetitive trailing parenthetical tags that the model may memorize as filler. At inference time the server maps OpenAI roles into the same User and Assistant prefix pattern and stops generation when a new User turn would begin. Questions should be clear and answers should read like complete paragraphs rather than bullet fragments so the model learns fluent continuations.
+
+User: What should I do when a training job fails or the framework restarts?
+Assistant: Failed jobs remain in the task list with framework and training logs attached; read the last training error before restarting. After an API restart, in-flight jobs are marked failed automatically and you can restart with the same parameters, optionally resuming from the last epoch checkpoint if one was written. Common failures include Ray head not listening on port 6379, vocabulary size validation mismatches, or worker engines that never leave scheduling. Fix the root cause, pull the latest platform code, and run a shorter max_steps job to verify the pipeline before scaling workers again.
+
+User: What is a causal language model, and how is it different from a classifier?
+Assistant: A causal language model is trained to predict the next token in a sequence while only looking at tokens that came before it. That left-to-right constraint is what makes the same architecture useful for chat: you append the user's message, then sample or search for a continuation that reads like an assistant reply. A sequence classifier, by contrast, reads the whole input at once and emits a single label from a fixed set of categories. On this platform, causal language modeling is the default when you want OpenAI-style completions; classification uses an encoder such as BERT with a classification head.
+
+User: How do I train a small GPT-style model from scratch on Cloudera AI using this application?
+Assistant: Open Model Tasks, choose a from-scratch preset, and point the dataset at a real text file such as starter_corpus.txt or your own JSONL export. The job first fits a byte-level BPE tokenizer on your corpus so the vocabulary matches your data, then randomly initializes a compact GPT-2 stack whose width and depth you set under Architecture. Ray Train runs the optimization loop while CDSW worker engines can attach as distributed GPU workers. When the job succeeds, weights and tokenizer land under data/models/job_<id> and the model registry records metadata plus a model card for review.
+
+User: Why does the platform train a custom BPE tokenizer instead of always using GPT-2's vocabulary?
+Assistant: GPT-2's 50k token vocabulary was built on a large web crawl; it is a poor match for domain-specific or small corpora where many merges never appear. Training BPE on your own text lets rare words and punctuation split in a way that reflects your sources, and the embedding table size can follow the actual merge count instead of a huge fixed table. The trade-off is that you need enough characters to fill the vocabulary meaningfully; otherwise training stops below your target vocab size. After BPE training, the architecture vocab_size field is updated to match the tokenizer you just created.
+
+User: What role does Ray play during a training job in this stack?
+Assistant: Ray provides a distributed runtime: a head process in your session exposes the global control service on port 6379, and worker processes join that cluster to offer CPU or GPU resources. Ray Train wraps your PyTorch training loop, places one copy per worker, and handles process group setup so gradients can be synchronized when you scale beyond a single device. The web UI and API stay on the driver session; they stream framework logs while workers provision, attach, and run the train loop. If Ray cannot reach the head on localhost, check that start.py launched ray start --head successfully.
+
+User: How do CDSW or CML worker engines connect to the Ray head?
+Assistant: When you request GPU workers for a job, the platform calls the Cloudera workers API to start isolated engines in your project. Each engine runs bootstrap code that installs dependencies if needed, then executes ray start --block --address=<master_ip>:6379 so the process stays attached until the job ends. Workers discover the master IP from environment variables such as CDSW_MASTER_IP while the session driver talks to the same head on 127.0.0.1 to avoid pod networking issues. Framework logs list each worker id and scheduling state so you can tell whether engines are still pending or already joined.
+
+User: What hyperparameters should I start with for a tiny from-scratch GPT-2 smoke run?
+Assistant: Use a few hundred to a few thousand max_steps, a modest learning rate around 6e-4, and per-device batch sizes of two to four depending on GPU memory. Keep sequences short at first so iteration is fast, then increase max_seq_length when you move to serious runs. Enable gradient checkpointing if you hit out-of-memory errors on the worker. Cosine learning-rate decay with a short warmup fraction is the default because it stabilizes early optimization and still anneals smoothly near the end of training.
+
+User: How do I evaluate a model after training and promote it responsibly?
+Assistant: When training completes, the registry creates an entry in the trained state with job metadata and an auto-generated model card. Call the OpenAI-compatible chat endpoint with low temperature and prompts formatted as User and Assistant turns to match training. Transition the registry entry to testing while you run qualitative checks, record benchmark metrics under benchmarked if you have them, and move to production only after you accept the limitations section of the model card. Retire older versions when a new checkpoint supersedes them so /v1/models lists only supported ids.
+
+User: What is LoRA fine-tuning and when would I use it instead of full from-scratch training?
+Assistant: Low-Rank Adaptation inserts small trainable matrices into attention projections while keeping most of the base weights frozen. That dramatically cuts optimizer memory and often reaches good task quality with far fewer trainable parameters. It is appropriate when you already have a strong pretrained checkpoint and want to specialize it on a narrow dataset. From-scratch training on this platform builds both tokenizer and weights anew and is mainly for education, smoke tests, or domains where no suitable base model exists. LoRA requires init_mode pretrained with a Hugging Face base_model id.
