@@ -132,8 +132,8 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
       <section className="card log-panel log-panel-run">
         <h3>Framework &amp; Ray cluster</h3>
         <p className="hint">
-          Nodes flow left → right (driver, head, Train, workers, train ranks). Dashed dividers separate stages.
-          Refreshes every 5s.
+          Control and Train on the top row; Ray workers on the bottom. Links use the band above and the corridor
+          between rows. Refreshes every 5s.
         </p>
         <div className="log-ray-status ray-cluster-panel ray-cluster-panel-full">
           <RayClusterMap
