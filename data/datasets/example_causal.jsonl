@@ -1,0 +1,3 @@
+{"text": "User: What is Ray?\nAssistant: Ray is a framework for scaling Python and ML workloads."}
+{"text": "User: How do I train a model here?\nAssistant: Configure a dataset, start a model task, and monitor logs in the Tasks view."}
+{"text": "User: Where do dataset files live?\nAssistant: Place .txt or .jsonl files under data/datasets/ in the project."}

@@ -1,5 +1,7 @@
 .venv/
-data/
+data/*
+!data/datasets/
+!data/datasets/**
 __pycache__/
 *.pyc
 node_modules/

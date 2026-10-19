@@ -142,7 +142,14 @@ def dataset_preview(
 ) -> dict[str, int | str]:
     try:
         texts, _ = load_training_samples(dataset.model_dump(), task_type=task_type)
-    except ValueError as exc:
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Hugging Face datasets not available: {exc}",
+        ) from exc
+    except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     total_chars = sum(len(t) for t in texts)
     return {

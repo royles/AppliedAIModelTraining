@@ -1,0 +1,1000 @@
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 0)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 1)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 2)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 3)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 4)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 5)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 6)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 7)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 8)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 9)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 10)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 11)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 12)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 13)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 14)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 15)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 16)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 17)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 18)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 19)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 20)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 21)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 22)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 23)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 24)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 25)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 26)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 27)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 28)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 29)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 30)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 31)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 32)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 33)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 34)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 35)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 36)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 37)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 38)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 39)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 40)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 41)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 42)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 43)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 44)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 45)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 46)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 47)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 48)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 49)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 50)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 51)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 52)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 53)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 54)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 55)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 56)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 57)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 58)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 59)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 60)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 61)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 62)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 63)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 64)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 65)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 66)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 67)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 68)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 69)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 70)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 71)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 72)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 73)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 74)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 75)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 76)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 77)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 78)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 79)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 80)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 81)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 82)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 83)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 84)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 85)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 86)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 87)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 88)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 89)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 90)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 91)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 92)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 93)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 94)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 95)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 96)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 97)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 98)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 99)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 100)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 101)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 102)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 103)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 104)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 105)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 106)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 107)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 108)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 109)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 110)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 111)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 112)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 113)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 114)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 115)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 116)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 117)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 118)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 119)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 120)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 121)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 122)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 123)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 124)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 125)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 126)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 127)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 128)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 129)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 130)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 131)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 132)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 133)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 134)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 135)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 136)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 137)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 138)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 139)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 140)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 141)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 142)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 143)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 144)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 145)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 146)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 147)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 148)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 149)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 150)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 151)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 152)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 153)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 154)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 155)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 156)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 157)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 158)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 159)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 160)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 161)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 162)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 163)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 164)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 165)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 166)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 167)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 168)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 169)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 170)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 171)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 172)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 173)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 174)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 175)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 176)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 177)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 178)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 179)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 180)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 181)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 182)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 183)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 184)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 185)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 186)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 187)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 188)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 189)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 190)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 191)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 192)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 193)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 194)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 195)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 196)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 197)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 198)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 199)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 200)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 201)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 202)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 203)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 204)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 205)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 206)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 207)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 208)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 209)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 210)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 211)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 212)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 213)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 214)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 215)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 216)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 217)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 218)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 219)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 220)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 221)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 222)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 223)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 224)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 225)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 226)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 227)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 228)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 229)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 230)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 231)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 232)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 233)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 234)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 235)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 236)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 237)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 238)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 239)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 240)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 241)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 242)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 243)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 244)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 245)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 246)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 247)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 248)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 249)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 250)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 251)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 252)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 253)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 254)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 255)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 256)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 257)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 258)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 259)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 260)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 261)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 262)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 263)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 264)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 265)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 266)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 267)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 268)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 269)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 270)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 271)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 272)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 273)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 274)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 275)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 276)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 277)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 278)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 279)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 280)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 281)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 282)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 283)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 284)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 285)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 286)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 287)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 288)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 289)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 290)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 291)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 292)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 293)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 294)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 295)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 296)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 297)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 298)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 299)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 300)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 301)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 302)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 303)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 304)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 305)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 306)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 307)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 308)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 309)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 310)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 311)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 312)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 313)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 314)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 315)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 316)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 317)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 318)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 319)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 320)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 321)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 322)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 323)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 324)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 325)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 326)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 327)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 328)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 329)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 330)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 331)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 332)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 333)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 334)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 335)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 336)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 337)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 338)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 339)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 340)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 341)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 342)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 343)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 344)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 345)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 346)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 347)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 348)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 349)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 350)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 351)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 352)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 353)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 354)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 355)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 356)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 357)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 358)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 359)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 360)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 361)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 362)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 363)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 364)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 365)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 366)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 367)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 368)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 369)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 370)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 371)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 372)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 373)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 374)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 375)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 376)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 377)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 378)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 379)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 380)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 381)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 382)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 383)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 384)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 385)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 386)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 387)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 388)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 389)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 390)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 391)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 392)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 393)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 394)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 395)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 396)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 397)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 398)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 399)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 400)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 401)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 402)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 403)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 404)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 405)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 406)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 407)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 408)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 409)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 410)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 411)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 412)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 413)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 414)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 415)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 416)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 417)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 418)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 419)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 420)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 421)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 422)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 423)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 424)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 425)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 426)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 427)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 428)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 429)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 430)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 431)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 432)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 433)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 434)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 435)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 436)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 437)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 438)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 439)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 440)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 441)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 442)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 443)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 444)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 445)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 446)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 447)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 448)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 449)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 450)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 451)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 452)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 453)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 454)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 455)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 456)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 457)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 458)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 459)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 460)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 461)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 462)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 463)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 464)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 465)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 466)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 467)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 468)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 469)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 470)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 471)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 472)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 473)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 474)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 475)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 476)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 477)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 478)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 479)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 480)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 481)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 482)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 483)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 484)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 485)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 486)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 487)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 488)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 489)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 490)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 491)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 492)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 493)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 494)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 495)
+User: What is a transformer?
+Assistant: A stack of attention layers that maps token sequences to predictions. (doc 496)
+User: How does training work?
+Assistant: You minimize loss on examples using optimizers such as AdamW over many steps. (doc 497)
+User: Why use Ray?
+Assistant: Ray scales Python workloads across CPUs and GPUs with a distributed runtime. (doc 498)
+User: What is tokenization?
+Assistant: Text is split into subword tokens with a vocabulary learned from corpus statistics. (doc 499)
