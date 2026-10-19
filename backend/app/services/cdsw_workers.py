@@ -135,7 +135,7 @@ def wait_for_gcs_port(
     return False
 
 
-def build_worker_start_code(head_address: str) -> str:
+def build_worker_start_code(head_address: str, *, cpus: float = 4.0, gpus: int = 1) -> str:
     """
     Python code for launch_workers `code=`.
 
@@ -143,12 +143,16 @@ def build_worker_start_code(head_address: str) -> str:
     when Ray is missing (worker engines start with a bare interpreter).
     """
     # head_address is session-controlled (IP:port); no user strings in code path.
+    cpu_i = max(1, int(cpus))
+    gpu_i = max(0, int(gpus))
     return f'''import os
 import subprocess
 import sys
 from pathlib import Path
 
 FALLBACK_HEAD = "{head_address}"
+WORKER_CPUS = {cpu_i}
+WORKER_GPUS = {gpu_i}
 
 def project_root() -> Path:
     for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT", "CDSW_WORKING_DIRECTORY"):
@@ -170,10 +174,24 @@ def ensure_ray(py: str, root: Path) -> None:
     else:
         subprocess.check_call([py, "-m", "pip", "install", "-q", "ray"], env=env)
 
-py = sys.executable
+def pick_python(root: Path) -> str:
+    venv_py = root / ".venv" / "bin" / "python"
+    if venv_py.is_file():
+        return str(venv_py)
+    return sys.executable
+
 root = project_root()
 os.chdir(root)
+py = pick_python(root)
 ensure_ray(py, root)
+
+def worker_node_ip() -> str:
+    for key in ("CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
+        ip = os.environ.get(key)
+        if ip:
+            return ip.strip()
+    return ""
+
 def resolve_head() -> str:
     for key in ("CDSW_MASTER_IP", "CML_MASTER_IP", "CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
         ip = os.environ.get(key)
@@ -182,21 +200,44 @@ def resolve_head() -> str:
     return FALLBACK_HEAD
 
 HEAD = resolve_head()
-print(f"[platform] CDSW worker connecting to Ray master at {{HEAD}}", flush=True)
-cmd = [py, "-m", "ray.scripts.scripts", "start", "--block", f"--address={{HEAD}}"]
+NODE_IP = worker_node_ip()
+print(
+    f"[platform] CDSW worker python={{py}} head={{HEAD}} node_ip={{NODE_IP or 'auto'}} "
+    f"cpus={{WORKER_CPUS}} gpus={{WORKER_GPUS}}",
+    flush=True,
+)
+cmd = [
+    py, "-m", "ray.scripts.scripts", "start", "--block",
+    f"--address={{HEAD}}",
+    f"--num-cpus={{WORKER_CPUS}}",
+    f"--num-gpus={{WORKER_GPUS}}",
+]
+if NODE_IP:
+    cmd.append(f"--node-ip-address={{NODE_IP}}")
+print(f"[platform] exec: {{' '.join(cmd)}}", flush=True)
 rc = subprocess.call(cmd)
 print(f"[platform] ray start --block exited with code {{rc}}", flush=True)
+print("[platform] see ray_process_exit.log in the Ray session dir on this engine", flush=True)
 raise SystemExit(rc)
 '''
 
 
-def worker_launch_env(project_root: Path | None = None) -> dict[str, str]:
+def worker_launch_env(
+    project_root: Path | None = None,
+    *,
+    cpus: float | None = None,
+    gpus: int | None = None,
+) -> dict[str, str]:
     root = (project_root or REPO_ROOT).resolve()
     env: dict[str, str] = {
         "PIP_USER": "0",
         "CDSW_PROJECT_ROOT": str(root),
         "PROJECT_ROOT": str(root),
     }
+    if cpus is not None:
+        env["PLATFORM_WORKER_CPU_COUNT"] = str(int(max(1, cpus)))
+    if gpus is not None:
+        env["PLATFORM_WORKER_GPU_COUNT"] = str(max(0, int(gpus)))
     for key in (
         "CDSW_WORKING_DIRECTORY",
         "HOME",
@@ -238,7 +279,9 @@ class CdswRayWorkerPool:
     def launch(self, count: int, head_address: str) -> LaunchedWorkers:
         if count < 1:
             raise ValueError("count must be >= 1")
-        code = build_worker_start_code(head_address)
+        code = build_worker_start_code(
+            head_address, cpus=self.cpu, gpus=self.gpus_per_worker
+        )
         if self._client is None:
             simulated = [f"local-sim-{i}" for i in range(count)]
             logger.info(
@@ -253,7 +296,7 @@ class CdswRayWorkerPool:
             "memory": self.memory_gb,
             "nvidia_gpu": self.gpus_per_worker,
             "code": code,
-            "env": worker_launch_env(),
+            "env": worker_launch_env(cpus=self.cpu, gpus=self.gpus_per_worker),
         }
         optional = {
             "accelerator_label_id": self._accelerator_label_id

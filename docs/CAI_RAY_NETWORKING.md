@@ -37,3 +37,6 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 | `Ray GCS not reachable at 127.0.0.1:6379` | Head not running — `ss -ltn \| grep 6379`, rerun `python3 scripts/start.py`, inspect `start-user.log`. |
 | Workers `scheduling` forever | Resource profile / GPU labels; worker code never reaches `ray start --block`. |
 | Head in Framework UI ≠ session IP | Stale SQLite `ray_head_address`; live env wins after sync on API start. |
+| `PlacementGroupCleaner … State API` | Often transient while Train starts; harmless if training continues. If workers exit, check GPU scheduling below. |
+| Ray worker engines exit / `ray start --block exited` | Worker log: pip OOM during `requirements.txt`, wrong head IP, or GPU not advertised. Use **≥16 GiB** profile, project `.venv` (run `install.py` on session), and confirm `ray start` prints `gpus=1`. Set `PLATFORM_KEEP_WORKERS_ON_FAIL=1` to leave workers up after a failed job. Inspect `/tmp/ray/session_*/logs/ray_process_exit.log` on the worker. |
+| `TrainController` requests `GPU: 1` but job fails | Session head is often CPU-only; GPU must be on a **joined worker node**. Framework log shows `Cluster resources before Train` — need `GPU ≥ 1`. |

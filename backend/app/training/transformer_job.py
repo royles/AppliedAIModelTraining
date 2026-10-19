@@ -405,6 +405,33 @@ def run_transformer_training(
         except Exception as exc:  # noqa: BLE001
             _framework(framework_line("warn", f"Cluster stats unavailable: {exc}"))
 
+    from app.services.ray_train_runtime import (
+        apply_ray_train_runtime_env,
+        cluster_resource_summary,
+        verify_train_resources,
+    )
+
+    apply_ray_train_runtime_env()
+    resources = cluster_resource_summary()
+    if resources:
+        _framework(
+            framework_line(
+                "ray",
+                "Cluster resources before Train: "
+                + ", ".join(f"{k}={v:g}" for k, v in sorted(resources.items())),
+            )
+        )
+    try:
+        verify_train_resources(
+            num_workers=num_workers,
+            use_gpu=use_gpu,
+            cpus_per_worker=1,
+            gpus_per_worker=1 if use_gpu else 0,
+        )
+    except RuntimeError as exc:
+        _framework(framework_line("fail", str(exc)))
+        raise
+
     scaling = ScalingConfig(
         num_workers=num_workers,
         use_gpu=use_gpu,

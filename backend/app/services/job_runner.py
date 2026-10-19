@@ -275,6 +275,17 @@ def run_training_job(job_id: int) -> None:
             "framework",
             framework_line("train", "Ray Train job submitted to master"),
         )
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            framework_line(
+                "info",
+                "PlacementGroupCleaner 'State API' warnings are usually benign while "
+                "workers start; if training fails, open CDSW worker logs and "
+                "ray_process_exit.log on the worker engine.",
+            ),
+        )
         result = run_transformer_training(
             ray_address=ray_addr,
             num_workers=train_workers,
@@ -323,10 +334,32 @@ def run_training_job(job_id: int) -> None:
         _update_job(db, job_id, status="failed", error_message=str(exc))
     finally:
         if pool is not None:
+            keep = os.environ.get("PLATFORM_KEEP_WORKERS_ON_FAIL", "").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            job_failed = False
             try:
-                pool.stop_all()
+                job = db.get(TrainingJob, job_id)
+                job_failed = job is not None and job.status == "failed"
             except Exception:  # noqa: BLE001
                 pass
+            if keep and job_failed:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "info",
+                        "PLATFORM_KEEP_WORKERS_ON_FAIL=1 — CDSW worker engines left running for debugging.",
+                    ),
+                )
+            else:
+                try:
+                    pool.stop_all()
+                except Exception:  # noqa: BLE001
+                    pass
         db.close()
 
 

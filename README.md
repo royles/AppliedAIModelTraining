@@ -130,6 +130,8 @@ On small containers the platform automatically **caps Ray Train to 1 worker** an
 | `DEFAULT_GPUS_PER_WORKER` | Default GPUs per worker (default `1`) |
 | `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force low-memory caps; auto-detected when cgroup &lt; 6 GiB |
 | `RAY_TRAIN_NUM_WORKERS` | Hard cap on Ray Train worker processes (e.g. `1`) |
+| `PLATFORM_KEEP_WORKERS_ON_FAIL` | Set `1` to skip `stop_workers` after a failed job (debug worker / Ray logs) |
+| `RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S` | Seconds to wait for Train workers (default **900** on CAI) |
 
 Check `GET /api/health` → `details.memory` for detected limits and recommendations.
 
