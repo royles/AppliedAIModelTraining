@@ -4,6 +4,8 @@ import { jobArchitectureSummary, jobInitMode } from "./jobUtils";
 import { ModelInferenceLinks } from "./ModelInferenceLinks";
 import { confirmDeleteTask } from "./taskDelete";
 import { formatLogLines } from "./logFormat";
+import { RayStatusPanel } from "./RayStatusPanel";
+import { rayStatusFingerprint } from "./rayStatusFields";
 
 type Props = {
   job: TrainingJob;
@@ -33,15 +35,13 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
   const rayStatusLogRef = useRef<HTMLDivElement>(null);
   const frameworkLogRef = useRef<HTMLDivElement>(null);
   const trainingLogRef = useRef<HTMLDivElement>(null);
-  const lastRayStatusTextRef = useRef("");
   const lastFrameworkTextRef = useRef("");
   const lastTrainingTextRef = useRef("");
-  const scrollStickRef = useRef({ ray: true, framework: true, training: true });
+  const scrollStickRef = useRef({ framework: true, training: true });
 
   const loadLogs = useCallback(async () => {
     try {
       scrollStickRef.current = {
-        ray: !rayStatusLogRef.current || isNearBottom(rayStatusLogRef.current),
         framework: !frameworkLogRef.current || isNearBottom(frameworkLogRef.current),
         training: !trainingLogRef.current || isNearBottom(trainingLogRef.current),
       };
@@ -63,15 +63,12 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
     return () => window.clearInterval(id);
   }, [loadLogs]);
 
-  const rayStatusText = logs
-    ? JSON.stringify(logs.ray_status, null, 2)
-    : "Loading Ray status…";
+  const rayStatusKey = logs ? rayStatusFingerprint(logs.ray_status) : "";
 
   useEffect(() => {
-    lastRayStatusTextRef.current = "";
     lastFrameworkTextRef.current = "";
     lastTrainingTextRef.current = "";
-    scrollStickRef.current = { ray: true, framework: true, training: true };
+    scrollStickRef.current = { framework: true, training: true };
   }, [job.id]);
 
   useEffect(() => {
@@ -79,13 +76,6 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
 
     const frameworkText = formatLogLines(logs.framework);
     const trainingText = formatLogLines(logs.training);
-
-    if (rayStatusText !== lastRayStatusTextRef.current) {
-      if (scrollStickRef.current.ray) {
-        scrollLogToBottom(rayStatusLogRef.current);
-      }
-      lastRayStatusTextRef.current = rayStatusText;
-    }
 
     if (frameworkText !== lastFrameworkTextRef.current) {
       if (scrollStickRef.current.framework) {
@@ -100,7 +90,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
       }
       lastTrainingTextRef.current = trainingText;
     }
-  }, [logs, rayStatusText]);
+  }, [logs, rayStatusKey]);
 
   return (
     <div className="task-detail">
@@ -171,8 +161,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 5s)</p>
           <div className="log-ray-status" ref={rayStatusLogRef}>
-            <strong>Ray status</strong>
-            <pre>{rayStatusText}</pre>
+            <RayStatusPanel status={logs?.ray_status} loading={!logs} />
           </div>
           <div className="log-stream log-stream-framework" ref={frameworkLogRef}>
             <pre>{formatLogLines(logs?.framework ?? [])}</pre>

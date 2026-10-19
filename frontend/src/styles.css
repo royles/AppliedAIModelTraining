@@ -606,6 +606,53 @@ body {
   margin-bottom: 0.25rem;
 }
 
+.ray-status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ray-status-heading {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #c5d4e8;
+}
+
+.ray-status-kv {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.ray-status-kv li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 38%) 1fr;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #1a2438;
+  align-items: start;
+}
+
+.ray-status-kv li:last-child {
+  border-bottom: none;
+}
+
+.ray-status-label {
+  color: #9fb0c9;
+}
+
+.ray-status-value {
+  color: #e8eef7;
+  word-break: break-word;
+}
+
+.ray-pill {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+}
+
 .log-panel-framework .log-stream-framework {
   flex: 1 1 64%;
   min-height: 16rem;
