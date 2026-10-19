@@ -138,9 +138,18 @@ function enrichComponents(
         unit: "text",
       });
     }
+    if (distributed.world_size_note) {
+      extra.push({
+        key: "world_size",
+        label: "World size",
+        value: 0,
+        display: distributed.world_size_note,
+        unit: "text",
+      });
+    }
     const keys = new Set(c.metrics.map((m) => m.key));
     const merged = [...c.metrics, ...extra.filter((e) => !keys.has(e.key))];
-    return { ...c, metrics: merged };
+    return { ...c, metrics: merged.slice(0, 6) };
   });
 }
 

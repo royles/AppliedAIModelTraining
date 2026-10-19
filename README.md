@@ -129,7 +129,7 @@ On small containers the platform automatically **caps Ray Train to 1 worker** an
 | `DEFAULT_WORKER_CPU` | CPUs sent to `launch_workers` (default `4`) |
 | `DEFAULT_GPUS_PER_WORKER` | Default GPUs per worker (default `1`) |
 | `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force low-memory caps; auto-detected when cgroup &lt; 6 GiB |
-| `RAY_TRAIN_NUM_WORKERS` | Hard cap on Ray Train worker processes (e.g. `1`) |
+| `RAY_TRAIN_NUM_WORKERS` | Cap Ray Train ranks for **session-only** jobs (ignored when CDSW worker engines are launched) |
 | `PLATFORM_KEEP_WORKERS_ON_FAIL` | Set `1` to skip `stop_workers` after a failed job (debug worker / Ray logs) |
 | `PLATFORM_NCCL_DEFAULTS` | Default **`1`**: apply NCCL env for GPU Ray Train (set **`0`** to disable) |
 | `RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S` | Seconds to wait for Train workers (default **900** on CAI) |

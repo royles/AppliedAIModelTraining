@@ -129,6 +129,7 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
     effective_train_workers = effective_ray_train_workers(
         max(1, job.num_workers),
         platform.ray_train_num_workers,
+        cdsw_worker_engines=expected_workers,
     )
     ray_status["distributed"] = build_distributed_training_status(
         job_id=job_id,

@@ -44,6 +44,8 @@ export type DistributedTrainingStatus = {
   mode_label?: string;
   multi_train_ranks?: boolean;
   multi_engine_cluster?: boolean;
+  train_uses_all_engines?: boolean;
+  world_size_note?: string;
   status: string;
   active: boolean;
   multi_worker: boolean;

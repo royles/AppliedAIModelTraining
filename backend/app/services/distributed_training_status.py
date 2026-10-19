@@ -193,7 +193,37 @@ def build_distributed_training_status(
             cdsw_engines=cdsw_engines,
             multi_train_ranks=multi_train_ranks,
         ),
+        "train_uses_all_engines": cdsw_engines > 0 and configured_train >= cdsw_engines,
+        "world_size_note": _world_size_note(
+            world_size=world_size,
+            configured_train=configured_train,
+            cdsw_engines=cdsw_engines,
+            ranks_live=ranks_live,
+        ),
     }
+
+
+def _world_size_note(
+    *,
+    world_size: int,
+    configured_train: int,
+    cdsw_engines: int,
+    ranks_live: int,
+) -> str:
+    effective_ws = world_size if world_size > 0 else configured_train
+    if cdsw_engines > 1 and effective_ws <= 1:
+        return (
+            "Observed world_size=1: training is not distributed across all CDSW engines. "
+            "Check framework log for worker caps or failed Ray Train workers."
+        )
+    if cdsw_engines > 0 and effective_ws >= cdsw_engines:
+        return (
+            f"TorchTrainer world_size={effective_ws} matches {cdsw_engines} CDSW engine(s); "
+            f"{ranks_live} rank(s) reported in logs."
+        )
+    if effective_ws > 1:
+        return f"Distributed training with world_size={effective_ws}."
+    return "Single Ray Train rank (no multi-engine CDSW cluster for this job)."
 
 
 def _mode_label(

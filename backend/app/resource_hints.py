@@ -51,10 +51,22 @@ def is_low_memory_container() -> bool:
 
 
 def effective_ray_train_workers(
-    requested: int, persisted_cap: int | None = None
+    requested: int,
+    persisted_cap: int | None = None,
+    *,
+    cdsw_worker_engines: int = 0,
 ) -> int:
-    """Cap Ray Train worker count on small session pods to reduce OOM kills."""
+    """
+    Ray Train worker processes (TorchTrainer world size).
+
+    When CDSW worker engines are provisioned, training MUST use one rank per engine;
+    session low-memory caps do not apply (compute runs on worker pods, not the session).
+    """
     requested = max(1, requested)
+    engines = max(0, int(cdsw_worker_engines))
+    if engines > 0:
+        return max(requested, engines)
+
     cap = persisted_cap if persisted_cap is not None else 0
     if cap <= 0:
         cap = int(os.environ.get("RAY_TRAIN_NUM_WORKERS", "0") or 0)

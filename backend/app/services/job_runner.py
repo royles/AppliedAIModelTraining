@@ -219,10 +219,14 @@ def run_training_job(job_id: int) -> None:
         if platform.ray_local_mode and not pool.is_remote:
             ray_addr = None
 
+        cdsw_engines = job.num_workers if head and job.num_workers > 0 else 0
         train_workers = effective_ray_train_workers(
             max(1, job.num_workers),
             platform.ray_train_num_workers,
+            cdsw_worker_engines=cdsw_engines,
         )
+        train_config["ray_train_workers_scheduled"] = train_workers
+        train_config["cdsw_worker_engines"] = cdsw_engines
         if train_workers < job.num_workers:
             append_job_log(
                 db,
@@ -234,10 +238,20 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
             logger.warning(
-                "Capping Ray Train workers from %s to %s (small container / "
-                "PLATFORM_CAI_LOW_MEMORY / RAY_TRAIN_NUM_WORKERS).",
+                "Capping Ray Train workers from %s to %s (RAY_TRAIN_NUM_WORKERS / platform cap).",
                 job.num_workers,
                 train_workers,
+            )
+        elif cdsw_engines > 0:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    f"Distributed Train: {train_workers} Ray Train rank(s) "
+                    f"across {cdsw_engines} CDSW engine(s) (world_size={train_workers}).",
+                ),
             )
 
         _update_job(
