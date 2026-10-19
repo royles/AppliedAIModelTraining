@@ -152,7 +152,7 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [routes, setRoutes] = useState<RoutedLink[]>([]);
-  const [fit, setFit] = useState({ scale: 1, height: 0 });
+  const [diagramHeight, setDiagramHeight] = useState(0);
 
   const components = useMemo(
     () => enrichComponents(topology?.components ?? [], distributed),
@@ -181,7 +181,6 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
 
     const measure = () => {
       const canvasBox = canvasEl.getBoundingClientRect();
-      const viewport = root.querySelector(".ray-cluster-viewport") as HTMLElement | null;
       const pad = 4;
 
       const linkBand = canvasEl.querySelector(".ray-cluster-link-band");
@@ -243,15 +242,9 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       const next = links.length > 0 ? routeClusterLinks(anchors, bounds) : [];
       setRoutes((prev) => (routedLinksEqual(prev, next) ? prev : next));
 
-      const naturalW = canvasEl.scrollWidth;
-      const naturalH = canvasEl.scrollHeight;
-      const availW = (viewport?.clientWidth ?? root.clientWidth) - 4;
-      const scale =
-        naturalW > 0 && availW > 0 && naturalW > availW
-          ? Math.max(0.5, Math.min(1, availW / naturalW))
-          : 1;
-      const height = Math.ceil(naturalH * scale) + 4;
-      setFit((prev) => (prev.scale === scale && prev.height === height ? prev : { scale, height }));
+      const naturalH = canvasEl.getBoundingClientRect().height || canvasEl.scrollHeight;
+      const height = Math.ceil(naturalH) + 2;
+      setDiagramHeight((prev) => (prev === height ? prev : height));
     };
 
     measure();
@@ -288,16 +281,9 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
 
       <div
         className="ray-cluster-viewport"
-        style={{ height: fit.height > 0 ? `${fit.height}px` : undefined }}
+        style={{ height: diagramHeight > 0 ? `${diagramHeight}px` : undefined }}
       >
-        <div
-          ref={canvasRef}
-          className="ray-cluster-canvas ray-cluster-canvas-grid"
-          style={{
-            transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,
-            transformOrigin: "top left",
-          }}
-        >
+        <div ref={canvasRef} className="ray-cluster-canvas ray-cluster-canvas-grid">
           <svg className="ray-cluster-svg ray-cluster-svg-overlay" aria-hidden>
             {routes.map((ln) => (
               <path
