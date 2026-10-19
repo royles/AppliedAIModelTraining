@@ -1,26 +1,86 @@
 import { describe, expect, it } from "vitest";
 import { routeClusterLinks } from "./rayClusterRouting";
 
+const bounds = {
+  linkBandBottom: 32,
+  controlRowTop: 36,
+  controlRowBottom: 120,
+  gutterTop: 120,
+  gutterBottom: 132,
+  workerRowTop: 132,
+  workerRowBottom: 220,
+};
+
 describe("routeClusterLinks", () => {
-  it("routes forward links through a top corridor", () => {
+  it("routes same-row links in the top band", () => {
     const paths = routeClusterLinks(
       [
         {
           key: "a-b",
           healthy: true,
+          sourceRow: "control",
+          targetRow: "control",
           sx: 100,
-          sourceTop: 44,
+          scx: 80,
+          sourceTop: 40,
+          sourceBottom: 110,
           ex: 198,
-          ey: 60,
           tx: 210,
-          targetTop: 44,
+          targetTop: 40,
+          targetBottom: 110,
         },
       ],
-      { linkBandBottom: 36, minNodeTop: 44 },
+      bounds,
     );
-    expect(paths).toHaveLength(1);
-    expect(paths[0].d).toMatch(/^M /);
-    expect(paths[0].d).toContain("L");
-    expect(paths[0].d).not.toMatch(/L 150 50 L 150 60/);
+    expect(paths[0].d).toContain("M 100.0 40.0");
+  });
+
+  it("routes control to worker through the gutter", () => {
+    const paths = routeClusterLinks(
+      [
+        {
+          key: "c-w",
+          healthy: true,
+          sourceRow: "control",
+          targetRow: "worker",
+          sx: 200,
+          scx: 180,
+          sourceTop: 40,
+          sourceBottom: 115,
+          ex: 300,
+          tx: 320,
+          targetTop: 135,
+          targetBottom: 210,
+        },
+      ],
+      bounds,
+    );
+    expect(paths[0].d).toMatch(/115\.0/);
+    expect(paths[0].d).toMatch(/135\.0/);
+    expect(paths[0].d).toMatch(/126\.0/);
+  });
+
+  it("keeps worker same-row links in the worker row", () => {
+    const paths = routeClusterLinks(
+      [
+        {
+          key: "w-w",
+          healthy: true,
+          sourceRow: "worker",
+          targetRow: "worker",
+          sx: 100,
+          scx: 80,
+          sourceTop: 140,
+          sourceBottom: 210,
+          ex: 198,
+          tx: 210,
+          targetTop: 140,
+          targetBottom: 210,
+        },
+      ],
+      bounds,
+    );
+    expect(paths[0].d).not.toMatch(/20\.0/);
+    expect(paths[0].d).toMatch(/140\.0/);
   });
 });

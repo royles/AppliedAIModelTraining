@@ -1,6 +1,12 @@
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RayClusterComponent, RayClusterLink } from "./rayClusterTypes";
-import { routeClusterLinks, routedLinksEqual, type RoutedLink } from "./rayClusterRouting";
+import {
+  routeClusterLinks,
+  routedLinksEqual,
+  type LayoutBounds,
+  type NodeRow,
+  type RoutedLink,
+} from "./rayClusterRouting";
 import { parseDistributed, parseTopology } from "./rayClusterTypes";
 
 type Props = {
@@ -10,30 +16,26 @@ type Props = {
   cdswEngines?: number;
 };
 
-const ROLE_ORDER: Record<string, number> = {
+const CONTROL_ORDER: Record<string, number> = {
   driver: 0,
   master: 1,
   controller: 2,
-  worker: 3,
-  worker_pending: 4,
-  worker_dead: 5,
-  train_worker: 6,
+  train_worker: 3,
+};
+
+const WORKER_ORDER: Record<string, number> = {
+  worker: 0,
+  worker_pending: 1,
+  worker_dead: 2,
 };
 
 const EMPTY_LINKS: RayClusterLink[] = [];
 
-const ROLE_TIER: Record<string, string> = {
-  driver: "tier-driver",
-  master: "tier-head",
-  controller: "tier-controller",
-  train_worker: "tier-train",
-  worker: "tier-workers",
-  worker_pending: "tier-workers",
-  worker_dead: "tier-workers",
-};
-
-function tierForRole(role: string): string {
-  return ROLE_TIER[role] ?? "tier-workers";
+function nodeRow(role: string): NodeRow {
+  if (role === "worker" || role === "worker_pending" || role === "worker_dead") {
+    return "worker";
+  }
+  return "control";
 }
 
 function clusterAlerts(
@@ -53,12 +55,16 @@ function clusterAlerts(
   return out;
 }
 
-function NodeCard({ node }: { node: RayClusterComponent }) {
+function NodeCard({ node, row }: { node: RayClusterComponent; row: NodeRow }) {
   const roleClass = node.role.replace(/_/g, "-");
+  const compact = row === "worker";
   return (
     <article
-      className={`ray-node-card ${node.healthy ? "healthy" : "unhealthy"} role-${roleClass}`}
+      className={`ray-node-card ${node.healthy ? "healthy" : "unhealthy"} role-${roleClass}${
+        compact ? " ray-node-card-compact" : ""
+      }`}
       data-node-id={node.id}
+      data-node-row={row}
     >
       <header className="ray-node-card-head">
         <span className="ray-node-role">{node.role.replace(/_/g, " ")}</span>
@@ -67,11 +73,11 @@ function NodeCard({ node }: { node: RayClusterComponent }) {
         </span>
       </header>
       <h6 className="ray-node-title">{node.title}</h6>
-      <p className="ray-node-sub">{node.subtitle}</p>
+      {!compact && <p className="ray-node-sub">{node.subtitle}</p>}
       {node.host ? <code className="ray-node-host">{node.host}</code> : null}
       {node.metrics.length > 0 && (
         <ul className="ray-node-metrics">
-          {node.metrics.slice(0, 4).map((m) => (
+          {node.metrics.slice(0, compact ? 3 : 4).map((m) => (
             <li key={m.key}>
               <span>{m.label}</span>
               <strong>{m.display}</strong>
@@ -93,8 +99,7 @@ function enrichComponents(
   const cfg = distributed.configured;
   const obs = distributed.observed;
   const modeLabel =
-    (distributed as { mode_label?: string }).mode_label ??
-    distributed.summary;
+    (distributed as { mode_label?: string }).mode_label ?? distributed.summary;
 
   return components.map((c) => {
     if (c.id !== "train-controller") {
@@ -115,41 +120,29 @@ function enrichComponents(
         unit: "text",
       },
       {
-        key: "backend",
-        label: "Backend",
-        value: 0,
-        display: distributed.backend ?? "—",
-        unit: "text",
-      },
-      {
         key: "ranks",
-        label: "Ranks live",
+        label: "Ranks",
         value: obs.ranks_live,
         display: `${obs.ranks_live}/${obs.world_size || cfg.ray_train_workers || "?"}`,
         unit: "count",
       },
     ];
-    if (distributed.collective_backend) {
-      extra.push({
-        key: "collective",
-        label: "Collective",
-        value: 0,
-        display: String(distributed.collective_backend),
-        unit: "text",
-      });
-    }
-    if (distributed.world_size_note) {
-      extra.push({
-        key: "world_size",
-        label: "World size",
-        value: 0,
-        display: distributed.world_size_note,
-        unit: "text",
-      });
-    }
     const keys = new Set(c.metrics.map((m) => m.key));
     const merged = [...c.metrics, ...extra.filter((e) => !keys.has(e.key))];
-    return { ...c, metrics: merged.slice(0, 6) };
+    return { ...c, metrics: merged.slice(0, 5) };
+  });
+}
+
+function sortNodes(
+  nodes: RayClusterComponent[],
+  order: Record<string, number>,
+): RayClusterComponent[] {
+  return [...nodes].sort((a, b) => {
+    const d = (order[a.role] ?? 9) - (order[b.role] ?? 9);
+    if (d !== 0) {
+      return d;
+    }
+    return a.id.localeCompare(b.id);
   });
 }
 
@@ -169,15 +162,12 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
   const summary = topology?.summary;
   const alerts = clusterAlerts(status, topology?.note);
 
-  const flowNodes = useMemo(
-    () =>
-      [...components].sort((a, b) => {
-        const byRole = (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9);
-        if (byRole !== 0) {
-          return byRole;
-        }
-        return a.id.localeCompare(b.id);
-      }),
+  const controlNodes = useMemo(
+    () => sortNodes(components.filter((c) => nodeRow(c.role) === "control"), CONTROL_ORDER),
+    [components],
+  );
+  const workerNodes = useMemo(
+    () => sortNodes(components.filter((c) => nodeRow(c.role) === "worker"), WORKER_ORDER),
     [components],
   );
 
@@ -188,25 +178,41 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       setRoutes((prev) => (prev.length === 0 ? prev : []));
       return;
     }
+
     const measure = () => {
-      const canvas = canvasEl;
-      const canvasBox = canvas.getBoundingClientRect();
+      const canvasBox = canvasEl.getBoundingClientRect();
       const viewport = root.querySelector(".ray-cluster-viewport") as HTMLElement | null;
-      const linkBand = canvas.querySelector(".ray-cluster-link-band") as HTMLElement | null;
-      const nodesRow = canvas.querySelector(".ray-cluster-nodes-row") as HTMLElement | null;
       const pad = 4;
+
+      const linkBand = canvasEl.querySelector(".ray-cluster-link-band");
+      const controlRow = canvasEl.querySelector(".ray-cluster-row-control .ray-cluster-row-nodes");
+      const workerRow = canvasEl.querySelector(".ray-cluster-row-workers .ray-cluster-row-nodes");
 
       const linkBandBottom = linkBand
         ? linkBand.getBoundingClientRect().bottom - canvasBox.top
-        : 36;
-      let minNodeTop = Infinity;
-      (nodesRow ?? canvas).querySelectorAll("[data-node-id]").forEach((el) => {
-        const r = el.getBoundingClientRect();
-        minNodeTop = Math.min(minNodeTop, r.top - canvasBox.top);
-      });
-      if (!Number.isFinite(minNodeTop)) {
-        minNodeTop = linkBandBottom + 4;
-      }
+        : 32;
+
+      const controlRect = controlRow?.getBoundingClientRect();
+      const workerRect = workerRow?.getBoundingClientRect();
+      const gutterEl = canvasEl.querySelector(".ray-cluster-row-gutter");
+      const gutterRect = gutterEl?.getBoundingClientRect();
+
+      const controlRowTop = controlRect ? controlRect.top - canvasBox.top : linkBandBottom + 4;
+      const controlRowBottom = controlRect ? controlRect.bottom - canvasBox.top : linkBandBottom + 80;
+      const workerRowTop = workerRect ? workerRect.top - canvasBox.top : controlRowBottom + 12;
+      const workerRowBottom = workerRect ? workerRect.bottom - canvasBox.top : controlRowTop + 160;
+      const gutterTop = gutterRect ? gutterRect.top - canvasBox.top : controlRowBottom;
+      const gutterBottom = gutterRect ? gutterRect.bottom - canvasBox.top : workerRowTop;
+
+      const bounds: LayoutBounds = {
+        linkBandBottom,
+        controlRowTop,
+        controlRowBottom,
+        gutterTop,
+        gutterBottom,
+        workerRowTop,
+        workerRowBottom,
+      };
 
       const anchors = [];
       for (const link of links) {
@@ -215,35 +221,38 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
         if (!fromEl || !toEl) continue;
         const a = fromEl.getBoundingClientRect();
         const b = toEl.getBoundingClientRect();
+        const sourceRow = (fromEl.getAttribute("data-node-row") as NodeRow) || "control";
+        const targetRow = (toEl.getAttribute("data-node-row") as NodeRow) || "control";
         anchors.push({
           key: `${link.from}-${link.to}-${link.kind}`,
           healthy: link.healthy,
+          sourceRow,
+          targetRow,
           sx: a.right - canvasBox.left + pad,
+          scx: a.left + a.width / 2 - canvasBox.left,
           sourceTop: a.top - canvasBox.top,
+          sourceBottom: a.bottom - canvasBox.top,
           ex: b.left - canvasBox.left - pad,
-          ey: b.top + b.height / 2 - canvasBox.top,
           tx: b.left + b.width / 2 - canvasBox.left,
           targetTop: b.top - canvasBox.top,
+          targetBottom: b.bottom - canvasBox.top,
         });
       }
-      const next =
-        links.length > 0
-          ? routeClusterLinks(anchors, { linkBandBottom, minNodeTop })
-          : [];
+
+      const next = links.length > 0 ? routeClusterLinks(anchors, bounds) : [];
       setRoutes((prev) => (routedLinksEqual(prev, next) ? prev : next));
 
-      const naturalW = canvas.scrollWidth;
-      const naturalH = canvas.scrollHeight;
+      const naturalW = canvasEl.scrollWidth;
+      const naturalH = canvasEl.scrollHeight;
       const availW = (viewport?.clientWidth ?? root.clientWidth) - 4;
       const scale =
         naturalW > 0 && availW > 0 && naturalW > availW
-          ? Math.max(0.55, Math.min(1, availW / naturalW))
+          ? Math.max(0.5, Math.min(1, availW / naturalW))
           : 1;
       const height = Math.ceil(naturalH * scale) + 4;
-      setFit((prev) =>
-        prev.scale === scale && prev.height === height ? prev : { scale, height },
-      );
+      setFit((prev) => (prev.scale === scale && prev.height === height ? prev : { scale, height }));
     };
+
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(root);
@@ -282,43 +291,49 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       >
         <div
           ref={canvasRef}
-          className="ray-cluster-canvas ray-cluster-canvas-ltr"
+          className="ray-cluster-canvas ray-cluster-canvas-grid"
           style={{
             transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,
             transformOrigin: "top left",
           }}
         >
-          <div className="ray-cluster-link-band" aria-hidden>
-            <svg className="ray-cluster-svg">
-              {routes.map((ln) => (
-                <path
-                  key={ln.key}
-                  d={ln.d}
-                  fill="none"
-                  className={ln.healthy ? "link-ok" : "link-bad"}
-                />
-              ))}
-            </svg>
-          </div>
+          <svg className="ray-cluster-svg ray-cluster-svg-overlay" aria-hidden>
+            {routes.map((ln) => (
+              <path
+                key={ln.key}
+                d={ln.d}
+                fill="none"
+                className={ln.healthy ? "link-ok" : "link-bad"}
+              />
+            ))}
+          </svg>
 
-          <div className="ray-cluster-nodes-row">
-          {flowNodes.map((node, index) => {
-            const prev = flowNodes[index - 1];
-            const gap =
-              prev && tierForRole(prev.role) !== tierForRole(node.role) ? (
-                <div
-                  key={`gap-before-${node.id}`}
-                  className="ray-cluster-flow-gap"
-                  aria-hidden
-                />
-              ) : null;
-            return (
-              <Fragment key={node.id}>
-                {gap}
-                <NodeCard node={node} />
-              </Fragment>
-            );
-          })}
+          <div className="ray-cluster-link-band" aria-hidden />
+
+          <div className="ray-cluster-stage">
+            <section className="ray-cluster-row ray-cluster-row-control">
+              <header className="ray-cluster-row-label">Control &amp; train</header>
+              <div className="ray-cluster-row-nodes">
+                {controlNodes.map((node) => (
+                  <NodeCard key={node.id} node={node} row="control" />
+                ))}
+              </div>
+            </section>
+
+            <div className="ray-cluster-row-gutter" aria-hidden />
+
+            <section className="ray-cluster-row ray-cluster-row-workers">
+              <header className="ray-cluster-row-label">Ray workers</header>
+              <div className="ray-cluster-row-nodes">
+                {workerNodes.length === 0 ? (
+                  <p className="hint ray-cluster-row-empty">No worker nodes in cluster yet.</p>
+                ) : (
+                  workerNodes.map((node) => (
+                    <NodeCard key={node.id} node={node} row="worker" />
+                  ))
+                )}
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -336,7 +351,9 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
             </span>
           </>
         )}
-        {distributed?.summary && <span className="ray-cluster-legend-summary">{distributed.summary}</span>}
+        {distributed?.summary && (
+          <span className="ray-cluster-legend-summary">{distributed.summary}</span>
+        )}
       </footer>
     </div>
   );

@@ -1092,7 +1092,102 @@ body {
   height: 2.35rem;
   min-height: 2.35rem;
   flex-shrink: 0;
-  z-index: 0;
+  z-index: 1;
+}
+
+/* Two-row stage: control & train on top, Ray workers below; links use band + gutter */
+.ray-cluster-canvas.ray-cluster-canvas-grid {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  min-height: 8rem;
+  padding: 0.1rem 0.35rem 0.45rem;
+  box-sizing: border-box;
+}
+
+.ray-cluster-svg-overlay {
+  z-index: 3;
+}
+
+.ray-cluster-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.ray-cluster-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+  z-index: 2;
+}
+
+.ray-cluster-row-label {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  padding: 0 0.15rem;
+}
+
+.ray-cluster-row-nodes {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.55rem;
+  position: relative;
+  z-index: 2;
+}
+
+.ray-cluster-row-control .ray-node-card {
+  width: 9.25rem;
+  flex: 0 0 auto;
+}
+
+.ray-cluster-row-gutter {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  min-height: 2.75rem;
+  margin: 0.15rem 0;
+  border-radius: 6px;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.15) 0%,
+    rgba(30, 58, 138, 0.12) 50%,
+    rgba(15, 23, 42, 0.15) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08), inset 0 -1px 0 rgba(148, 163, 184, 0.06);
+}
+
+.ray-cluster-row-workers .ray-cluster-row-nodes {
+  align-items: flex-start;
+}
+
+.ray-cluster-row-workers .ray-node-card-compact {
+  width: 7.75rem;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.4rem;
+}
+
+.ray-cluster-row-workers .ray-node-card-compact .ray-node-title {
+  font-size: 0.72rem;
+}
+
+.ray-cluster-row-empty {
+  margin: 0.25rem 0.15rem;
+  font-size: 0.68rem;
+  color: #64748b;
 }
 
 .ray-cluster-nodes-row {

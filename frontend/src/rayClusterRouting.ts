@@ -1,18 +1,21 @@
-/** Orthogonal SVG paths for the Ray cluster diagram (avoid crossing node cards). */
+/** Orthogonal SVG paths for the two-row Ray cluster diagram. */
+
+export type NodeRow = "control" | "worker";
 
 export type LinkAnchor = {
   key: string;
   healthy: boolean;
-  /** Source: right edge, top corner */
+  sourceRow: NodeRow;
+  targetRow: NodeRow;
+  /** Source right edge (same-row) or center x (cross-row exit) */
   sx: number;
+  scx: number;
   sourceTop: number;
-  /** Target: left edge (for final hop along top border) */
+  sourceBottom: number;
   ex: number;
-  ey: number;
-  /** Vertical drop column (target horizontal center) */
   tx: number;
-  /** Target top edge (canvas coordinates) */
   targetTop: number;
+  targetBottom: number;
 };
 
 export type RoutedLink = {
@@ -21,8 +24,18 @@ export type RoutedLink = {
   d: string;
 };
 
+export type LayoutBounds = {
+  linkBandBottom: number;
+  controlRowTop: number;
+  controlRowBottom: number;
+  /** Vertical band between control and worker rows (links run here). */
+  gutterTop: number;
+  gutterBottom: number;
+  workerRowTop: number;
+  workerRowBottom: number;
+};
+
 const STUB = 8;
-const CORRIDOR_ABOVE = 14;
 
 function pathFromPoints(points: [number, number][]): string {
   if (points.length === 0) {
@@ -35,54 +48,99 @@ function pathFromPoints(points: [number, number][]): string {
     .join(" ");
 }
 
-/**
- * Route only through the link band and the gap above nodes — never through card interiors.
- */
-export function routeClusterLinks(
-  anchors: LinkAnchor[],
-  bounds: { linkBandBottom: number; minNodeTop: number },
-): RoutedLink[] {
+function corridorY(bounds: LayoutBounds, lane: number): number {
+  return Math.max(8 + lane, bounds.linkBandBottom - 12 - lane);
+}
+
+function gutterY(bounds: LayoutBounds, lane: number): number {
+  const mid = (bounds.gutterTop + bounds.gutterBottom) / 2;
+  const half = Math.max(4, (bounds.gutterBottom - bounds.gutterTop) / 2 - 2);
+  const spread = Math.min(half, lane * 1.25);
+  return mid + (lane % 2 === 0 ? spread : -spread);
+}
+
+function workerCorridorY(bounds: LayoutBounds, lane: number): number {
+  return Math.min(
+    bounds.workerRowBottom - 10 - lane,
+    bounds.workerRowTop + 14 + lane * 2,
+  );
+}
+
+function routeSameRow(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
+  const dropY = a.targetTop;
+  const isWorker = a.sourceRow === "worker";
+
+  if (a.ex >= a.sx) {
+    const yC = isWorker ? workerCorridorY(bounds, lane) : corridorY(bounds, lane);
+    const pts: [number, number][] = [
+      [a.sx, a.sourceTop],
+      [a.sx + STUB, a.sourceTop],
+      [a.sx + STUB, yC],
+      [a.tx, yC],
+      [a.tx, dropY],
+    ];
+    if (Math.abs(a.ex - a.tx) > 2) {
+      pts.push([a.ex, dropY]);
+    }
+    return pts;
+  }
+
+  const yLow = isWorker
+    ? bounds.workerRowBottom - 8 - lane
+    : gutterY(bounds, lane);
+  const pts: [number, number][] = [
+    [a.sx, a.sourceTop],
+    [a.sx + STUB, a.sourceTop],
+    [a.sx + STUB, yLow],
+    [a.tx, yLow],
+    [a.tx, dropY],
+  ];
+  if (Math.abs(a.ex - a.tx) > 2) {
+    pts.push([a.ex, dropY]);
+  }
+  return pts;
+}
+
+function routeControlToWorker(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
+  const yG = gutterY(bounds, lane);
+  return [
+    [a.scx, a.sourceBottom],
+    [a.scx, yG],
+    [a.tx, yG],
+    [a.tx, a.targetTop],
+    [a.ex, a.targetTop],
+  ];
+}
+
+function routeWorkerToControl(a: LinkAnchor, bounds: LayoutBounds, lane: number): [number, number][] {
+  const yG = gutterY(bounds, lane);
+  return [
+    [a.scx, a.sourceTop],
+    [a.scx, yG],
+    [a.tx, yG],
+    [a.tx, a.targetBottom],
+    [a.ex, a.targetBottom],
+  ];
+}
+
+export function routeClusterLinks(anchors: LinkAnchor[], bounds: LayoutBounds): RoutedLink[] {
   if (anchors.length === 0) {
     return [];
   }
 
-  const laneStep = 3;
-  const maxLane = Math.min(12, Math.max(0, anchors.length - 1));
-  const corridorTop = 6;
+  const laneStep = 2;
+  const maxLane = Math.min(8, Math.max(0, anchors.length - 1));
 
   return anchors.map((a, index) => {
     const lane = maxLane > 0 ? (index % (maxLane + 1)) * laneStep : 0;
-    const yCorridor = Math.min(bounds.linkBandBottom - CORRIDOR_ABOVE - lane, bounds.minNodeTop - 6);
-    const yCorridorClamped = Math.max(corridorTop + lane, yCorridor);
-
-    const dropEndY = Math.min(a.targetTop, bounds.minNodeTop);
-
     let points: [number, number][];
-    if (a.ex >= a.sx) {
-      points = [
-        [a.sx, a.sourceTop],
-        [a.sx + STUB, a.sourceTop],
-        [a.sx + STUB, yCorridorClamped],
-        [a.tx, yCorridorClamped],
-        [a.tx, dropEndY],
-      ];
-      if (Math.abs(a.ex - a.tx) > 2) {
-        points.push([a.ex, dropEndY]);
-      }
+    if (a.sourceRow === a.targetRow) {
+      points = routeSameRow(a, bounds, lane);
+    } else if (a.sourceRow === "control" && a.targetRow === "worker") {
+      points = routeControlToWorker(a, bounds, lane);
     } else {
-      const yLow = bounds.minNodeTop + 24 + lane;
-      points = [
-        [a.sx, a.sourceTop],
-        [a.sx + STUB, a.sourceTop],
-        [a.sx + STUB, yLow],
-        [a.tx, yLow],
-        [a.tx, dropEndY],
-      ];
-      if (Math.abs(a.ex - a.tx) > 2) {
-        points.push([a.ex, dropEndY]);
-      }
+      points = routeWorkerToControl(a, bounds, lane);
     }
-
     return { key: a.key, healthy: a.healthy, d: pathFromPoints(points) };
   });
 }
