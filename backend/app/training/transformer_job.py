@@ -173,14 +173,21 @@ def _train_loop(config: dict[str, Any]) -> None:
     from app.services.job_log import append_training_log_file
     from app.services.log_flair import (
         steps_per_epoch,
+        train_cuda_mapping_line,
         train_epoch_end_line,
         train_epoch_start_line,
         train_finished_line,
+        train_nccl_network_line,
         train_save_line,
         train_step_line,
         train_warmup_done_line,
         train_worker_ready_line,
         training_line,
+    )
+    from app.services.nccl_env import (
+        cuda_device_mapping_summary,
+        detect_collective_backend,
+        nccl_networking_summary,
     )
 
     def _log_training(message: str, *, all_ranks: bool = False) -> None:
@@ -209,11 +216,24 @@ def _train_loop(config: dict[str, Any]) -> None:
         train_worker_ready_line(rank, world_size, str(device), len(texts), max_steps),
         all_ranks=True,
     )
+    _log_training(
+        train_cuda_mapping_line(cuda_device_mapping_summary(device)),
+        all_ranks=True,
+    )
+    collective_backend = detect_collective_backend()
+    _log_training(
+        train_nccl_network_line(
+            nccl_networking_summary(
+                world_size=world_size,
+                collective_backend=collective_backend,
+            )
+        ),
+        all_ranks=(world_size > 1),
+    )
     try:
         import socket
 
         from app.services.distributed_training_status import update_distributed_rank
-        from app.services.nccl_env import detect_collective_backend
 
         artifact_dir = config.get("artifact_dir")
         if artifact_dir:
@@ -430,6 +450,15 @@ def run_transformer_training(
     )
 
     apply_ray_train_runtime_env()
+    if use_gpu:
+        from app.services.nccl_env import nccl_networking_summary
+
+        _framework(
+            framework_line(
+                "train",
+                nccl_networking_summary(world_size=max(1, num_workers)),
+            )
+        )
     resources = cluster_resource_summary()
     if resources:
         _framework(

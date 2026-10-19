@@ -66,6 +66,14 @@ def train_worker_ready_line(
     )
 
 
+def train_cuda_mapping_line(summary: str) -> str:
+    return training_line("info", summary)
+
+
+def train_nccl_network_line(summary: str) -> str:
+    return training_line("info", summary)
+
+
 def train_step_line(
     step: int,
     max_steps: int,
