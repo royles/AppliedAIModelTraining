@@ -13,9 +13,19 @@ type Props = {
   onOpenRegistry?: () => void;
 };
 
+function formatLogEntry(ts: string, message: string): string {
+  const prefix = `[${ts}] `;
+  const parts = message.split("\n");
+  if (parts.length <= 1) {
+    return prefix + message;
+  }
+  const indent = " ".repeat(prefix.length);
+  return parts.map((line, i) => (i === 0 ? prefix + line : indent + line)).join("\n");
+}
+
 function formatLogLines(lines: { ts: string; message: string }[]): string {
   if (lines.length === 0) return "No entries yet.";
-  return lines.map((l) => `[${l.ts}] ${l.message}`).join("\n");
+  return lines.map((l) => formatLogEntry(l.ts, l.message)).join("\n");
 }
 
 const SCROLL_STICK_THRESHOLD_PX = 48;
