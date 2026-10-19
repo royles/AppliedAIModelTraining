@@ -9,6 +9,8 @@ from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from app.inference.generation import platform_generation_extras
+from app.inference.prompting import messages_to_prompt, read_platform_config, use_platform_prompt_format
 from app.inference.schemas_openai import UsageInfo
 
 logger = logging.getLogger(__name__)
@@ -41,18 +43,6 @@ def unload_model(model_path: str) -> None:
         _loaded.pop(path, None)
 
 
-def messages_to_prompt(tokenizer: AutoTokenizer, messages: list[dict[str, str]]) -> str:
-    if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template:
-        return tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-    parts: list[str] = []
-    for msg in messages:
-        parts.append(f"{msg['role']}: {msg['content']}")
-    parts.append("assistant:")
-    return "\n".join(parts)
-
-
 def chat_complete(
     model_path: str,
     messages: list[dict[str, str]],
@@ -62,18 +52,27 @@ def chat_complete(
     top_p: float = 1.0,
 ) -> tuple[str, UsageInfo]:
     tokenizer, model = load_causal_model(model_path)
-    prompt = messages_to_prompt(tokenizer, messages)
+    prompt = messages_to_prompt(tokenizer, messages, model_path=model_path)
     inputs = tokenizer(prompt, return_tensors="pt").to(_device())
     prompt_len = inputs["input_ids"].shape[1]
+
+    meta = read_platform_config(model_path)
+    platform_model = use_platform_prompt_format(model_path, meta)
 
     gen_kwargs: dict = {
         "max_new_tokens": max_tokens,
         "do_sample": temperature > 0,
-        "pad_token_id": tokenizer.eos_token_id or tokenizer.pad_token_id,
+        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+        "eos_token_id": tokenizer.eos_token_id or tokenizer.pad_token_id,
     }
     if temperature > 0:
         gen_kwargs["temperature"] = max(temperature, 1e-5)
         gen_kwargs["top_p"] = top_p
+    else:
+        gen_kwargs["do_sample"] = False
+
+    if platform_model:
+        gen_kwargs.update(platform_generation_extras(tokenizer))
 
     with torch.no_grad():
         output = model.generate(**inputs, **gen_kwargs)

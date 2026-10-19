@@ -71,11 +71,18 @@ def _save_artifacts(model, tokenizer, artifact_dir: str, config: dict[str, Any])
         model_to_save.save_pretrained(path)
     else:
         raise RuntimeError("Model does not support save_pretrained")
+    from app.inference.prompting import PLATFORM_CHAT_TEMPLATE, ensure_platform_chat_template
+
+    if config.get("task_type") == "causal_lm":
+        ensure_platform_chat_template(tokenizer)
+        if not getattr(tokenizer, "chat_template", None):
+            tokenizer.chat_template = PLATFORM_CHAT_TEMPLATE
     tokenizer.save_pretrained(path)
     meta = {
         "init_mode": config.get("init_mode"),
         "task_type": config.get("task_type"),
         "architecture": config.get("architecture"),
+        "prompt_format": "platform_user_assistant",
     }
     (path / "platform_config.json").write_text(json.dumps(meta, indent=2))
 
