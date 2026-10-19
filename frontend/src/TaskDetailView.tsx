@@ -160,7 +160,11 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 5s)</p>
           <div className="log-ray-status">
-            <RayStatusPanel status={logs?.ray_status} loading={!logs} />
+            <RayStatusPanel
+              status={logs?.ray_status}
+              loading={!logs}
+              jobWorkers={job.num_workers}
+            />
           </div>
           <div className="log-stream log-stream-framework" ref={frameworkLogRef}>
             <pre>{formatLogLines(logs?.framework ?? [])}</pre>

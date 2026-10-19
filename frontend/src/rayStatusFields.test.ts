@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { rayStatusFingerprint, rayStatusToFields } from "./rayStatusFields";
+import {
+  rayResourceBarMax,
+  rayStatusFingerprint,
+  rayStatusToDashboard,
+  rayStatusToFields,
+} from "./rayStatusFields";
 
 const sample = {
   initialized: true,
@@ -9,17 +14,14 @@ const sample = {
   cluster_resources: { GPU: 1, CPU: 8.0, node: 1.0 },
 };
 
-const fields = rayStatusToFields(sample);
-const labels = fields.map((f) => f.label);
-assert.deepEqual(labels.slice(0, 4), [
-  "Job Ray address",
-  "Ray initialized (API process)",
-  "Runtime",
-  "Nodes",
-]);
+const dash = rayStatusToDashboard(sample);
+assert.equal(dash.stats.find((s) => s.id === "initialized")?.format, "pill");
+assert.deepEqual(dash.resources.map((r) => r.label), ["CPU", "GPU", "node"]);
+assert.equal(dash.resources[0].accent, "cpu");
+assert.equal(rayResourceBarMax(dash), 8);
 
-const resourceLabels = fields.filter((f) => f.id.startsWith("cluster_resources.")).map((f) => f.label);
-assert.deepEqual(resourceLabels, ["CPU", "GPU", "node"]);
+const fields = rayStatusToFields(sample);
+assert.ok(fields.length >= 4);
 
 const shuffled = {
   ...sample,

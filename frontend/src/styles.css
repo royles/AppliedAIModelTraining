@@ -653,6 +653,179 @@ body {
   padding: 0.15rem 0.5rem;
 }
 
+.ray-dashboard {
+  gap: 0.75rem;
+}
+
+.ray-dashboard-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ray-dashboard-message {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #243049;
+  background: #0a101c;
+}
+
+.ray-dashboard-message strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #9fb0c9;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ray-dashboard-message p {
+  margin: 0;
+  color: #e8eef7;
+  line-height: 1.4;
+}
+
+.ray-dashboard-message.tone-error {
+  border-color: #7f1d1d;
+  background: #1c0a0a;
+}
+
+.ray-dashboard-message.tone-warn {
+  border-color: #b45309;
+  background: #1a1206;
+}
+
+.ray-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.ray-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #243049;
+  background: #0a101c;
+  min-width: 0;
+}
+
+.ray-stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9fb0c9;
+}
+
+.ray-stat-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #e8eef7;
+}
+
+.ray-stat-code {
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.ray-stat-mini-track {
+  margin-top: 0.15rem;
+  height: 4px;
+}
+
+.ray-resource-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ray-resource-heading {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9fb0c9;
+}
+
+.ray-metric-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ray-metric-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.ray-metric-bar-label {
+  font-size: 0.78rem;
+  color: #c5d4e8;
+  font-weight: 500;
+}
+
+.ray-metric-bar-value {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: #e8eef7;
+}
+
+.ray-metric-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #1a2438;
+  overflow: hidden;
+}
+
+.ray-metric-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  transition: width 0.35s ease;
+}
+
+.ray-metric-bar[data-accent="cpu"] .ray-metric-bar-fill {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.ray-metric-bar[data-accent="gpu"] .ray-metric-bar-fill {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+.ray-metric-bar[data-accent="memory"] .ray-metric-bar-fill {
+  background: linear-gradient(90deg, #059669, #34d399);
+}
+
+.ray-metric-bar[data-accent="node"] .ray-metric-bar-fill,
+.ray-metric-bar-fill.accent-node {
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+
+.ray-metric-bar[data-accent="default"] .ray-metric-bar-fill {
+  background: linear-gradient(90deg, #475569, #94a3b8);
+}
+
+.ray-dashboard-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #1a2438;
+  font-size: 0.75rem;
+}
+
+.ray-dashboard-detail code {
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
 .log-panel-framework .log-stream-framework {
   flex: 1 1 64%;
   min-height: 16rem;
