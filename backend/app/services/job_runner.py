@@ -14,6 +14,7 @@ from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.cdsw_workers import (
     CdswRayWorkerPool,
+    ray_driver_init_address,
     worker_ids_to_json,
 )
 from app.services.platform_settings import (
@@ -115,6 +116,8 @@ def run_training_job(job_id: int) -> None:
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
         ray_addr = resolve_ray_address(head)
+        if head:
+            ray_addr = ray_driver_init_address(head) or ray_addr
         if head and ray_addr is None:
             from app.services.cdsw_workers import ray_client_address
 

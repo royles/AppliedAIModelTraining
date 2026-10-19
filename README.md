@@ -130,6 +130,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 
 - **`ModuleNotFoundError: No module named 'ray'`** on a worker engine — run `python3 scripts/install.py` on the **session** (system Python), then launch workers again. New worker bootstrap code installs `backend/requirements.txt` on first start if Ray is missing.
 - **`PlacementGroupCleaner … Failed to query Ray Train Controller`** — usually transient while the head or workers are still starting, or when workers failed to join. Confirm workers show `ray start --block` running and the head is reachable on port `6379`.
+- **`Failed to connect to the observability pubsub at address …:6379`** — the training driver could not reach Ray GCS quickly (often when using the pod IP from the same session). Restart the app after `git pull` (driver uses `127.0.0.1:6379` on CAI). If it repeats, confirm `ray start --head` is running and port `6379` is open on localhost.
 
 ## Environment variables
 

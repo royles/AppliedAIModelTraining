@@ -80,6 +80,37 @@ def ray_client_address(head: str) -> str:
     return f"ray://{host}:10001"
 
 
+def _local_gcs_reachable(port: int = 6379) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
+def ray_driver_init_address(head: str | None) -> str | None:
+    """
+    Address for ray.init() from the CDSW session driver (same pod as the head).
+
+    Remote worker engines must still use the session IP in build_worker_start_code.
+    Connecting via 127.0.0.1 avoids Ray observability pubsub timeouts to the pod IP.
+    """
+    if not head:
+        return None
+    host, _, port = head.partition(":")
+    port = port or "6379"
+    try:
+        port_i = int(port)
+    except ValueError:
+        return head
+    session_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
+    if session_ip and host == session_ip and _local_gcs_reachable(port_i):
+        return f"127.0.0.1:{port_i}"
+    return head
+
+
 def build_worker_start_code(head_address: str) -> str:
     """
     Python code for launch_workers `code=`.

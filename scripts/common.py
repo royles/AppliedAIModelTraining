@@ -504,6 +504,7 @@ def start_ray_head() -> None:
 
     if _ray_port_open(6379):
         print("Ray head already listening on :6379")
+        os.environ["RAY_ADDRESS"] = "127.0.0.1:6379"
         return
 
     include_dashboard = os.environ.get("RAY_INCLUDE_DASHBOARD", "").lower() in (
