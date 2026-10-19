@@ -18,6 +18,7 @@ from typing import Any, Protocol
 
 from app.config import REPO_ROOT
 from app.resource_hints import log_worker_launch_memory
+from app.services.cai_networking import ray_driver_gcs_address, ray_worker_head_address
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +69,8 @@ def cdsw_available() -> bool:
 
 
 def ray_head_address() -> str | None:
-    """Best-effort Ray head address when running inside a CML/CDSW session."""
-    ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
-    if ip:
-        return f"{ip}:6379"
-    return os.environ.get("RAY_HEAD_ADDRESS")
+    """Worker-facing Ray head (master CDSW_IP_ADDRESS:6379)."""
+    return ray_worker_head_address()
 
 
 def ray_client_address(head: str) -> str:
@@ -92,43 +90,27 @@ def _local_gcs_reachable(port: int = 6379) -> bool:
 
 def ray_driver_init_address(head: str | None) -> str | None:
     """
-    Address for ray.init() from the CDSW session driver (same pod as the head).
-
-    Remote worker engines must still use the session IP in build_worker_start_code.
-    The driver must not dial the pod/container IP from inside the same pod (Ray GCS /
-    observability pubsub time out). Platform settings may store the worker-facing
-    head as 100.x.x.x while CDSW_IP_ADDRESS is unset in the API process.
+    Address for ray.init() from the master session driver (see docs/CAI_RAY_NETWORKING.md).
     """
     if not head:
-        env = os.environ.get("RAY_ADDRESS")
-        if env and cdsw_available():
-            return ray_driver_init_address(env) or env
-        return env
+        if cdsw_available():
+            return ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+        return os.environ.get("RAY_ADDRESS")
+    if cdsw_available():
+        return ray_driver_gcs_address(head)
     host, _, port = head.partition(":")
     port = port or "6379"
     try:
         port_i = int(port)
     except ValueError:
         return head
-
-    loopback = f"127.0.0.1:{port_i}"
     if host in ("127.0.0.1", "localhost"):
-        return loopback
-
+        return f"127.0.0.1:{port_i}"
     session_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS")
-    ray_head = os.environ.get("RAY_HEAD_ADDRESS") or ""
-    ray_head_host = ray_head.partition(":")[0] if ray_head else ""
-
-    # CAI/CML: training driver always runs in the session pod next to the Ray head.
-    if cdsw_available():
-        return loopback
-
     if session_ip and host == session_ip:
-        return loopback
-    if ray_head_host and host == ray_head_host:
-        return loopback
+        return f"127.0.0.1:{port_i}"
     if _local_gcs_reachable(port_i):
-        return loopback
+        return f"127.0.0.1:{port_i}"
     return head
 
 
@@ -166,7 +148,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HEAD = "{head_address}"
+FALLBACK_HEAD = "{head_address}"
 
 def project_root() -> Path:
     for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT", "CDSW_WORKING_DIRECTORY"):
@@ -192,7 +174,15 @@ py = sys.executable
 root = project_root()
 os.chdir(root)
 ensure_ray(py, root)
-print(f"[platform] CDSW worker connecting to Ray head (master) at {{HEAD}}", flush=True)
+def resolve_head() -> str:
+    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP", "CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
+        ip = os.environ.get(key)
+        if ip:
+            return ip.strip() + ":6379"
+    return FALLBACK_HEAD
+
+HEAD = resolve_head()
+print(f"[platform] CDSW worker connecting to Ray master at {{HEAD}}", flush=True)
 cmd = [py, "-m", "ray.scripts.scripts", "start", "--block", f"--address={{HEAD}}"]
 rc = subprocess.call(cmd)
 print(f"[platform] ray start --block exited with code {{rc}}", flush=True)

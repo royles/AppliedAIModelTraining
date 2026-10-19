@@ -18,6 +18,7 @@ from app.schemas import (
     RaySettings,
 )
 from app.services import cdsw_workers
+from app.services.cai_networking import ray_worker_head_address
 
 
 def _env_defaults() -> dict[str, Any]:
@@ -108,9 +109,24 @@ def update_platform_settings(
 
 
 def resolved_ray_head(row: PlatformSettings | None) -> str | None:
+    """Prefer live CAI session IP over stale SQLite defaults (see docs/CAI_RAY_NETWORKING.md)."""
+    live = ray_worker_head_address() or cdsw_workers.ray_head_address()
+    if live:
+        return live
     if row and row.ray_head_address:
         return row.ray_head_address
-    return cdsw_workers.ray_head_address() or get_settings().cdsw_head_address
+    return get_settings().cdsw_head_address
+
+
+def sync_platform_ray_head_from_session(db: Session) -> None:
+    """Keep Framework settings aligned with CDSW_IP_ADDRESS / RAY_HEAD_ADDRESS."""
+    head = ray_worker_head_address()
+    if not head:
+        return
+    row = ensure_platform_settings(db)
+    if row.ray_head_address != head:
+        row.ray_head_address = head
+        db.commit()
 
 
 def worker_pool_kwargs(row: PlatformSettings) -> dict[str, Any]:

@@ -37,7 +37,7 @@ React UI ──► FastAPI ──► SQLite
                       └── ray start --block --address=<head>
 ```
 
-On Cloudera Machine Learning, the session pod runs the API and Ray head; additional GPU workers are started with the [workers API](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html). Set `CDSW_IP_ADDRESS` / `CML_*` resource IDs as documented by Cloudera.
+On Cloudera Machine Learning, the session pod runs the API and Ray head; additional GPU workers are started with the [workers API](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html). Workers reach the master via **`CDSW_MASTER_IP`** / **`CDSW_IP_ADDRESS:6379`**; the in-session driver uses **`127.0.0.1:6379`**. See **[docs/CAI_RAY_NETWORKING.md](docs/CAI_RAY_NETWORKING.md)** and Cloudera’s [worker network communication](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html) guide. Set `CML_*` resource IDs as documented by Cloudera.
 
 Locally, workers are simulated and Ray runs in-process on CPU.
 

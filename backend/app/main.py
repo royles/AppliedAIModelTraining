@@ -12,6 +12,7 @@ from app.api.routes import router
 from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import SessionLocal, init_db
 from app.services.job_lifecycle import reconcile_stale_jobs
+from app.services.platform_settings import sync_platform_ray_head_from_session
 from app.middleware.path_prefix import PathPrefixMiddleware
 from app.static_ui import mount_static_ui
 
@@ -24,6 +25,7 @@ async def lifespan(_app: FastAPI):
     init_db()
     db = SessionLocal()
     try:
+        sync_platform_ray_head_from_session(db)
         reconcile_stale_jobs(
             db,
             reason=(

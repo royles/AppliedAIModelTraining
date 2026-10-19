@@ -25,6 +25,11 @@ from app.schemas import (
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
+from app.services.cai_networking import (
+    master_engine_ip,
+    ray_driver_gcs_address,
+    ray_worker_head_address,
+)
 from app.services.job_delete import delete_training_job
 from app.services.job_log import build_job_logs
 from app.services.job_lifecycle import restart_training_job
@@ -123,8 +128,17 @@ def health() -> HealthResponse:
         ray_runtime=runtime,
         cdsw_available=cdsw_workers.cdsw_available(),
         details={
-            "ray_head": cdsw_workers.ray_head_address(),
-            "docs": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html",
+            "ray_head_worker": ray_worker_head_address(),
+            "ray_head_driver": ray_driver_gcs_address(ray_worker_head_address())
+            if cdsw_workers.cdsw_available()
+            else None,
+            "master_engine_ip": master_engine_ip(),
+            "networking_doc": "docs/CAI_RAY_NETWORKING.md",
+            "cloudera_docs": {
+                "workers_api": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html",
+                "worker_network": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html",
+                "engine_env": "https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html",
+            },
             "memory": memory_guidance_for_health(),
             "repo_root": str(REPO_ROOT.resolve()),
             "datasets_root": str(DATASETS_ROOT),
