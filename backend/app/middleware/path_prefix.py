@@ -16,12 +16,19 @@ def _header_prefix(scope: Scope) -> str | None:
     return None
 
 
-def _effective_prefix(scope: Scope) -> str:
+def effective_path_prefix(scope: Scope) -> str:
+    """Proxy path prefix from X-Forwarded-Prefix or PLATFORM_ROOT_PATH."""
     env_prefix = (os.environ.get("PLATFORM_ROOT_PATH") or "").strip().rstrip("/")
     header = _header_prefix(scope)
     if header:
         return header
     return env_prefix
+
+
+def base_href_for_scope(scope: Scope) -> str:
+    """HTML <base href> for relative ./assets/* URLs (CAI application subpaths)."""
+    prefix = effective_path_prefix(scope).rstrip("/")
+    return f"{prefix}/" if prefix else "/"
 
 
 class PathPrefixMiddleware:
@@ -34,12 +41,14 @@ class PathPrefixMiddleware:
             return
 
         path = scope.get("path", "")
-        prefix = _effective_prefix(scope)
+        prefix = effective_path_prefix(scope)
         if prefix and path.startswith(prefix):
             new_scope = dict(scope)
             stripped = path[len(prefix) :] or "/"
             new_scope["path"] = stripped
-            new_scope["root_path"] = (scope.get("root_path") or "") + prefix
+            # Do not set scope["root_path"] here: we already rewrote path. Starlette
+            # StaticFiles + Mount break when root_path is set but path is stripped
+            # (assets 404 → blank React shell with only CSS background).
             await self.app(new_scope, receive, send)
             return
 
