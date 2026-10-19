@@ -22,10 +22,24 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 | `CDSW_MASTER_IP` / `CML_MASTER_IP` | Worker engines only | Master IP for outbound connections (preferred in worker bootstrap code). |
 | `RAY_HEAD_ADDRESS` | Session after `start_ray_head` | Cached `CDSW_IP_ADDRESS:6379` for workers and UI. |
 | `RAY_ADDRESS` | Session driver | Set to **`127.0.0.1:6379`** after head is up. |
+| `PLATFORM_NCCL_DEFAULTS` | Session + workers | Default **`1`**: apply NCCL / `TORCH_NCCL` env (`NCCL_ASYNC_ERROR_HANDLING`, socket interface `^docker0,lo`, etc.). Set **`0`** to skip. |
+
+## NCCL (multi-GPU Ray Train)
+
+PyTorch distributed on CUDA uses the **NCCL** backend. On CAI, worker engines often need explicit socket interface selection and async error handling so collectives fail fast instead of hanging.
+
+When `PLATFORM_NCCL_DEFAULTS` is enabled (default), the platform merges defaults in:
+
+- `apply_ray_train_runtime_env()` (session driver before Train)
+- CDSW worker bootstrap env (`cdsw_workers.worker_launch_env`)
+- Existing env vars are **never** overwritten
+
+Set `NCCL_DEBUG=INFO` in the project/session if you need NCCL logs (not set by default).
 
 ## Code map
 
 - `app/services/cai_networking.py` — resolve master IP, worker head, driver loopback.
+- `app/services/nccl_env.py` — default NCCL env for GPU Train (`PLATFORM_NCCL_DEFAULTS`).
 - `app/services/cdsw_workers.py` — `build_worker_start_code`, `launch_workers`.
 - `scripts/common.py` — `start_ray_head()`, `cai_session_ip()`.
 

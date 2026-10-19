@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from app.services.cdsw_workers import cdsw_available
+from app.services.nccl_env import apply_nccl_env
 
 
 def apply_ray_train_runtime_env() -> None:
@@ -23,6 +24,7 @@ def apply_ray_train_runtime_env() -> None:
     for key, value in defaults.items():
         if not os.environ.get(key):
             os.environ[key] = value
+    apply_nccl_env()
 
 
 def cluster_resource_summary() -> dict[str, float]:

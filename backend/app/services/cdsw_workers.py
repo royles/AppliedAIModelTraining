@@ -19,6 +19,7 @@ from typing import Any, Protocol
 from app.config import REPO_ROOT
 from app.resource_hints import log_worker_launch_memory
 from app.services.cai_networking import ray_driver_gcs_address, ray_worker_head_address
+from app.services.nccl_env import apply_nccl_env
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,7 @@ def worker_launch_env(
         env["PLATFORM_WORKER_CPU_COUNT"] = str(int(max(1, cpus)))
     if gpus is not None:
         env["PLATFORM_WORKER_GPU_COUNT"] = str(max(0, int(gpus)))
+    apply_nccl_env(env)
     for key in (
         "CDSW_WORKING_DIRECTORY",
         "HOME",

@@ -131,6 +131,7 @@ On small containers the platform automatically **caps Ray Train to 1 worker** an
 | `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force low-memory caps; auto-detected when cgroup &lt; 6 GiB |
 | `RAY_TRAIN_NUM_WORKERS` | Hard cap on Ray Train worker processes (e.g. `1`) |
 | `PLATFORM_KEEP_WORKERS_ON_FAIL` | Set `1` to skip `stop_workers` after a failed job (debug worker / Ray logs) |
+| `PLATFORM_NCCL_DEFAULTS` | Default **`1`**: apply NCCL env for GPU Ray Train (set **`0`** to disable) |
 | `RAY_TRAIN_WORKER_GROUP_START_TIMEOUT_S` | Seconds to wait for Train workers (default **900** on CAI) |
 
 Check `GET /api/health` → `details.memory` for detected limits and recommendations.
@@ -161,6 +162,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `DEFAULT_GPUS_PER_WORKER` | Default GPU count for workers; default `1` |
 | `PLATFORM_CAI_LOW_MEMORY` | `1` = cap Ray Train workers and batch size on tiny sessions |
 | `RAY_TRAIN_NUM_WORKERS` | Max Ray Train workers per job (overrides auto cap when &gt; 0) |
+| `PLATFORM_NCCL_DEFAULTS` | Default **`1`**: NCCL / PyTorch distributed env for multi-GPU Train (`0` = off) |
 | `PLATFORM_PYTHON` | Override interpreter for start/install (default: current `python3`) |
 | `PLATFORM_SKIP_DEP_CHECK` | Set `1` to skip automatic `pip install` in `start.py` |
 | `PLATFORM_UVICORN_LOG_LEVEL` | With `PLATFORM_ACCESS_LOG=1`, uvicorn level (default `info`) |

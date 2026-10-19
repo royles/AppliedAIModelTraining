@@ -213,6 +213,7 @@ def _train_loop(config: dict[str, Any]) -> None:
         import socket
 
         from app.services.distributed_training_status import update_distributed_rank
+        from app.services.nccl_env import detect_collective_backend
 
         artifact_dir = config.get("artifact_dir")
         if artifact_dir:
@@ -222,6 +223,7 @@ def _train_loop(config: dict[str, Any]) -> None:
                 world_size=world_size,
                 device=str(device),
                 host=socket.gethostname(),
+                collective_backend=detect_collective_backend(),
             )
     except Exception:  # noqa: BLE001
         pass

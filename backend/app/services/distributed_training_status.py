@@ -27,6 +27,7 @@ def update_distributed_rank(
     world_size: int,
     device: str,
     host: str,
+    collective_backend: str | None = None,
 ) -> None:
     """Called from each Ray Train worker when the train loop starts."""
     path = Path(artifact_dir) / "distributed.json"
@@ -54,12 +55,15 @@ def update_distributed_rank(
         "host": host,
         "last_seen": now,
         "state": "training",
+        "collective_backend": collective_backend,
     }
     data["backend"] = "ray.train.torch"
     data["world_size"] = world_size
     data["ranks"] = sorted(ranks_map.values(), key=lambda r: int(r["rank"]))
     data["updated_at"] = now
     data["multi_worker"] = world_size > 1
+    if collective_backend:
+        data["collective_backend"] = collective_backend
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -141,8 +145,18 @@ def build_distributed_training_status(
     elif running:
         status_label = "starting"
 
+    collective = file_data.get("collective_backend")
+    if not collective and ranks:
+        collective = ranks[0].get("collective_backend")
+    if not collective and world_size > 1:
+        collective = "nccl (expected for CUDA multi-rank)"
+
     return {
         "backend": file_data.get("backend") or "ray.train.torch",
+        "collective_backend": collective,
+        "nccl_defaults_enabled": __import__(
+            "app.services.nccl_env", fromlist=["nccl_defaults_enabled"]
+        ).nccl_defaults_enabled(),
         "status": status_label,
         "active": active,
         "multi_worker": multi_worker,
