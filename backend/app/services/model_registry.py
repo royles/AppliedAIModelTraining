@@ -15,6 +15,7 @@ from app.services.model_card import build_training_metadata, generate_model_card
 from app.services.model_lifecycle import (
     STATE_BENCHMARKED,
     STATE_RETIRED,
+    STATE_TRAINED,
     assert_transition,
     state_guidance,
 )
