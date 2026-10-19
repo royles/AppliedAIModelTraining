@@ -177,6 +177,37 @@ def ui_bundle_has_sidebar_ux() -> bool:
     return False
 
 
+def ui_bundle_runtime_sanity() -> tuple[bool, str]:
+    """
+    Catch shipped bundles that load but crash React at runtime (e.g. ReferenceError).
+    """
+    import re
+
+    assets = FRONTEND_DIST / "assets"
+    index = FRONTEND_DIST / "index.html"
+    if not index.is_file() or not assets.is_dir():
+        return False, "frontend/dist is incomplete"
+    html = index.read_text(encoding="utf-8", errors="ignore")
+    js_match = re.search(r'(?:\./|/)assets/(index-[^"\']+\.js)', html)
+    if not js_match:
+        return False, "index.html is missing a ./assets/index-*.js script tag"
+    js_name = js_match.group(1)
+    js_path = assets / js_name
+    if not js_path.is_file():
+        return (
+            False,
+            f"index.html references {js_name} but that file is missing — run scripts/build_ui.py",
+        )
+    text = js_path.read_text(encoding="utf-8", errors="ignore")
+    if re.search(r"\buiBuildLabel\b", text):
+        return (
+            False,
+            f"{js_name} is a broken UI bundle (uiBuildLabel ReferenceError). "
+            "Run: python3 scripts/build_ui.py --force",
+        )
+    return True, ""
+
+
 def ensure_prebuilt_ui_or_npm() -> tuple[bool, str]:
     """
     CAI/CDSW often has no Node. Return (ok, message) for whether UX can start.
@@ -189,6 +220,9 @@ def ensure_prebuilt_ui_or_npm() -> tuple[bool, str]:
             "frontend/dist is missing and npm is not installed. "
             "Run `git pull origin main` (dist is committed) or copy frontend/dist from a dev machine.",
         )
+    sane, sanity_msg = ui_bundle_runtime_sanity()
+    if not sane:
+        return False, sanity_msg
     if ui_bundle_has_sidebar_ux():
         if frontend_dist_stale():
             return (
