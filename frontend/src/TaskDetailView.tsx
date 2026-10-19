@@ -17,6 +17,12 @@ function formatLogLines(lines: { ts: string; message: string }[]): string {
   return lines.map((l) => `[${l.ts}] ${l.message}`).join("\n");
 }
 
+const SCROLL_STICK_THRESHOLD_PX = 48;
+
+function isNearBottom(el: HTMLDivElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_STICK_THRESHOLD_PX;
+}
+
 function scrollLogToBottom(el: HTMLDivElement | null) {
   if (el) {
     el.scrollTop = el.scrollHeight;
@@ -30,9 +36,18 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated 
   const rayStatusLogRef = useRef<HTMLDivElement>(null);
   const frameworkLogRef = useRef<HTMLDivElement>(null);
   const trainingLogRef = useRef<HTMLDivElement>(null);
+  const lastRayStatusTextRef = useRef("");
+  const lastFrameworkTextRef = useRef("");
+  const lastTrainingTextRef = useRef("");
+  const scrollStickRef = useRef({ ray: true, framework: true, training: true });
 
   const loadLogs = useCallback(async () => {
     try {
+      scrollStickRef.current = {
+        ray: !rayStatusLogRef.current || isNearBottom(rayStatusLogRef.current),
+        framework: !frameworkLogRef.current || isNearBottom(frameworkLogRef.current),
+        training: !trainingLogRef.current || isNearBottom(trainingLogRef.current),
+      };
       const [data, freshJob] = await Promise.all([
         api.getJobLogs(job.id),
         api.getJob(job.id),
@@ -56,9 +71,38 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated 
     : "Loading Ray status…";
 
   useEffect(() => {
-    scrollLogToBottom(rayStatusLogRef.current);
-    scrollLogToBottom(frameworkLogRef.current);
-    scrollLogToBottom(trainingLogRef.current);
+    lastRayStatusTextRef.current = "";
+    lastFrameworkTextRef.current = "";
+    lastTrainingTextRef.current = "";
+    scrollStickRef.current = { ray: true, framework: true, training: true };
+  }, [job.id]);
+
+  useEffect(() => {
+    if (!logs) return;
+
+    const frameworkText = formatLogLines(logs.framework);
+    const trainingText = formatLogLines(logs.training);
+
+    if (rayStatusText !== lastRayStatusTextRef.current) {
+      if (scrollStickRef.current.ray) {
+        scrollLogToBottom(rayStatusLogRef.current);
+      }
+      lastRayStatusTextRef.current = rayStatusText;
+    }
+
+    if (frameworkText !== lastFrameworkTextRef.current) {
+      if (scrollStickRef.current.framework) {
+        scrollLogToBottom(frameworkLogRef.current);
+      }
+      lastFrameworkTextRef.current = frameworkText;
+    }
+
+    if (trainingText !== lastTrainingTextRef.current) {
+      if (scrollStickRef.current.training) {
+        scrollLogToBottom(trainingLogRef.current);
+      }
+      lastTrainingTextRef.current = trainingText;
+    }
   }, [logs, rayStatusText]);
 
   return (
