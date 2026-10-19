@@ -32,7 +32,6 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
-  const rayStatusLogRef = useRef<HTMLDivElement>(null);
   const frameworkLogRef = useRef<HTMLDivElement>(null);
   const trainingLogRef = useRef<HTMLDivElement>(null);
   const lastFrameworkTextRef = useRef("");
@@ -160,7 +159,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
         <section className="card log-panel log-panel-framework">
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 5s)</p>
-          <div className="log-ray-status" ref={rayStatusLogRef}>
+          <div className="log-ray-status">
             <RayStatusPanel status={logs?.ray_status} loading={!logs} />
           </div>
           <div className="log-stream log-stream-framework" ref={frameworkLogRef}>
