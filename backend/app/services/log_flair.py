@@ -105,8 +105,14 @@ def train_finished_line(steps: int) -> str:
 
 
 def framework_banner(title: str) -> str:
-    line = "═" * min(48, max(12, len(title) + 4))
-    return f"╔{line}╗\n║ {title} ║\n╚{line}╝"
+    inner_width = min(48, max(12, len(title) + 4))
+    bar = "═" * inner_width
+    inner = f" {title} "
+    if len(inner) < inner_width:
+        inner = inner + " " * (inner_width - len(inner))
+    elif len(inner) > inner_width:
+        inner = inner[: inner_width - 1] + " "
+    return f"╔{bar}╗\n║{inner}║\n╚{bar}╝"
 
 
 def steps_per_epoch(num_examples: int, batch_size: int) -> int:
