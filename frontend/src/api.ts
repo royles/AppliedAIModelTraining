@@ -228,6 +228,11 @@ export const api = {
     request<{ status: string; job_id: string }>(`/api/jobs/${jobId}`, {
       method: "DELETE",
     }),
+  restartJob: (jobId: number, body?: { resume?: boolean }) =>
+    request<TrainingJob>(`/api/jobs/${jobId}/restart`, {
+      method: "POST",
+      body: JSON.stringify(body ?? { resume: true }),
+    }),
   createJob: (body: {
     experiment_id: number;
     name: string;

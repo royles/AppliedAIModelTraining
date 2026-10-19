@@ -8,6 +8,8 @@ type Props = {
   job: TrainingJob;
   onBack: () => void;
   onDelete: (jobId: number) => void | Promise<void>;
+  onRestart: (jobId: number, resume: boolean) => void | Promise<void>;
+  onJobUpdated?: (job: TrainingJob) => void;
 };
 
 function formatLogLines(lines: { ts: string; message: string }[]): string {
@@ -21,22 +23,27 @@ function scrollLogToBottom(el: HTMLDivElement | null) {
   }
 }
 
-export function TaskDetailView({ job, onBack, onDelete }: Props) {
+export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated }: Props) {
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState(false);
   const rayStatusLogRef = useRef<HTMLDivElement>(null);
   const frameworkLogRef = useRef<HTMLDivElement>(null);
   const trainingLogRef = useRef<HTMLDivElement>(null);
 
   const loadLogs = useCallback(async () => {
     try {
-      const data = await api.getJobLogs(job.id);
+      const [data, freshJob] = await Promise.all([
+        api.getJobLogs(job.id),
+        api.getJob(job.id),
+      ]);
       setLogs(data);
+      onJobUpdated?.(freshJob);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [job.id]);
+  }, [job.id, onJobUpdated]);
 
   useEffect(() => {
     loadLogs();
@@ -64,17 +71,37 @@ export function TaskDetailView({ job, onBack, onDelete }: Props) {
           <h2>{job.name}</h2>
           <span className={`pill ${job.status}`}>{job.status}</span>
         </div>
-        <button
-          type="button"
-          className="btn-danger task-detail-delete"
-          onClick={() => {
-            if (confirmDeleteTask(job)) {
-              void onDelete(job.id);
-            }
-          }}
-        >
-          Delete task
-        </button>
+        <div className="task-detail-actions">
+          {job.status === "failed" && (
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={restarting}
+              onClick={() => {
+                const resume = window.confirm(
+                  "Restart this task with the same parameters?\n\n" +
+                    "OK = resume from the last saved epoch/step if available.\n" +
+                    "Cancel = start training over (keeps prior artifacts on disk).",
+                );
+                setRestarting(true);
+                void onRestart(job.id, resume).finally(() => setRestarting(false));
+              }}
+            >
+              {restarting ? "Restarting…" : "Restart task"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-danger task-detail-delete"
+            onClick={() => {
+              if (confirmDeleteTask(job)) {
+                void onDelete(job.id);
+              }
+            }}
+          >
+            Delete task
+          </button>
+        </div>
       </div>
 
       <article className="card task-detail-summary">
@@ -85,6 +112,12 @@ export function TaskDetailView({ job, onBack, onDelete }: Props) {
           <li><span>Workers / GPU</span><span>{job.num_workers} / {job.gpus_per_worker}</span></li>
           <li><span>Max steps</span><span>{job.max_steps}</span></li>
           <li><span>Ray</span><span><code>{job.ray_address ?? "local"}</code></span></li>
+          {job.error_message && (
+            <li className="task-error">
+              <span>Error</span>
+              <span>{job.error_message}</span>
+            </li>
+          )}
         </ul>
       </article>
 

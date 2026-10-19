@@ -219,6 +219,17 @@ export default function App() {
     setSelectedJobId(null);
   }
 
+  async function restartTask(jobId: number, resume: boolean) {
+    try {
+      const updated = await api.restartJob(jobId, { resume });
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+      setError(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function deleteTask(jobId: number) {
     try {
       await api.deleteJob(jobId);
@@ -287,6 +298,10 @@ export default function App() {
               setNav("tasks");
             }}
             onDelete={deleteTask}
+            onRestart={restartTask}
+            onJobUpdated={(fresh) => {
+              setJobs((prev) => prev.map((j) => (j.id === fresh.id ? fresh : j)));
+            }}
           />
         ) : nav === "tasks" ? (
           <>

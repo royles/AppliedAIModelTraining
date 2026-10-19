@@ -14,6 +14,7 @@ from app.schemas import (
     ExperimentRead,
     HealthResponse,
     ScaleWorkersRequest,
+    JobRestartRequest,
     TrainingJobCreate,
     TrainingJobRead,
     JobLogsRead,
@@ -26,6 +27,7 @@ from app.resource_hints import memory_guidance_for_health
 from app.services import cdsw_workers
 from app.services.job_delete import delete_training_job
 from app.services.job_log import build_job_logs
+from app.services.job_lifecycle import restart_training_job
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.model_registry import get_trained_model_for_job, openai_model_ids_for_jobs
 from app.services.platform_settings import get_platform_settings, update_platform_settings
@@ -285,6 +287,21 @@ def scale_workers(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return wg
+
+
+@router.post("/jobs/{job_id}/restart", response_model=TrainingJobRead)
+def restart_job(
+    job_id: int,
+    payload: JobRestartRequest,
+    db: Session = Depends(get_db),
+) -> TrainingJobRead:
+    try:
+        job = restart_training_job(db, job_id, resume=payload.resume)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _job_to_read(db, job)
 
 
 @router.delete("/jobs/{job_id}")

@@ -88,7 +88,8 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     task = config["task_type"]
     batch_size = config["per_device_train_batch_size"]
-    max_steps = config["max_steps"]
+    max_steps = int(config["max_steps"])
+    resume_step = int(config.get("resume_global_step") or 0)
     max_len = config["max_seq_length"]
     artifact_dir = config["artifact_dir"]
 
@@ -153,10 +154,13 @@ def _train_loop(config: dict[str, Any]) -> None:
     warmup_steps = max(1, int(max_steps * config.get("warmup_ratio", 0.03)))
     job_epochs = int(config.get("job_epochs") or 1)
 
-    step = 0
+    step = resume_step
     micro = 0
     model.train()
     optimizer.zero_grad()
+    if resume_step > 0:
+        for _ in range(resume_step):
+            scheduler.step()
 
     job_id = int(config.get("job_id") or 0)
     from app.services.job_log import append_training_log_file
@@ -215,8 +219,8 @@ def _train_loop(config: dict[str, Any]) -> None:
             return True
         return s % log_every == 0
 
-    dataset_pass = 0
-    warmup_logged = False
+    dataset_pass = int(config.get("resume_epoch") or 0)
+    warmup_logged = resume_step >= warmup_steps
 
     while step < max_steps:
         dataset_pass += 1
@@ -290,6 +294,20 @@ def _train_loop(config: dict[str, Any]) -> None:
                     break
         if rank == 0 and steps_this_pass > 0:
             _log_training(train_epoch_end_line(dataset_pass, steps_this_pass))
+            if task == "causal_lm":
+                from app.services.job_progress import write_progress
+
+                ckpt_dir = Path(artifact_dir) / "checkpoints" / f"epoch_{dataset_pass}"
+                _save_artifacts(model, tokenizer, str(ckpt_dir), config)
+                write_progress(
+                    artifact_dir,
+                    {
+                        "global_step": step,
+                        "epoch": dataset_pass,
+                        "max_steps": max_steps,
+                    },
+                )
+                _log_training(train_save_line(f"Checkpoint saved (epoch {dataset_pass}, step {step})."))
         if step >= max_steps:
             break
 

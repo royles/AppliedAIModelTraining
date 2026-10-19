@@ -43,6 +43,13 @@ class TrainingJobCreate(BaseModel):
     max_steps: int | None = Field(default=None, ge=1, le=100_000)
 
 
+class JobRestartRequest(BaseModel):
+    resume: bool = Field(
+        default=True,
+        description="When true, continue from progress.json / last epoch checkpoint if present.",
+    )
+
+
 class TrainingJobRead(BaseModel):
     id: int
     experiment_id: int

@@ -167,8 +167,21 @@ body {
   align-self: flex-start;
 }
 
-.task-detail-delete {
+.task-detail-actions {
   margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.task-detail-delete {
+  margin-left: 0;
+}
+
+.task-error span:last-child {
+  color: #fca5a5;
+  font-size: 0.9rem;
 }
 
 .btn-danger {

@@ -10,7 +10,8 @@ from fastapi.responses import RedirectResponse
 from app.api.openai_routes import router as openai_router
 from app.api.routes import router
 from app.config import REPO_ROOT, effective_cors_origins, get_settings
-from app.database import init_db
+from app.database import SessionLocal, init_db
+from app.services.job_lifecycle import reconcile_stale_jobs
 from app.middleware.path_prefix import PathPrefixMiddleware
 from app.static_ui import mount_static_ui
 
@@ -21,6 +22,17 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(_app: FastAPI):
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     init_db()
+    db = SessionLocal()
+    try:
+        reconcile_stale_jobs(
+            db,
+            reason=(
+                "Framework restarted: training was interrupted. "
+                "Use Restart on this task to run again (optionally resume from the last epoch)."
+            ),
+        )
+    finally:
+        db.close()
     yield
 
 

@@ -35,6 +35,21 @@ from app.training.transformer_config import TransformerTrainingConfig
 
 logger = logging.getLogger(__name__)
 
+_job_threads: dict[int, threading.Thread] = {}
+_job_thread_lock = threading.Lock()
+_pending_resume: dict[int, bool] = {}
+
+
+def job_is_running(job_id: int) -> bool:
+    with _job_thread_lock:
+        thread = _job_threads.get(job_id)
+        return thread is not None and thread.is_alive()
+
+
+def _pop_resume_flag(job_id: int) -> bool:
+    with _job_thread_lock:
+        return _pending_resume.pop(job_id, False)
+
 
 def _update_job(db: Session, job_id: int, **fields) -> None:
     job = db.get(TrainingJob, job_id)
@@ -73,11 +88,33 @@ def run_training_job(job_id: int) -> None:
         )
         append_job_log(db, job_id, "framework", framework_line("queue", "Job queued"))
 
+        if job.worker_group:
+            db.delete(job.worker_group)
+            db.commit()
+
         cfg = resolve_job_config(job)
         artifact_dir = str((REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve())
         Path(artifact_dir).mkdir(parents=True, exist_ok=True)
         train_config = cfg.to_train_dict(job_id=job_id, artifact_dir=artifact_dir)
         train_config["job_epochs"] = job.epochs
+
+        from app.services.job_progress import apply_resume_to_train_config
+
+        resume_run = _pop_resume_flag(job_id)
+        train_config = apply_resume_to_train_config(
+            train_config, artifact_dir, resume=resume_run
+        )
+        if train_config.get("resume") and train_config.get("resume_global_step"):
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    f"Resuming from step {train_config['resume_global_step']} "
+                    f"(checkpoint={train_config.get('resume_checkpoint_path', 'weights only')})",
+                ),
+            )
 
         def framework_log(msg: str) -> None:
             append_job_log(db, job_id, "framework", msg)
@@ -88,6 +125,7 @@ def run_training_job(job_id: int) -> None:
                     cfg,
                     train_config,
                     log=framework_log,
+                    skip_tokenizer_if_present=bool(train_config.get("resume")),
                 )
             except ValueError as exc:
                 append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
@@ -279,9 +317,20 @@ def run_training_job(job_id: int) -> None:
         db.close()
 
 
-def enqueue_training_job(job_id: int) -> None:
-    thread = threading.Thread(target=run_training_job, args=(job_id,), daemon=True)
-    thread.start()
+def enqueue_training_job(job_id: int, *, resume: bool = False) -> None:
+    with _job_thread_lock:
+        existing = _job_threads.get(job_id)
+        if existing is not None and existing.is_alive():
+            raise RuntimeError(f"Training job {job_id} is already running")
+        _pending_resume[job_id] = resume
+        thread = threading.Thread(
+            target=run_training_job,
+            args=(job_id,),
+            daemon=True,
+            name=f"training-job-{job_id}",
+        )
+        _job_threads[job_id] = thread
+        thread.start()
 
 
 def scale_job_workers(job_id: int, target: int, db: Session) -> WorkerGroup:

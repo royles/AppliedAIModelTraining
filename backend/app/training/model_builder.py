@@ -66,6 +66,14 @@ def build_model(
     *,
     task_type: str,
 ) -> PreTrainedModel:
+    resume_ckpt = config.get("resume_checkpoint_path")
+    if resume_ckpt:
+        if task_type == "causal_lm":
+            return AutoModelForCausalLM.from_pretrained(resume_ckpt)
+        return AutoModelForSequenceClassification.from_pretrained(
+            resume_ckpt, num_labels=config.get("num_labels", 2)
+        )
+
     init_mode = config.get("init_mode", "pretrained")
     arch = _architecture_from_config(config)
 

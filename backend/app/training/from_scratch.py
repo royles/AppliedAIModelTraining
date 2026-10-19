@@ -50,12 +50,19 @@ def prepare_from_scratch_training(
     train_config: dict[str, Any],
     *,
     log: LogFn | None = None,
+    skip_tokenizer_if_present: bool = False,
 ) -> dict[str, Any]:
     if cfg.init_mode != "from_scratch":
         return train_config
 
     tok_cfg: TokenizerBuildConfig = cfg.tokenizer
     artifact_dir = Path(train_config["artifact_dir"])
+    existing_tok = artifact_dir / "tokenizer"
+    if skip_tokenizer_if_present and existing_tok.is_dir():
+        train_config["tokenizer_path"] = str(existing_tok)
+        if log:
+            log(f"Reusing saved tokenizer from {existing_tok} (resume).")
+        return train_config
     texts, _ = load_training_samples(cfg.dataset.model_dump(), task_type=cfg.task_type)
 
     def _log(msg: str) -> None:
