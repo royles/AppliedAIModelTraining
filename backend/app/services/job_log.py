@@ -97,12 +97,20 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
         framework.append(
             {"ts": _now_iso(), "message": f"Error: {job.error_message}"},
         )
+    ray_status = ray_status_snapshot()
+    ray_status["job_ray_address"] = job.ray_address
+    if job.status in ("provisioning", "running") and not ray_status.get("initialized"):
+        ray_status["note"] = (
+            "Status reflects the web API process. Training connects to Ray in a "
+            "background thread; see framework logs after 'Ray Train job submitted'."
+        )
+
     return {
         "job_id": job_id,
         "status": job.status,
         "ray_address": job.ray_address,
         "framework": framework,
         "training": training,
-        "ray_status": ray_status_snapshot(),
+        "ray_status": ray_status,
         "metrics": json.loads(job.metrics_json) if job.metrics_json else None,
     }

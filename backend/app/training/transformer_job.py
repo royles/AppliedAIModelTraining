@@ -252,12 +252,41 @@ def run_transformer_training(
     from ray.train import ScalingConfig
     from ray.train.torch import TorchTrainer
 
+    job_id = int(train_config.get("job_id") or 0)
+
+    def _framework(msg: str) -> None:
+        if job_id <= 0:
+            return
+        try:
+            from app.database import SessionLocal
+            from app.services.job_log import append_job_log
+
+            db = SessionLocal()
+            try:
+                append_job_log(db, job_id, "framework", msg)
+            finally:
+                db.close()
+        except Exception:  # noqa: BLE001
+            pass
+
     if ray_address:
+        _framework(f"Connecting driver to Ray at {ray_address}…")
         if not ray.is_initialized():
             ray.init(address=ray_address, ignore_reinit_error=True)
     else:
+        _framework("Starting local Ray runtime for training…")
         if not ray.is_initialized():
             ray.init(ignore_reinit_error=True)
+
+    try:
+        nodes = len(ray.nodes())
+        resources = ray.cluster_resources()
+        _framework(
+            f"Ray connected: {nodes} node(s), cluster GPUs={resources.get('GPU', 0)}, "
+            f"CPUs={resources.get('CPU', 0)}."
+        )
+    except Exception as exc:  # noqa: BLE001
+        _framework(f"Ray connected (cluster stats unavailable: {exc}).")
 
     scaling = ScalingConfig(
         num_workers=num_workers,
@@ -269,7 +298,12 @@ def run_transformer_training(
         train_loop_config=train_config,
         scaling_config=scaling,
     )
+    _framework(
+        f"Ray Train scheduling {num_workers} worker(s) "
+        f"(use_gpu={use_gpu}); first training metrics appear after the worker starts."
+    )
     result = trainer.fit()
+    _framework("Ray Train run finished; collecting metrics.")
     artifact = train_config.get("artifact_dir")
     return {
         "metrics": result.metrics,
