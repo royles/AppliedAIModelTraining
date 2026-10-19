@@ -114,6 +114,7 @@ body {
 .main-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 1.25rem clamp(1rem, 3vw, 2rem) 2rem;
   overflow: auto;
   display: flex;
@@ -513,12 +514,20 @@ body {
   color: #9fb0c9;
 }
 
+.task-detail {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .task-detail-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .task-detail-title-wrap {
@@ -541,7 +550,8 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   flex: 1;
-  min-height: 320px;
+  min-height: min(52vh, 100%);
+  align-items: stretch;
 }
 
 @media (max-width: 900px) {
@@ -565,7 +575,13 @@ body {
 .log-panel {
   display: flex;
   flex-direction: column;
-  min-height: 280px;
+  min-height: 0;
+  height: 100%;
+}
+
+.log-panel h3,
+.log-panel > .hint {
+  flex-shrink: 0;
 }
 
 .log-panel h3 {
@@ -575,19 +591,35 @@ body {
 
 .log-stream,
 .log-ray-status {
-  flex: 1;
   overflow: auto;
   background: #070d18;
   border: 1px solid #243049;
   border-radius: 8px;
   padding: 0.65rem;
   margin-top: 0.5rem;
-  max-height: 22rem;
+  min-height: 0;
 }
 
-.log-ray-status {
-  max-height: 8rem;
+.log-panel-framework .log-ray-status {
+  flex: 0 1 36%;
+  min-height: 12rem;
   margin-bottom: 0.25rem;
+}
+
+.log-panel-framework .log-stream-framework {
+  flex: 1 1 64%;
+  min-height: 16rem;
+}
+
+.log-panel-training .log-stream-training {
+  flex: 1;
+  min-height: 0;
+}
+
+.task-detail-summary,
+.task-detail .banner,
+.task-detail .inference-links {
+  flex-shrink: 0;
 }
 
 .log-stream pre,
@@ -602,6 +634,7 @@ body {
 
 .task-detail-summary {
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .grid {

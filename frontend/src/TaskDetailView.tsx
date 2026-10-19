@@ -171,21 +171,21 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
       {error && <div className="banner error">{error}</div>}
 
       <div className="log-split">
-        <section className="card log-panel">
+        <section className="card log-panel log-panel-framework">
           <h3>Framework &amp; Ray status</h3>
           <p className="hint">Provisioning, workers, Ray cluster snapshot (refreshes every 3s)</p>
           <div className="log-ray-status" ref={rayStatusLogRef}>
             <strong>Ray status</strong>
             <pre>{rayStatusText}</pre>
           </div>
-          <div className="log-stream" ref={frameworkLogRef}>
+          <div className="log-stream log-stream-framework" ref={frameworkLogRef}>
             <pre>{formatLogLines(logs?.framework ?? [])}</pre>
           </div>
         </section>
-        <section className="card log-panel">
+        <section className="card log-panel log-panel-training">
           <h3>Training steps</h3>
           <p className="hint">Loss, learning rate, and checkpoint steps from the train loop</p>
-          <div className="log-stream" ref={trainingLogRef}>
+          <div className="log-stream log-stream-training" ref={trainingLogRef}>
             <pre>{formatLogLines(logs?.training ?? [])}</pre>
           </div>
         </section>
