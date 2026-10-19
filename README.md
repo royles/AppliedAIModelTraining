@@ -111,7 +111,7 @@ For GPU workers, set `GPUS_PER_WORKER=1` and pass `gpus_per_worker` on the job (
 
 ## Memory and resource profiles (CAI)
 
-Ray OOM errors (`worker(s) were killed … low on memory`) mean the **container cgroup limit** is too small for Ray head + training workers. The platform passes `memory=` to `launch_workers`, but the **CML resource profile** (via `CML_RESOURCE_PROFILE_ID`) sets the real cap.
+Ray OOM errors (`worker(s) were killed … low on memory`) mean the **container cgroup limit** is too small for Ray head + training workers. The platform passes `memory=` to `launch_workers`, but the **CML resource profile** (via `CML_RESOURCE_PROFILE_ID`) sets the real cap. A **~3.7 GiB session** cannot host Ray head, the API, and Ray Train control actors; repeated jobs also leave **detached `PlacementGroupCleaner` actors** on the head until you run **`ray stop`** and restart.
 
 | Role | Minimum | Recommended |
 | --- | --- | --- |
