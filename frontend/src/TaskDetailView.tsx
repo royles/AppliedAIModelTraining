@@ -131,7 +131,7 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
 
       <section className="card log-panel log-panel-run">
         <h3>Framework &amp; Ray cluster</h3>
-        <p className="hint">Left-to-right: driver → head → Train → workers (updates every 5s)</p>
+        <p className="hint">Left-to-right: driver → head → Train → workers → train ranks (updates every 5s)</p>
         <div className="log-ray-status ray-cluster-panel ray-cluster-panel-full">
           <RayClusterMap
             status={logs?.ray_status}

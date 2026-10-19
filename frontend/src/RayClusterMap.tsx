@@ -230,7 +230,7 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
     return <p className="hint">Loading cluster map…</p>;
   }
 
-  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-train", "tier-workers"];
+  const tierOrder = ["tier-driver", "tier-head", "tier-controller", "tier-workers", "tier-train"];
 
   if (!topology || components.length === 0) {
     return (
