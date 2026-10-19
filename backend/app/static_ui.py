@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -32,10 +33,10 @@ def mount_static_ui(app: FastAPI) -> bool:
     return True
 
 
-def read_ui_build_info() -> dict[str, str]:
+def read_ui_build_info() -> dict[str, Any]:
     """Asset hashes from index.html + optional stamp for debugging stale CAI bundles."""
     dist = frontend_dist_dir()
-    info: dict[str, str] = {"status": "missing"}
+    info: dict[str, Any] = {"status": "missing"}
     if not frontend_dist_ready():
         return info
     index_path = dist / "index.html"

@@ -18,6 +18,7 @@ from app.schemas import (
     TrainingJobCreate,
     TrainingJobRead,
     JobLogsRead,
+    UiBuildInfoRead,
     TransformerPresetRead,
     WorkerGroupRead,
     PlatformSettingsRead,
@@ -111,10 +112,10 @@ def _build_config(payload: TrainingJobCreate) -> TransformerTrainingConfig:
     return TransformerTrainingConfig.model_validate(merged)
 
 
-@router.get("/ui/build-info")
-def ui_build_info() -> dict[str, str]:
+@router.get("/ui/build-info", response_model=UiBuildInfoRead)
+def ui_build_info() -> UiBuildInfoRead:
     """Which committed frontend/dist bundle is on disk (helps debug stale CAI UX)."""
-    return read_ui_build_info()
+    return UiBuildInfoRead.model_validate(read_ui_build_info())
 
 
 @router.get("/health", response_model=HealthResponse)

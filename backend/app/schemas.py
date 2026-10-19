@@ -73,6 +73,19 @@ class TrainingJobRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UiBuildFeaturesRead(BaseModel):
+    model_registry: bool = False
+
+
+class UiBuildInfoRead(BaseModel):
+    status: str
+    platform_version: str | None = None
+    js: str | None = None
+    css: str | None = None
+    stamp: str | None = None
+    features: UiBuildFeaturesRead | None = None
+
+
 class LogLineRead(BaseModel):
     ts: str
     message: str

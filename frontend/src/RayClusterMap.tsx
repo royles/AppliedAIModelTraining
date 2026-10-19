@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DistributedTrainingStrip } from "./DistributedTrainingStrip";
-import type { RayClusterComponent } from "./rayClusterTypes";
+import type { RayClusterComponent, RayClusterLink } from "./rayClusterTypes";
 import { parseDistributed, parseTopology } from "./rayClusterTypes";
 
 type Props = {
@@ -18,6 +18,8 @@ const ROLE_ORDER: Record<string, number> = {
   worker_pending: 5,
   worker_dead: 6,
 };
+
+const EMPTY_LINKS: RayClusterLink[] = [];
 
 const ROLE_TIER: Record<string, string> = {
   driver: "tier-driver",
@@ -93,7 +95,7 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
   const [lines, setLines] = useState<Line[]>([]);
 
   const components = topology?.components ?? [];
-  const links = topology?.links ?? [];
+  const links = topology?.links ?? EMPTY_LINKS;
 
   const tiers = useMemo(() => {
     const grouped = new Map<string, RayClusterComponent[]>();
@@ -112,7 +114,7 @@ export function RayClusterMap({ status, jobStatus, loading }: Props) {
   useLayoutEffect(() => {
     const root = containerRef.current;
     if (!root || links.length === 0) {
-      setLines([]);
+      setLines((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     const measure = () => {
