@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
@@ -40,7 +41,12 @@ def _ray_session(ray_address: str | None) -> Iterator[bool]:
     connected = already
     if not already:
         try:
-            ray.init(address=ray_address, ignore_reinit_error=True, logging_level="error")
+            from app.services.cai_networking import coerce_session_driver_ray_address
+
+            connect = coerce_session_driver_ray_address(ray_address) or ray_address
+            if connect != ray_address:
+                os.environ["RAY_ADDRESS"] = connect
+            ray.init(address=connect, ignore_reinit_error=True, logging_level="error")
             connected = ray.is_initialized()
         except Exception:  # noqa: BLE001
             connected = False

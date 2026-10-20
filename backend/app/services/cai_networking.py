@@ -9,6 +9,7 @@ Based on:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 RAY_GCS_PORT = 6379
 
@@ -28,6 +29,69 @@ def master_engine_ip() -> str | None:
 
 def format_ray_head(host: str, port: int = RAY_GCS_PORT) -> str:
     return f"{host}:{port}"
+
+
+def parse_gcs_host_port(address: str) -> tuple[str, int]:
+    """Parse a GCS ``host:port`` or ``ray://host:port`` string."""
+    raw = address.strip()
+    if raw.startswith("ray://"):
+        raw = raw[6:]
+    host, _, port_s = raw.partition(":")
+    if not host:
+        host = "127.0.0.1"
+    try:
+        port = int(port_s or str(RAY_GCS_PORT))
+    except ValueError:
+        port = RAY_GCS_PORT
+    return host, port
+
+
+def is_cai_master_session() -> bool:
+    """
+    True when this process runs on the CAI **master session** engine (Ray head host).
+
+    ``cdsw`` / ``cml.workers_v1`` may be missing from the app venv even on CAI; use
+    engine env vars and the standard ``/home/cdsw`` session layout as signals.
+    """
+    if master_engine_ip():
+        return True
+    home = os.environ.get("HOME", "")
+    if home.startswith("/home/cdsw"):
+        return True
+    return Path("/home/cdsw").is_dir() and os.environ.get("USER", "") == "cdsw"
+
+
+def coerce_session_driver_ray_address(address: str | None) -> str | None:
+    """
+    Ray Train driver on the master session must use loopback for GCS (port 6379).
+
+    Workers continue to use ``CDSW_IP_ADDRESS:6379``; only the in-pod driver is rewritten.
+    """
+    if not address:
+        if is_cai_master_session():
+            return ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+        return address
+
+    host, port = parse_gcs_host_port(address)
+    if host in ("127.0.0.1", "localhost"):
+        return format_ray_head("127.0.0.1", port)
+
+    if not is_cai_master_session() or port != RAY_GCS_PORT:
+        return address
+
+    # Co-located Ray head on this session — pod IP triggers "No node info found" in ray.init.
+    return format_ray_head("127.0.0.1", RAY_GCS_PORT)
+
+
+def apply_master_session_ray_driver_env() -> str | None:
+    """Set ``RAY_ADDRESS`` for the co-located Ray driver when on a CAI master session."""
+    if not is_cai_master_session():
+        return None
+    addr = coerce_session_driver_ray_address(os.environ.get("RAY_ADDRESS"))
+    if not addr:
+        addr = ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+    os.environ["RAY_ADDRESS"] = addr
+    return addr
 
 
 def ray_worker_head_address(explicit: str | None = None) -> str | None:

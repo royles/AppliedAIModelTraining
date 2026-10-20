@@ -232,6 +232,7 @@ def run_training_job(job_id: int) -> None:
                     ),
                 )
                 raise RuntimeError("Ray GCS not available on 127.0.0.1:6379")
+        if ray_addr:
             os.environ["RAY_ADDRESS"] = ray_addr
 
         use_gpu = job.gpus_per_worker > 0

@@ -403,10 +403,20 @@ def run_transformer_training(
             pass
 
     if ray_address:
+        from app.services.cai_networking import coerce_session_driver_ray_address
         from app.services.cdsw_workers import ray_driver_init_address
 
+        raw_ray_address = ray_address
         ray_address = ray_driver_init_address(ray_address) or ray_address
+        ray_address = coerce_session_driver_ray_address(ray_address) or ray_address
         os.environ["RAY_ADDRESS"] = ray_address
+        if raw_ray_address != ray_address:
+            _framework(
+                framework_line(
+                    "ray",
+                    f"Driver Ray address {raw_ray_address} → {ray_address} (master session loopback)",
+                )
+            )
         worker_head = train_config.get("ray_head_address")
         if worker_head and worker_head != ray_address:
             _framework(

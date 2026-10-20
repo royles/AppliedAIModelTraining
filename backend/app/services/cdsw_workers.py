@@ -95,33 +95,36 @@ def ray_driver_init_address(head: str | None) -> str | None:
 
     Ray must not use the pod IP from the same session — use loopback when GCS is local.
     """
-    from app.services.cai_networking import master_engine_ip
+    from app.services.cai_networking import (
+        coerce_session_driver_ray_address,
+        format_ray_head,
+        parse_gcs_host_port,
+        ray_driver_gcs_address,
+    )
 
     if not head:
         if cdsw_available():
-            return ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+            return coerce_session_driver_ray_address(
+                ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+            )
         env = os.environ.get("RAY_ADDRESS")
-        if env and _local_gcs_reachable(_parse_gcs_port(env)):
-            return f"127.0.0.1:{_parse_gcs_port(env)}"
-        return env
+        return coerce_session_driver_ray_address(env)
 
-    host, _, port_s = head.partition(":")
-    port_i = _parse_gcs_port(head if ":" in head else f"{head}:6379")
-
-    if host in ("127.0.0.1", "localhost", ""):
-        return f"127.0.0.1:{port_i}"
-
-    # Co-located head: connecting via pod IP often yields "No node info found".
-    if _local_gcs_reachable(port_i):
-        return f"127.0.0.1:{port_i}"
+    host, port_i = parse_gcs_host_port(head if ":" in head else f"{head}:6379")
 
     if cdsw_available():
-        return ray_driver_gcs_address(head)
+        resolved = coerce_session_driver_ray_address(ray_driver_gcs_address(head))
+        if resolved:
+            return resolved
 
-    session_ip = master_engine_ip()
-    if session_ip and host == session_ip:
-        return f"127.0.0.1:{port_i}"
-    return head
+    coerced = coerce_session_driver_ray_address(head)
+    if coerced and coerced != head:
+        return coerced
+
+    if _local_gcs_reachable(port_i):
+        return format_ray_head("127.0.0.1", port_i)
+
+    return coerced or head
 
 
 def _parse_gcs_port(address: str, default: int = 6379) -> int:
