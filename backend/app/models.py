@@ -77,7 +77,7 @@ class PlatformSettings(Base):
     ray_head_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
     ray_train_num_workers: Mapped[int] = mapped_column(Integer, default=0)
     worker_cpu: Mapped[float] = mapped_column(Float, default=4.0)
-    worker_memory_gb: Mapped[float] = mapped_column(Float, default=16.0)
+    worker_memory_gb: Mapped[float] = mapped_column(Float, default=8.0)
     gpus_per_worker: Mapped[int] = mapped_column(Integer, default=0)
     default_job_num_workers: Mapped[int] = mapped_column(Integer, default=1)
     accelerator_label_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

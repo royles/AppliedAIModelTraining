@@ -25,11 +25,10 @@ def test_large_session_allows_ray_train(monkeypatch):
     assert ray_train_session_memory_error() is None
 
 
-def test_object_store_cap_on_tiny_session(monkeypatch):
+def test_object_store_cap_on_minimum_session(monkeypatch):
     monkeypatch.setattr(
         "app.resource_hints.container_memory_limit_gb",
-        lambda: 3.66,
+        lambda: 8.0,
     )
     nbytes = ray_head_object_store_bytes()
-    assert nbytes is not None
-    assert 96 * 1024 * 1024 <= nbytes <= 384 * 1024 * 1024
+    assert nbytes == 512 * 1024 * 1024

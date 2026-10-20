@@ -236,6 +236,12 @@ cmd = [
     f"--num-cpus={{WORKER_CPUS}}",
     f"--num-gpus={{WORKER_GPUS}}",
 ]
+obj = os.environ.get("PLATFORM_RAY_OBJECT_STORE_BYTES")
+if obj:
+    cmd.append(f"--object-store-memory={{obj}}")
+node_mem = os.environ.get("PLATFORM_RAY_NODE_MEMORY_BYTES")
+if node_mem:
+    cmd.append(f"--memory={{node_mem}}")
 if NODE_IP:
     cmd.append(f"--node-ip-address={{NODE_IP}}")
 print(f"[platform] exec: {{' '.join(cmd)}}", flush=True)
@@ -251,6 +257,7 @@ def worker_launch_env(
     *,
     cpus: float | None = None,
     gpus: int | None = None,
+    memory_gb: float | None = None,
 ) -> dict[str, str]:
     root = (project_root or REPO_ROOT).resolve()
     env: dict[str, str] = {
@@ -263,6 +270,13 @@ def worker_launch_env(
     if gpus is not None:
         env["PLATFORM_WORKER_GPU_COUNT"] = str(max(0, int(gpus)))
     apply_nccl_env(env)
+    from app.services.ray_memory_config import worker_ray_memory_env
+
+    mem_gb = memory_gb
+    if mem_gb is None:
+        mem_gb = float(os.environ.get("PLATFORM_WORKER_MEMORY_GB", "8") or 8)
+    env["PLATFORM_WORKER_MEMORY_GB"] = str(mem_gb)
+    env.update(worker_ray_memory_env(mem_gb))
     for key in (
         "CDSW_WORKING_DIRECTORY",
         "HOME",
@@ -281,7 +295,7 @@ class CdswRayWorkerPool:
     def __init__(
         self,
         cpu: float = 4.0,
-        memory_gb: float = 16.0,
+        memory_gb: float = 8.0,
         gpus_per_worker: int = 1,
         *,
         accelerator_label_id: str | None = None,
@@ -321,7 +335,11 @@ class CdswRayWorkerPool:
             "memory": self.memory_gb,
             "nvidia_gpu": self.gpus_per_worker,
             "code": code,
-            "env": worker_launch_env(cpus=self.cpu, gpus=self.gpus_per_worker),
+            "env": worker_launch_env(
+                cpus=self.cpu,
+                gpus=self.gpus_per_worker,
+                memory_gb=self.memory_gb,
+            ),
         }
         optional = {
             "accelerator_label_id": self._accelerator_label_id

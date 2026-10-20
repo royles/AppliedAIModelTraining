@@ -152,7 +152,7 @@ class RaySettings(BaseModel):
 
 class CdswWorkerSettings(BaseModel):
     worker_cpu: float = Field(default=4.0, gt=0, le=128)
-    worker_memory_gb: float = Field(default=16.0, ge=1, le=512)
+    worker_memory_gb: float = Field(default=8.0, ge=8, le=512)
     gpus_per_worker: int = Field(default=0, ge=0, le=8)
     default_job_num_workers: int = Field(default=1, ge=1, le=32)
     accelerator_label_id: str | None = None

@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from app.config import REPO_ROOT
 from app.resource_hints import (
     effective_ray_train_workers,
-    is_low_memory_container,
     ray_train_session_memory_error,
+    should_apply_train_memory_savings,
 )
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
@@ -280,7 +280,10 @@ def run_training_job(job_id: int) -> None:
                 f"epochs={job.epochs}",
             ),
         )
-        if is_low_memory_container() and train_config.get("per_device_train_batch_size", 4) > 2:
+        worker_mem = float(getattr(pool, "memory_gb", 8.0) if head else 0)
+        if should_apply_train_memory_savings(
+            worker_memory_gb=worker_mem if cdsw_engines > 0 else None,
+        ) and train_config.get("per_device_train_batch_size", 4) > 2:
             train_config = {
                 **train_config,
                 "per_device_train_batch_size": min(
@@ -288,7 +291,7 @@ def run_training_job(job_id: int) -> None:
                 ),
             }
             logger.warning(
-                "Low-memory container: reduced per_device_train_batch_size to %s",
+                "8 GiB memory profile: reduced per_device_train_batch_size to %s",
                 train_config["per_device_train_batch_size"],
             )
 

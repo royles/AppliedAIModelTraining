@@ -593,7 +593,7 @@ def print_cai_memory_hints() -> None:
         )
     print(
         f"CDSW workers: set CML_RESOURCE_PROFILE_ID to >={RECOMMENDED_WORKER_MEMORY_GB:.0f} GiB "
-        f"(DEFAULT_WORKER_MEMORY_GB env, default 16)."
+        f"(DEFAULT_WORKER_MEMORY_GB env, default 8 — platform minimum)."
     )
 
 
@@ -638,12 +638,16 @@ def start_ray_head() -> None:
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
-    from app.resource_hints import ray_head_object_store_bytes  # noqa: PLC0415
+    from app.resource_hints import container_memory_limit_gb, ray_head_start_memory_args  # noqa: PLC0415
 
-    obj_bytes = ray_head_object_store_bytes()
-    if obj_bytes is not None:
-        ray_args.append(f"--object-store-memory={obj_bytes}")
-        print(f"Small session: Ray object store capped at {obj_bytes // (1024 * 1024)} MiB")
+    mem_args = ray_head_start_memory_args()
+    ray_args.extend(mem_args)
+    if mem_args:
+        limit = container_memory_limit_gb()
+        print(
+            f"Minimum-memory Ray profile (~{limit:.1f} GiB session): "
+            + " ".join(mem_args),
+        )
     if include_dashboard:
         ray_args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
     else:

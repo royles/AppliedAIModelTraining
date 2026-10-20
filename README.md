@@ -115,20 +115,21 @@ Ray OOM errors (`worker(s) were killed … low on memory`) mean the **container 
 
 | Role | Minimum | Recommended |
 | --- | --- | --- |
-| **Session** (API, Ray head, `start.py`) | 8 GiB | **16 GiB** |
-| **CDSW worker** (scratch tiny / CPU) | 8 GiB | **16 GiB** |
+| **Session** (API, Ray head, `start.py`) | **8 GiB** (platform minimum) | **16 GiB** |
+| **CDSW worker** (scratch tiny / CPU) | **8 GiB** (platform minimum) | **16 GiB** |
 | **CDSW worker** (GPU / larger models) | 16 GiB | **32 GiB+** |
 
 A **~4 GiB** profile is too small for Ray training on the session pod. Use separate **≥16 GiB** worker profiles for jobs, keep the session on **≥16 GiB** when running a local Ray head.
 
-On small containers the platform automatically **caps Ray Train to 1 worker** and **batch size ≤ 2**. Override with care:
+On **8 GiB** head/worker profiles the platform **caps Ray object store (~512 MiB)**, **advertised node memory**, **batch size ≤ 2**, and (session-only jobs) **1 Train rank**. Override with care:
 
 | Variable | Purpose |
 | --- | --- |
-| `DEFAULT_WORKER_MEMORY_GB` | GiB sent to `launch_workers` (default `16`; must match profile) |
+| `DEFAULT_WORKER_MEMORY_GB` | GiB sent to `launch_workers` (default **`8`** minimum; must match profile) |
+| `PLATFORM_MIN_MEMORY_GB` | Treat instances ≤ this + 1 GiB as minimum tier for Ray memory caps (default `8`) |
 | `DEFAULT_WORKER_CPU` | CPUs sent to `launch_workers` (default `4`) |
 | `DEFAULT_GPUS_PER_WORKER` | Default GPUs per worker (default `1`) |
-| `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force low-memory caps; auto-detected when cgroup &lt; 6 GiB |
+| `PLATFORM_CAI_LOW_MEMORY` | Set `1` to force 8 GiB-tier caps; auto-detected when session ≤ ~9 GiB |
 | `RAY_TRAIN_NUM_WORKERS` | Cap Ray Train ranks for **session-only** jobs (ignored when CDSW worker engines are launched) |
 | `PLATFORM_KEEP_WORKERS_ON_FAIL` | Set `1` to skip `stop_workers` after a failed job (debug worker / Ray logs) |
 | `PLATFORM_NCCL_DEFAULTS` | Default **`1`**: apply NCCL env for GPU Ray Train (set **`0`** to disable) |
@@ -158,7 +159,7 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `PLATFORM_API_UPSTREAM` | Set on the UI gateway (default `http://127.0.0.1:8000`) |
 | `RAY_SKIP_HEAD` | Set to `1` to skip `ray start --head` in `start.py` |
 | `RAY_INCLUDE_DASHBOARD` | Default **on** when `ray[default]` is installed; set `0` to disable dashboard/State API |
-| `DEFAULT_WORKER_MEMORY_GB` | CDSW worker RAM (GiB); default `16` |
+| `DEFAULT_WORKER_MEMORY_GB` | CDSW worker RAM (GiB); default **`8`** (minimum) |
 | `DEFAULT_WORKER_CPU` | CDSW worker CPUs; default `4` |
 | `DEFAULT_GPUS_PER_WORKER` | Default GPU count for workers; default `1` |
 | `PLATFORM_CAI_LOW_MEMORY` | `1` = cap Ray Train workers and batch size on tiny sessions |

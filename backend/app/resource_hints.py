@@ -8,16 +8,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# GiB — align with CML resource profiles (profile limit wins over launch_workers memory=).
+# GiB — platform minimum bar (head + workers); match CML resource profiles.
 MIN_SESSION_MEMORY_GB = 8.0
 RECOMMENDED_SESSION_MEMORY_GB = 16.0
 MIN_WORKER_MEMORY_GB = 8.0
 RECOMMENDED_WORKER_MEMORY_GB = 16.0
 RECOMMENDED_WORKER_MEMORY_GB_GPU = 32.0
 
-LOW_MEMORY_CONTAINER_GB = 6.0
-# Below this, Ray head + Train controller + API reliably OOM even with worker engines.
-MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB = 8.0
+# Containers below this use low-memory Train caps (batch size, session-only worker count).
+LOW_MEMORY_CONTAINER_GB = MIN_SESSION_MEMORY_GB
+MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB = MIN_SESSION_MEMORY_GB
 
 
 def _read_cgroup_limit_bytes() -> int | None:
@@ -48,8 +48,20 @@ def container_memory_limit_gb() -> float | None:
 def is_low_memory_container() -> bool:
     if os.environ.get("PLATFORM_CAI_LOW_MEMORY", "").lower() in ("1", "true", "yes"):
         return True
-    limit = container_memory_limit_gb()
-    return limit is not None and limit < LOW_MEMORY_CONTAINER_GB
+    from app.services.ray_memory_config import container_at_minimum_memory
+
+    return container_at_minimum_memory()
+
+
+def should_apply_train_memory_savings(worker_memory_gb: float | None = None) -> bool:
+    """Batch caps and similar when session or workers are on the 8 GiB tier."""
+    if is_low_memory_container():
+        return True
+    if worker_memory_gb is None:
+        return False
+    from app.services.ray_memory_config import is_minimum_memory_gb
+
+    return is_minimum_memory_gb(worker_memory_gb)
 
 
 def effective_ray_train_workers(
@@ -84,16 +96,17 @@ def log_worker_launch_memory(memory_gb: float, gpus: int) -> None:
     recommended = RECOMMENDED_WORKER_MEMORY_GB_GPU if gpus > 0 else RECOMMENDED_WORKER_MEMORY_GB
     if memory_gb < minimum:
         logger.warning(
-            "Requesting %.1f GiB per CDSW worker; minimum recommended is %.0f GiB "
-            "(profile %s). Ray OOM kills are likely.",
+            "Requesting %.1f GiB per CDSW worker; platform minimum is %.0f GiB "
+            "(profile %s). Ray OOM kills are likely below the minimum bar.",
             memory_gb,
             minimum,
             os.environ.get("CML_RESOURCE_PROFILE_ID", "unset"),
         )
     elif memory_gb < recommended:
         logger.info(
-            "CDSW worker memory=%.1f GiB (recommended %.0f GiB for this job type).",
+            "CDSW worker memory=%.1f GiB (minimum bar %.0f GiB; recommended %.0f GiB).",
             memory_gb,
+            minimum,
             recommended,
         )
 
@@ -103,7 +116,7 @@ def log_worker_launch_memory(memory_gb: float, gpus: int) -> None:
             "Session container memory limit is ~%.2f GiB; use a >=%.0f GiB session profile "
             "for Ray head + API, and run training on separate worker engines.",
             session_limit,
-            RECOMMENDED_SESSION_MEMORY_GB,
+            MIN_SESSION_MEMORY_GB,
         )
 
 
@@ -117,28 +130,33 @@ def ray_train_session_memory_error() -> str | None:
     if limit is None or limit >= MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:
         return None
     return (
-        f"Session container memory is ~{limit:.2f} GiB (limit {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB "
-        f"required for Ray head + Train). Upgrade the CAI session resource profile to >= "
-        f"{RECOMMENDED_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
+        f"Session container memory is ~{limit:.2f} GiB (minimum {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB "
+        f"required for Ray head + Train). Upgrade the CAI session profile to >= "
+        f"{MIN_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
         f"Stale Ray Train jobs leak detached PlacementGroupCleaner actors on the head until Ray restarts."
     )
 
 
 def ray_head_object_store_bytes() -> int | None:
-    """Cap object store on tiny session pods so GCS + dashboard + Python fit in cgroup."""
-    limit = container_memory_limit_gb()
-    if limit is None or limit >= LOW_MEMORY_CONTAINER_GB:
-        return None
-    # ~10% of cgroup, clamped 96–384 MiB
-    mb = max(96, min(384, int(limit * 1024 * 0.10)))
-    return mb * 1024 * 1024
+    from app.services.ray_memory_config import object_store_bytes_for_instance
+
+    return object_store_bytes_for_instance(container_memory_limit_gb())
+
+
+def ray_head_start_memory_args() -> list[str]:
+    from app.services.ray_memory_config import ray_start_cli_memory_args
+
+    return ray_start_cli_memory_args(container_memory_limit_gb())
 
 
 def memory_guidance_for_health() -> dict[str, float | str | bool]:
+    from app.services.ray_memory_config import minimum_instance_memory_gb
+
     limit = container_memory_limit_gb()
     return {
         "container_memory_limit_gb": round(limit, 2) if limit is not None else None,
         "low_memory_container": is_low_memory_container(),
+        "minimum_instance_memory_gb": minimum_instance_memory_gb(),
         "recommended_session_memory_gb": RECOMMENDED_SESSION_MEMORY_GB,
         "recommended_worker_memory_gb": RECOMMENDED_WORKER_MEMORY_GB,
         "recommended_worker_memory_gb_gpu": RECOMMENDED_WORKER_MEMORY_GB_GPU,

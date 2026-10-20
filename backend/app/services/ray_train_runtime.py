@@ -41,6 +41,11 @@ def apply_ray_train_runtime_env() -> None:
     for key, value in defaults.items():
         if not os.environ.get(key):
             os.environ[key] = value
+    from app.services.ray_memory_config import apply_ray_memory_runtime_env
+
+    for key, value in apply_ray_memory_runtime_env().items():
+        if not os.environ.get(key):
+            os.environ[key] = value
     apply_nccl_env()
 
 
