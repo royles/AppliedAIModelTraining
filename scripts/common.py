@@ -634,110 +634,30 @@ def start_ray_head() -> None:
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
-    from app.services.cai_networking import gcs_tcp_reachable, reconcile_live_ray_head_env
+    from app.services.cai_networking import reconcile_live_ray_head_env
+    from app.services.ray_cai_networking import ensure_ray_head_for_workers
 
-    gcs_addr = f"{ip}:6379"
-    old_head = os.environ.get("RAY_HEAD_ADDRESS", "").strip()
-    if old_head and old_head.split(":")[0] != ip:
-        print(
-            f"Session IP changed ({old_head} -> {gcs_addr}); restarting Ray head for workers…",
-            file=sys.stderr,
-        )
-        run(
-            venv_ray_argv("stop", "--force"),
-            env=venv_subprocess_env(),
-            check=False,
-        )
     reconcile_live_ray_head_env()
-    include_dashboard_fn, state_api_reachable, dashboard_cli_args_fn = _ray_head_options()
-    local_tcp = gcs_tcp_reachable("127.0.0.1", 6379, timeout_sec=1.0)
-    pod_tcp = gcs_tcp_reachable(ip, 6379, timeout_sec=1.0)
-    if local_tcp or pod_tcp:
-        if local_tcp and not pod_tcp:
-            print(
-                f"WARNING: Ray GCS accepts localhost:6379 but not {gcs_addr}. "
-                "CDSW workers cannot join; restarting Ray head with pod IP binding…",
-                file=sys.stderr,
-            )
-            run(
-                venv_ray_argv("stop", "--force"),
-                env=venv_subprocess_env(),
-                check=False,
-            )
-        elif _gcs_rpc_ready(gcs_addr, timeout_sec=20.0):
-            print(f"Ray head already healthy at {gcs_addr}")
-            os.environ["RAY_ADDRESS"] = gcs_addr
-            _sync_ray_auth_env()
-            if not state_api_reachable():
-                print(
-                    "WARNING: Ray GCS is up but the API server (State API) is not reachable on "
-                    ":8265. Ray Train may log PlacementGroupCleaner warnings until you "
-                    "`ray stop` and restart this app (dashboard starts automatically when "
-                    "ray[default] is installed). Or set RAY_INCLUDE_DASHBOARD=1 before start.",
-                    file=sys.stderr,
-                )
-            return
-        elif local_tcp or pod_tcp:
-            print(
-                f"WARNING: TCP open on :6379 but GCS RPC not ready at {gcs_addr}; "
-                "restarting Ray head…",
-                file=sys.stderr,
-            )
-            run(
-                venv_ray_argv("stop", "--force"),
-                env=venv_subprocess_env(),
-                check=False,
-            )
-
-    include_dashboard = include_dashboard_fn()
-    ray_args = ["start", "--head", "--port=6379", f"--node-ip-address={ip}", "--disable-usage-stats"]
-    backend = REPO_ROOT / "backend"
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-    from app.resource_hints import container_memory_limit_gb, ray_head_start_memory_args  # noqa: PLC0415
-
-    mem_args = ray_head_start_memory_args()
-    ray_args.extend(mem_args)
-    if mem_args:
-        limit = container_memory_limit_gb()
-        print(
-            f"Minimum-memory Ray profile (~{limit:.1f} GiB session): "
-            + " ".join(mem_args),
-        )
-    ray_args.extend(dashboard_cli_args_fn())
-
-    print(f"CAI session at {ip}; starting Ray head (dashboard={include_dashboard})...")
+    force = os.environ.get("PLATFORM_RAY_FORCE_HEAD_RESTART", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
     try:
-        result = run(
-            venv_ray_argv(*ray_args),
-            env=venv_subprocess_env(),
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        print(f"Warning: {exc}", file=sys.stderr)
-        return
-
-    if result.returncode != 0:
+        gcs_addr = ensure_ray_head_for_workers(force_restart=force)
+        print(f"Ray head for CDSW workers: {gcs_addr}")
+        _sync_ray_auth_env()
+        _, state_api_reachable, _ = _ray_head_options()
+        if not state_api_reachable():
+            print(
+                "WARNING: Ray GCS is up but the State API is not reachable on :8265. "
+                "Install ray[default] or set RAY_INCLUDE_DASHBOARD=0.",
+                file=sys.stderr,
+            )
+    except Exception as exc:
         print(
-            "Warning: Ray head did not start. Training may use local Ray or workers "
-            "once the cluster is up. To skip this step: RAY_SKIP_HEAD=1. "
-            "Install ray[default] (see backend/requirements.txt) or set RAY_INCLUDE_DASHBOARD=0 "
-            "only if you accept Ray Train State API warnings.",
-            file=sys.stderr,
-        )
-        return
-    os.environ["RAY_ADDRESS"] = gcs_addr
-    _sync_ray_auth_env()
-    if not _gcs_rpc_ready(gcs_addr, timeout_sec=60.0):
-        print(
-            f"WARNING: Ray head started but GCS RPC is not reachable at {gcs_addr} "
-            "from this session. CDSW workers will fail to join until this is fixed.",
-            file=sys.stderr,
-        )
-    elif not gcs_tcp_reachable(ip, 6379, timeout_sec=2.0):
-        print(
-            f"WARNING: GCS RPC works but TCP to pod IP {gcs_addr} failed; "
-            "check CAI networking between session and worker engines.",
+            f"Warning: Ray head setup failed ({exc}). "
+            "Distributed training will fail until `ray stop --force` and restart.",
             file=sys.stderr,
         )
 

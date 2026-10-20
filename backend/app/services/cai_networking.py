@@ -142,16 +142,9 @@ def ray_driver_gcs_address(worker_head: str | None = None) -> str | None:
 
 
 def worker_ray_head_from_env(fallback_head: str) -> str:
-    """
-    Resolve Ray head on a worker engine.
+    from app.services.ray_cai_networking import worker_ray_join_address
 
-    Prefer ``PLATFORM_RAY_HEAD_ADDRESS`` / launch fallback over ``CDSW_MASTER_IP``,
-    which can be stale after the master session pod IP changes.
-    """
-    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip()
-    if pinned:
-        return pinned
-    return fallback_head
+    return worker_ray_join_address(fallback_head)
 
 
 def reconcile_live_ray_head_env() -> str | None:

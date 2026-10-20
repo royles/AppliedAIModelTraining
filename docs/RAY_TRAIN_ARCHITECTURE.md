@@ -29,6 +29,13 @@ That path is only suitable for **session-only / dev** (no CDSW workers), and eve
 
 When **`num_workers > 0`** and **non-distributed low memory mode is off**:
 
+1. Session ensures **Ray head** on the live master pod IP (`ensure_ray_head_for_workers`).
+2. A **connectivity probe** CDSW worker runs `TCP + ray.init` to the head before GPU workers launch.
+3. **Ray Train driver** runs on the **session** by default (same as earlier working builds).  
+   Opt-in remote driver: `PLATFORM_USE_REMOTE_TRAIN_DRIVER=1`.
+
+Legacy remote-only steps (opt-in):
+
 1. Session starts / keeps **Ray head** only.
 2. Platform launches **N GPU CDSW workers** (raylets) — unchanged.
 3. Session waits until Ray reports **head + N worker nodes** (subprocess poll; API process never calls `ray.init`).

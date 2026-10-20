@@ -10,9 +10,15 @@ from app.services.remote_train_driver import (
 )
 
 
-def test_remote_driver_default_when_distributed():
+def test_remote_driver_opt_in_only():
     os.environ.pop("PLATFORM_TRAIN_DRIVER_ON_SESSION", None)
-    assert use_remote_train_driver(launch_cdsw_workers=True, pool_is_remote=True)
+    os.environ.pop("PLATFORM_USE_REMOTE_TRAIN_DRIVER", None)
+    assert not use_remote_train_driver(launch_cdsw_workers=True, pool_is_remote=True)
+    os.environ["PLATFORM_USE_REMOTE_TRAIN_DRIVER"] = "1"
+    try:
+        assert use_remote_train_driver(launch_cdsw_workers=True, pool_is_remote=True)
+    finally:
+        os.environ.pop("PLATFORM_USE_REMOTE_TRAIN_DRIVER", None)
 
 
 def test_remote_driver_disabled_on_session_flag():

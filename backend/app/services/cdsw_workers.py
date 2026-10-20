@@ -225,12 +225,19 @@ def worker_node_ip() -> str:
     return ""
 
 def resolve_head() -> str:
-    # Launch-time address from the session (authoritative). Do not use CDSW_MASTER_IP
-    # here — CAI can leave a stale master IP after session reschedule (e.g. .179 vs .190).
-    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip()
-    if pinned:
-        return pinned
-    return FALLBACK_HEAD
+    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip() or FALLBACK_HEAD
+    pin_host = pinned.split(":")[0].strip()
+    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
+        ip = os.environ.get(key, "").strip()
+        if ip and ip == pin_host:
+            return ip + ":6379"
+    if os.environ.get("CDSW_MASTER_IP") and os.environ.get("CDSW_MASTER_IP").strip() != pin_host:
+        print(
+            f"[platform] WARN: CDSW_MASTER_IP={{os.environ.get('CDSW_MASTER_IP')}} "
+            f"!= launch head {{pinned}}; using launch head",
+            flush=True,
+        )
+    return pinned
 
 def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
     import socket

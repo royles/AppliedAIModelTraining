@@ -195,28 +195,57 @@ def run_training_job(job_id: int) -> None:
             )
 
         if launch_cdsw_workers:
+            from app.services.ray_cai_networking import (
+                build_worker_connectivity_probe_code,
+                ensure_ray_head_for_workers,
+                poll_worker_connectivity_probe,
+            )
+
+            def _fw(msg: str) -> None:
+                append_job_log(db, job_id, "framework", msg)
+
+            head = ensure_ray_head_for_workers(
+                framework_log=lambda m: _fw(framework_line("ray", m)),
+                force_restart=False,
+            )
+            worker_group.head_address = head
+            db.commit()
             append_job_log(
                 db,
                 job_id,
                 "framework",
                 framework_line(
                     "worker",
-                    f"Launching {job.num_workers} CDSW engine(s) toward master {head}",
+                    f"Launching {job.num_workers} CDSW GPU engine(s) toward Ray head {head}",
                 ),
             )
-            from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
-            from app.services.ray_driver_connect import ensure_ray_auth_token
-
-            gcs_probe = ray_driver_init_address(head) or head
-            if gcs_probe and not wait_for_gcs_rpc_subprocess(
-                gcs_probe,
-                auth_token=ensure_ray_auth_token(),
-                timeout_sec=120.0,
-            ):
+            probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
+            Path(probe_path).unlink(missing_ok=True)
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
+                ),
+            )
+            pool.launch(
+                1,
+                head,
+                code=build_worker_connectivity_probe_code(head, probe_path),
+                cpu=1.0,
+                memory_gb=4.0,
+                gpus_per_worker=0,
+            )
+            probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
+            if not probe.get("tcp") or not probe.get("ray_ok"):
                 detail = (
-                    f"Ray GCS at {gcs_probe} is not accepting RPC from the session "
-                    "(workers will see 'Failed to connect to GCS'). Run `ray stop --force` "
-                    "and restart scripts/start.py, or check start-user.log for head bind errors."
+                    "CDSW worker cannot reach Ray GCS on the master from the worker network "
+                    f"(head={head}). Probe: {probe}. "
+                    "This is a CAI engine networking issue (port 6379 master←worker) or Ray head "
+                    "not bound to the session pod IP. Run `ray stop --force` and "
+                    "`python3 scripts/start.py`, then retry."
                 )
                 append_job_log(db, job_id, "framework", framework_line("fail", detail))
                 raise RuntimeError(detail)
@@ -224,7 +253,10 @@ def run_training_job(job_id: int) -> None:
                 db,
                 job_id,
                 "framework",
-                framework_line("ray", f"GCS RPC ready at {gcs_probe}; launching workers"),
+                framework_line(
+                    "ray",
+                    f"Worker connectivity OK (nodes={probe.get('nodes', '?')}); launching GPU workers",
+                ),
             )
             launched = pool.launch(job.num_workers, head)
             worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
@@ -508,8 +540,24 @@ def run_training_job(job_id: int) -> None:
             def _poll_log(msg: str) -> None:
                 append_job_log(db, job_id, "framework", framework_line("ray", msg))
 
+            def _remote_poll(elapsed: float, has_result_file: bool) -> None:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "ray",
+                        f"Remote driver: waiting… {int(elapsed)}s "
+                        f"(result file {'present' if has_result_file else 'not yet'}) — "
+                        "check CDSW driver worker logs for GCS errors",
+                    ),
+                )
+
             try:
-                outcome = poll_remote_driver_result(artifact_dir)
+                outcome = poll_remote_driver_result(
+                    artifact_dir,
+                    on_poll=_remote_poll,
+                )
             except TimeoutError as exc:
                 _poll_log(str(exc))
                 raise
@@ -522,15 +570,15 @@ def run_training_job(job_id: int) -> None:
                 raise RuntimeError(err)
             result = outcome.get("result") or {"metrics": outcome.get("metrics")}
         else:
-            if launch_cdsw_workers and not use_remote:
+            if launch_cdsw_workers:
                 append_job_log(
                     db,
                     job_id,
                     "framework",
                     framework_line(
                         "train",
-                        "Train driver on session pod (PLATFORM_TRAIN_DRIVER_ON_SESSION=1). "
-                        "Unset that env var to use the remote CDSW driver (default).",
+                        "Ray Train driver on session pod (default). "
+                        "Set PLATFORM_USE_REMOTE_TRAIN_DRIVER=1 for a CDSW driver engine.",
                     ),
                 )
             result = run_transformer_training(

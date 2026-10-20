@@ -7,7 +7,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app.config import REPO_ROOT
 
@@ -56,11 +56,19 @@ def poll_remote_driver_result(
     *,
     timeout_sec: float = 6 * 3600.0,
     poll_sec: float = 10.0,
+    on_poll: Callable[[float, bool], None] | None = None,
 ) -> dict[str, Any]:
     result_path = remote_result_path(artifact_dir)
-    deadline = time.monotonic() + timeout_sec
+    started = time.monotonic()
+    deadline = started + timeout_sec
+    last_heartbeat = started
     while time.monotonic() < deadline:
-        if result_path.is_file():
+        has_file = result_path.is_file()
+        now = time.monotonic()
+        if on_poll and now - last_heartbeat >= 30.0:
+            last_heartbeat = now
+            on_poll(now - started, has_file)
+        if has_file:
             try:
                 data = json.loads(result_path.read_text(encoding="utf-8"))
                 if isinstance(data, dict) and data.get("status") in ("succeeded", "failed"):
@@ -194,7 +202,16 @@ def use_remote_train_driver(
 ) -> bool:
     if not launch_cdsw_workers or not pool_is_remote:
         return False
-    explicit = os.environ.get("PLATFORM_TRAIN_DRIVER_ON_SESSION", "").strip().lower()
-    if explicit in ("1", "true", "yes"):
+    if os.environ.get("PLATFORM_TRAIN_DRIVER_ON_SESSION", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
         return False
-    return True
+    # Default: Train driver on session (matches earlier working CAI builds).
+    # Remote driver is opt-in — extra CDSW engine; stalls UX if GCS networking fails.
+    return os.environ.get("PLATFORM_USE_REMOTE_TRAIN_DRIVER", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
