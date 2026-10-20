@@ -137,6 +137,23 @@ def run_training_job(job_id: int) -> None:
 
         platform = ensure_platform_settings(db)
         head = resolved_ray_head(platform)
+        from app.services.cai_networking import format_ray_head, master_engine_ip, parse_gcs_host_port
+
+        live_ip = master_engine_ip()
+        if live_ip and head:
+            head_host, _ = parse_gcs_host_port(head)
+            if head_host != live_ip:
+                live_head = format_ray_head(live_ip)
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "warn",
+                        f"Ray head was {head}; using live session master {live_head}",
+                    ),
+                )
+                head = live_head
         gpus_per_worker = job.gpus_per_worker
         if gpus_per_worker <= 0 and platform.gpus_per_worker > 0:
             gpus_per_worker = platform.gpus_per_worker

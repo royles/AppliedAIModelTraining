@@ -19,7 +19,8 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 | Variable | Set on | Used for |
 |----------|--------|----------|
 | `CDSW_IP_ADDRESS` / `CML_IP_ADDRESS` | Every engine | Master’s IP as seen by other engines; worker Ray head address `host:6379`. |
-| `CDSW_MASTER_IP` / `CML_MASTER_IP` | Worker engines only | Master IP for outbound connections (preferred in worker bootstrap code). |
+| `CDSW_MASTER_IP` / `CML_MASTER_IP` | Worker engines (CAI-set) | Can be **stale** after session reschedule; Ray join uses **`PLATFORM_RAY_HEAD_ADDRESS`** / launch fallback instead. |
+| `PLATFORM_RAY_HEAD_ADDRESS` | Worker engines at launch | Master `host:6379` pinned by the session when `launch_workers` runs. |
 | `RAY_HEAD_ADDRESS` | Session after `start_ray_head` | Cached `CDSW_IP_ADDRESS:6379` for workers and UI. |
 | `RAY_ADDRESS` | Session driver | Set to **`CDSW_IP_ADDRESS:6379`** after head is up (same GCS as workers). |
 | `RAY_AUTH_TOKEN` | Session driver | Ray 2.59+ GCS token from `~/.ray/auth_token` (synced at startup). |

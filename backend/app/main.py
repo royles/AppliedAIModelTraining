@@ -15,7 +15,10 @@ from app.database import SessionLocal, init_db
 from app.services.job_lifecycle import reconcile_stale_jobs
 from app.services.model_registry import backfill_registry_entries
 from app.services.ray_driver_connect import apply_ray_auth_from_session
-from app.services.cai_networking import apply_master_session_ray_driver_env
+from app.services.cai_networking import (
+    apply_master_session_ray_driver_env,
+    reconcile_live_ray_head_env,
+)
 from app.services.platform_settings import sync_platform_ray_head_from_session
 from app.middleware.path_prefix import PathPrefixMiddleware
 from app.static_ui import mount_static_ui
@@ -28,7 +31,10 @@ async def lifespan(_app: FastAPI):
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     init_db()
     apply_ray_auth_from_session()
+    live_head = reconcile_live_ray_head_env()
     driver_ray = apply_master_session_ray_driver_env()
+    if live_head:
+        logging.getLogger(__name__).info("CAI live Ray head (workers): %s", live_head)
     if driver_ray:
         logging.getLogger(__name__).info("CAI master session Ray driver address: %s", driver_ray)
     db = SessionLocal()

@@ -114,6 +114,22 @@ def update_platform_settings(
 
 def resolved_ray_head(row: PlatformSettings | None) -> str | None:
     """Prefer live CAI session IP over stale SQLite defaults (see docs/CAI_RAY_NETWORKING.md)."""
+    from app.services.cai_networking import format_ray_head, master_engine_ip, parse_gcs_host_port
+
+    live_ip = master_engine_ip()
+    live = format_ray_head(live_ip) if live_ip else None
+    if live:
+        if row and row.ray_head_address:
+            stale_host, _ = parse_gcs_host_port(row.ray_head_address)
+            if stale_host and live_ip and stale_host != live_ip:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "Platform ray_head_address %s stale; using live %s",
+                    row.ray_head_address,
+                    live,
+                )
+        return live
     live = ray_worker_head_address() or cdsw_workers.ray_head_address()
     if live:
         return live

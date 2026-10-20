@@ -145,12 +145,29 @@ def worker_ray_head_from_env(fallback_head: str) -> str:
     """
     Resolve Ray head on a worker engine.
 
-    Workers must use the **master** engine IP (``CDSW_MASTER_IP``), not this
-    worker's ``CDSW_IP_ADDRESS`` — otherwise ``ray start --block`` targets the
-    wrong host and GCS RPC times out.
+    Prefer ``PLATFORM_RAY_HEAD_ADDRESS`` / launch fallback over ``CDSW_MASTER_IP``,
+    which can be stale after the master session pod IP changes.
     """
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
-        ip = os.environ.get(key)
-        if ip:
-            return format_ray_head(ip.strip())
+    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip()
+    if pinned:
+        return pinned
     return fallback_head
+
+
+def reconcile_live_ray_head_env() -> str | None:
+    """Align ``RAY_HEAD_ADDRESS`` / ``RAY_ADDRESS`` with ``CDSW_IP_ADDRESS`` on the session."""
+    ip = master_engine_ip()
+    if not ip:
+        return None
+    live = format_ray_head(ip)
+    stale = os.environ.get("RAY_HEAD_ADDRESS", "").strip()
+    if stale and stale != live:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "RAY_HEAD_ADDRESS %s does not match live session %s; updating env",
+            stale,
+            live,
+        )
+    os.environ["RAY_HEAD_ADDRESS"] = live
+    return live

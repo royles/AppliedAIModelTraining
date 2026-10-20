@@ -631,15 +631,25 @@ def start_ray_head() -> None:
         print("Skipping Ray head startup (RAY_SKIP_HEAD is set).")
         return
 
-    os.environ["RAY_HEAD_ADDRESS"] = f"{ip}:6379"
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
-    include_dashboard_fn, state_api_reachable, dashboard_cli_args_fn = _ray_head_options()
-
-    from app.services.cai_networking import gcs_tcp_reachable
+    from app.services.cai_networking import gcs_tcp_reachable, reconcile_live_ray_head_env
 
     gcs_addr = f"{ip}:6379"
+    old_head = os.environ.get("RAY_HEAD_ADDRESS", "").strip()
+    if old_head and old_head.split(":")[0] != ip:
+        print(
+            f"Session IP changed ({old_head} -> {gcs_addr}); restarting Ray head for workers…",
+            file=sys.stderr,
+        )
+        run(
+            venv_ray_argv("stop", "--force"),
+            env=venv_subprocess_env(),
+            check=False,
+        )
+    reconcile_live_ray_head_env()
+    include_dashboard_fn, state_api_reachable, dashboard_cli_args_fn = _ray_head_options()
     local_tcp = gcs_tcp_reachable("127.0.0.1", 6379, timeout_sec=1.0)
     pod_tcp = gcs_tcp_reachable(ip, 6379, timeout_sec=1.0)
     if local_tcp or pod_tcp:
