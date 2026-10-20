@@ -94,7 +94,7 @@ def ray_driver_init_address(head: str | None) -> str | None:
     from app.services.ray_driver_connect import resolve_driver_gcs_address
 
     if head:
-        return resolve_driver_gcs_address(head)
+        return resolve_driver_gcs_address(head, worker_head=head)
     env = os.environ.get("RAY_ADDRESS")
     resolved = resolve_driver_gcs_address(env)
     if resolved:

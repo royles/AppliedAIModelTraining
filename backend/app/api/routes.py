@@ -25,6 +25,7 @@ from app.schemas import (
     PlatformSettingsUpdate,
 )
 from app.resource_hints import memory_guidance_for_health
+from app.services.ray_driver_connect import health_ray_driver_info
 from app.services import cdsw_workers
 from app.services.cai_networking import (
     master_engine_ip,
@@ -141,6 +142,7 @@ def health() -> HealthResponse:
                 "engine_env": "https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html",
             },
             "memory": memory_guidance_for_health(),
+            **health_ray_driver_info(),
             "repo_root": str(REPO_ROOT.resolve()),
             "datasets_root": str(DATASETS_ROOT),
             "starter_corpus_exists": starter.is_file(),

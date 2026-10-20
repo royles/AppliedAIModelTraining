@@ -836,7 +836,11 @@ def ensure_api_running(port: str | int | None = None) -> None:
     health = api_health_url(port)
     if http_ok(health):
         if uvicorn_cli_ready():
-            print(f"API already responding on :{port}")
+            print(
+                f"API already responding on :{port} "
+                "(after git pull, restart API: tmux kill-session -t api 2>/dev/null; "
+                "then re-run start.py, or kill the api pid in start-user.log)"
+            )
             return
         print(
             f"Port :{port} responds but uvicorn is missing for {platform_python()}; "

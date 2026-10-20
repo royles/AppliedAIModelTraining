@@ -406,11 +406,12 @@ def run_transformer_training(
         from app.services.cdsw_workers import ray_driver_init_address
         from app.services.ray_driver_connect import init_ray_train_driver, resolve_driver_gcs_address
 
+        worker_head = train_config.get("ray_head_address")
         raw_ray_address = ray_address
         ray_address = resolve_driver_gcs_address(
-            ray_driver_init_address(ray_address) or ray_address
+            ray_driver_init_address(ray_address) or ray_address,
+            worker_head=worker_head,
         ) or ray_address
-        worker_head = train_config.get("ray_head_address")
         if worker_head and worker_head != ray_address:
             _framework(
                 framework_line(
@@ -436,7 +437,11 @@ def run_transformer_training(
             def _ray_log(msg: str) -> None:
                 _framework(framework_line("ray", msg))
 
-            ray_address = init_ray_train_driver(ray_address, framework_log=_ray_log)
+            ray_address = init_ray_train_driver(
+                ray_address,
+                worker_head=worker_head,
+                framework_log=_ray_log,
+            )
     else:
         _framework(framework_line("ray", "Starting local Ray runtime"))
         if not ray.is_initialized():

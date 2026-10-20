@@ -232,11 +232,11 @@ def run_training_job(job_id: int) -> None:
                     "framework",
                     framework_line(
                         "fail",
-                        "Ray GCS not reachable on localhost:6379 — run scripts/start.py "
+                        f"Ray GCS not reachable at {ray_addr} — run scripts/start.py "
                         "or check start-user.log for ray start --head",
                     ),
                 )
-                raise RuntimeError("Ray GCS not available on 127.0.0.1:6379")
+                raise RuntimeError(f"Ray GCS not available at {ray_addr}")
         if ray_addr:
             os.environ["RAY_ADDRESS"] = ray_addr
 
@@ -326,11 +326,23 @@ def run_training_job(job_id: int) -> None:
                 train_config["per_device_train_batch_size"],
             )
 
+        from app.services.ray_driver_connect import RAY_DRIVER_CONNECT_REVISION
+
         append_job_log(
             db,
             job_id,
             "framework",
             framework_line("train", "Ray Train job submitted to master"),
+        )
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            framework_line(
+                "ray",
+                f"Ray driver connect revision {RAY_DRIVER_CONNECT_REVISION} "
+                f"(verify via GET /api/health → ray_driver_connect_revision)",
+            ),
         )
         result = run_transformer_training(
             ray_address=ray_addr,
