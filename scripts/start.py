@@ -108,7 +108,17 @@ def main() -> int:
     if is_cai_session():
         os.environ["RAY_LOCAL_MODE"] = "false"
         print_cai_memory_hints()
-        start_ray_head()
+        if os.environ.get("PLATFORM_RAY_START_AT_BOOT", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            start_ray_head()
+        else:
+            print(
+                "Ray head deferred until the first model task starts "
+                "(PLATFORM_RAY_START_AT_BOOT=1 to start Ray during scripts/start.py)."
+            )
 
     if args.dev_ui:
         print(f"=== Dev UI: {BIND_HOST}:{ux_port}, API {BIND_HOST}:{backend_port} ===")

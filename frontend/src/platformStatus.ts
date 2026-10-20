@@ -56,11 +56,25 @@ export function rayIndicatorFromHealth(health: Health | null, apiOk: boolean): {
       tone: ray.cdsw_available ? "warn" : "idle",
       label: "Ray",
       title: ray.cdsw_available
-        ? "Ray head not configured yet (startup may still be running)"
+        ? "Ray head not configured yet"
         : "Local mode — no CDSW Ray cluster",
     };
   }
+  if (ray.state === "local") {
+    return {
+      tone: "idle",
+      label: "Ray local",
+      title: "Training uses an in-process Ray runtime on this machine",
+    };
+  }
   if (!ray.gcs_reachable) {
+    if (ray.state === "deferred") {
+      return {
+        tone: "idle",
+        label: "Ray idle",
+        title: `Cluster starts when you run a model task (head will be ${addr})`,
+      };
+    }
     return {
       tone: "warn",
       label: "Ray starting",

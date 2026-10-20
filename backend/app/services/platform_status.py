@@ -50,6 +50,10 @@ def platform_ray_status() -> dict[str, Any]:
         out["state"] = "not_configured"
         return out
 
+    if not cdsw_workers.cdsw_available():
+        out["state"] = "local"
+        return out
+
     from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
     from app.services.ray_cluster_watch import ray_status_cluster_snapshot
     from app.services.ray_driver_connect import gcs_client_ready
@@ -58,7 +62,7 @@ def platform_ray_status() -> dict[str, Any]:
     reachable = gcs_client_ready(gcs, auth_token=token, rpc_timeout_sec=6.0)
     out["gcs_reachable"] = reachable
     if not reachable:
-        out["state"] = "starting" if cdsw_workers.cdsw_available() else "offline"
+        out["state"] = "deferred"
         return out
 
     snap = ray_status_cluster_snapshot(gcs, auth_token=token, timeout_sec=8.0)

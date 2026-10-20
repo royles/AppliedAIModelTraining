@@ -169,6 +169,34 @@ def run_training_job(job_id: int) -> None:
         pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": gpus_per_worker}
         pool = CdswRayWorkerPool(**pool_kwargs)
 
+        needs_cai_ray_head = bool(live_ip) and not (
+            platform.ray_local_mode and not pool.is_remote
+        )
+        if needs_cai_ray_head:
+            from app.services.ray_cai_networking import ensure_ray_head_for_workers
+            from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("ray", "Starting Ray head for this model task…"),
+            )
+
+            def _ray_head_log(msg: str) -> None:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    msg if msg.startswith("[") else framework_line("ray", msg),
+                )
+
+            head = ensure_ray_head_for_workers(
+                framework_log=_ray_head_log,
+                force_restart=False,
+            )
+            bind_gcs_auth_for_address(head, required=True)
+
         worker_group = WorkerGroup(
             job_id=job.id,
             target_workers=job.num_workers,
@@ -197,22 +225,9 @@ def run_training_job(job_id: int) -> None:
         if launch_cdsw_workers:
             from app.services.ray_cai_networking import (
                 build_worker_connectivity_probe_code,
-                ensure_ray_head_for_workers,
                 poll_worker_connectivity_probe,
             )
 
-            def _fw(msg: str) -> None:
-                append_job_log(db, job_id, "framework", msg)
-
-            from app.services.ray_gcs_auth import bind_gcs_auth_for_address
-
-            head = ensure_ray_head_for_workers(
-                framework_log=lambda m: _fw(
-                    m if m.startswith("[") else framework_line("ray", m)
-                ),
-                force_restart=False,
-            )
-            bind_gcs_auth_for_address(head, required=True)
             worker_group.head_address = head
             db.commit()
             from app.services.cai_networking import resolve_worker_ray_head_address_with_source
@@ -340,8 +355,8 @@ def run_training_job(job_id: int) -> None:
                     "framework",
                     framework_line(
                         "fail",
-                        f"Ray GCS not reachable at {ray_addr} — run scripts/start.py "
-                        "or check start-user.log for ray start --head",
+                        f"Ray GCS not reachable at {ray_addr} — check framework log "
+                        "for ray start --head errors",
                     ),
                 )
                 raise RuntimeError(f"Ray GCS not available at {ray_addr}")
@@ -368,7 +383,7 @@ def run_training_job(job_id: int) -> None:
             elif job.num_workers < 1:
                 detail = "Set Workers >= 1 for distributed GPU training."
             elif not head:
-                detail = "No Ray head address; run scripts/start.py on the master session."
+                detail = "No Ray head address on this session; check CDSW_IP_ADDRESS / framework logs."
             else:
                 detail = "CDSW worker launch was skipped."
             append_job_log(db, job_id, "framework", framework_line("fail", detail))
