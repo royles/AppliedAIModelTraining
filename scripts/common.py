@@ -602,11 +602,12 @@ def _ray_head_options():
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
     from app.services.ray_head_options import (
+        ray_head_dashboard_cli_args,
         ray_start_include_dashboard,
         state_api_reachable,
     )
 
-    return ray_start_include_dashboard, state_api_reachable
+    return ray_start_include_dashboard, state_api_reachable, ray_head_dashboard_cli_args
 
 
 def start_ray_head() -> None:
@@ -618,7 +619,7 @@ def start_ray_head() -> None:
         return
 
     os.environ["RAY_HEAD_ADDRESS"] = f"{ip}:6379"
-    include_dashboard_fn, state_api_reachable = _ray_head_options()
+    include_dashboard_fn, state_api_reachable, dashboard_cli_args_fn = _ray_head_options()
 
     if _ray_port_open(6379):
         print("Ray head already listening on :6379")
@@ -635,7 +636,7 @@ def start_ray_head() -> None:
         return
 
     include_dashboard = include_dashboard_fn()
-    ray_args = ["start", "--head", "--port=6379", f"--node-ip-address={ip}"]
+    ray_args = ["start", "--head", "--port=6379", f"--node-ip-address={ip}", "--disable-usage-stats"]
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
@@ -649,10 +650,7 @@ def start_ray_head() -> None:
             f"Minimum-memory Ray profile (~{limit:.1f} GiB session): "
             + " ".join(mem_args),
         )
-    if include_dashboard:
-        ray_args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
-    else:
-        ray_args.append("--include-dashboard=false")
+    ray_args.extend(dashboard_cli_args_fn())
 
     print(f"CAI session at {ip}; starting Ray head (dashboard={include_dashboard})...")
     try:

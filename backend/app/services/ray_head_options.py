@@ -21,13 +21,25 @@ def ray_start_include_dashboard() -> bool:
 
     Ray Train v2's PlacementGroupCleaner polls actor state via ray.util.state (HTTP API).
     With dashboard disabled, those calls fail and spam warnings.
+
+    Never returns True unless ``ray.dashboard`` is importable — otherwise
+    ``ray start --head`` fails with "Cannot include dashboard with missing packages."
     """
     explicit = os.environ.get("RAY_INCLUDE_DASHBOARD", "").strip().lower()
     if explicit in ("0", "false", "no"):
         return False
+    importable = ray_dashboard_importable()
     if explicit in ("1", "true", "yes"):
-        return True
-    return ray_dashboard_importable()
+        return importable
+    return importable
+
+
+def ray_head_dashboard_cli_args() -> list[str]:
+    """CLI flags for ``ray start --head`` (dashboard only when packages exist)."""
+    if ray_start_include_dashboard():
+        port = int(os.environ.get("RAY_DASHBOARD_PORT", "8265") or "8265")
+        return [f"--dashboard-port={port}", "--include-dashboard=true"]
+    return ["--include-dashboard=false"]
 
 
 def state_api_reachable(

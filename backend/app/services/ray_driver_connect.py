@@ -20,7 +20,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20d"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20e"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -160,7 +160,7 @@ def restart_co_located_ray_head(
         check=False,
     )
     from app.resource_hints import ray_head_start_memory_args
-    from app.services.ray_head_options import ray_start_include_dashboard
+    from app.services.ray_head_options import ray_head_dashboard_cli_args
 
     args = [
         "start",
@@ -170,10 +170,7 @@ def restart_co_located_ray_head(
         "--disable-usage-stats",
     ]
     args.extend(ray_head_start_memory_args())
-    if ray_start_include_dashboard():
-        args.extend(["--dashboard-port=8265", "--include-dashboard=true"])
-    else:
-        args.append("--include-dashboard=false")
+    args.extend(ray_head_dashboard_cli_args())
 
     proc = subprocess.run(
         _ray_cli(*args),
