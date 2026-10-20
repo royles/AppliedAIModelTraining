@@ -155,7 +155,7 @@ def gcs_client_ready(
     when ``_node_ip_address`` does not match the raylet yet, while ``ray status`` is OK.
     """
     from app.services.ray_cluster_watch import ray_cluster_snapshot_subprocess
-    from app.services.ray_gcs_auth import ensure_ray_auth_token, ray_gcs_status_ok
+    from app.services.ray_gcs_auth import ray_gcs_status_ok
 
     token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip() or None
     if ray_cluster_snapshot_subprocess(
