@@ -117,7 +117,11 @@ def _ray_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 25.
         return False
     if proc.returncode != 0:
         return False
-    return "active" in (proc.stdout or "").lower()
+    combined = f"{proc.stdout or ''}\n{proc.stderr or ''}".lower()
+    if "invalidauthtoken" in combined or "authentication token" in combined:
+        return False
+    # Ray CLI wording varies by version; exit 0 is the reliable success signal.
+    return True
 
 
 def _fetch_token_from_head_cli(gcs_address: str, *, generate_if_missing: bool) -> tuple[str | None, str]:

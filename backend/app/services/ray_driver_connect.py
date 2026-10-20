@@ -21,7 +21,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20l"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20m"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -107,30 +107,75 @@ def _driver_connect_diagnostics(worker_head: str | None) -> str:
     )
 
 
-def _ray_status_ok(gcs_address: str, timeout_sec: float = 120.0) -> bool:
+def _ray_status_cli_tail(gcs_address: str) -> str:
+    """Last ``ray status`` output for error messages."""
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
+
     env = os.environ.copy()
     env["RAY_ADDRESS"] = gcs_address
     apply_ray_auth_from_session()
+    load_gcs_auth_token_from_disk()
     if os.environ.get("RAY_AUTH_TOKEN"):
         env["RAY_AUTH_TOKEN"] = os.environ["RAY_AUTH_TOKEN"]
+    try:
+        proc = subprocess.run(
+            _ray_cli("status"),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return str(exc)
+    parts = [f"exit={proc.returncode}"]
+    if proc.stdout:
+        parts.append((proc.stdout or "")[-400:])
+    if proc.stderr:
+        parts.append((proc.stderr or "")[-400:])
+    return " | ".join(parts)
+
+
+def wait_for_head_gcs_ready(
+    gcs_address: str,
+    *,
+    timeout_sec: float = 180.0,
+    framework_log: Callable[[str], None] | None = None,
+) -> bool:
+    """
+    Wait until the co-located head accepts GCS RPC (ray.init snapshot in a subprocess).
+
+    Prefer this over parsing ``ray status`` text, which differs across Ray versions.
+    """
+    from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
+    from app.services.ray_gcs_auth import require_ray_gcs_auth_token
+
+    def _log(msg: str) -> None:
+        if framework_log:
+            framework_log(msg)
+        logger.info(msg)
+
     deadline = time.monotonic() + timeout_sec
+    attempt = 0
     while time.monotonic() < deadline:
+        attempt += 1
         try:
-            proc = subprocess.run(
-                _ray_cli("status"),
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-        except (subprocess.TimeoutExpired, OSError):
-            time.sleep(2.0)
+            token = require_ray_gcs_auth_token(gcs_address)
+        except RuntimeError as exc:
+            _log(f"GCS auth sync attempt {attempt}: {exc}")
+            time.sleep(3.0)
             continue
-        if proc.returncode == 0 and "active" in (proc.stdout or "").lower():
+        if wait_for_gcs_rpc_subprocess(
+            gcs_address, auth_token=token, timeout_sec=min(60.0, timeout_sec)
+        ):
             return True
-        time.sleep(2.0)
+        _log(f"GCS RPC not ready (attempt {attempt}); retrying…")
+        time.sleep(3.0)
     return False
+
+
+def _ray_status_ok(gcs_address: str, timeout_sec: float = 120.0) -> bool:
+    return wait_for_head_gcs_ready(gcs_address, timeout_sec=timeout_sec)
 
 
 def restart_co_located_ray_head(
@@ -193,9 +238,13 @@ def restart_co_located_ray_head(
     gcs = format_ray_head(ip)
     os.environ["RAY_ADDRESS"] = gcs
     os.environ["RAY_HEAD_ADDRESS"] = gcs
-    require_ray_gcs_auth_token(gcs)
-    if not _ray_status_ok(gcs, timeout_sec=90.0):
-        raise RuntimeError(f"Ray head at {gcs} did not become active after restart")
+    time.sleep(2.0)
+    if not wait_for_head_gcs_ready(gcs, timeout_sec=180.0, framework_log=framework_log):
+        detail = _ray_status_cli_tail(gcs)
+        raise RuntimeError(
+            f"Ray head at {gcs} did not become ready after restart (GCS RPC/auth). "
+            f"ray status: {detail}"
+        )
     _log(f"Ray head active at {gcs}")
     return gcs
 
