@@ -46,6 +46,10 @@ class TrainingJobCreate(BaseModel):
     batch_size: int | None = Field(default=None, ge=1, le=256)
     learning_rate: float | None = Field(default=None, gt=0)
     max_steps: int | None = Field(default=None, ge=1, le=100_000)
+    task_blueprint: dict | None = Field(
+        default=None,
+        description="Full model-task wizard JSON snapshot saved with the job artifact.",
+    )
 
 
 class JobRestartRequest(BaseModel):

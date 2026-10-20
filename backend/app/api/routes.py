@@ -64,6 +64,15 @@ from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
 )
+from app.services.task_blueprint_store import (
+    delete_named,
+    list_named_blueprints,
+    load_named,
+    read_draft,
+    save_job_blueprint,
+    save_named,
+    write_draft,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +201,7 @@ def dataset_preview(
     except ImportError as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"Hugging Face datasets not available: {exc}",
+            detail=f"Dataset dependencies not available: {exc}",
         ) from exc
     except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -223,6 +232,57 @@ def builtin_datasets() -> dict[str, dict[str, str]]:
 @router.get("/training/datasets/files")
 def dataset_files() -> list[dict[str, str]]:
     return list_dataset_files()
+
+
+@router.get("/training/task-blueprints/draft")
+def get_task_blueprint_draft() -> dict[str, Any]:
+    draft = read_draft()
+    return {"blueprint": draft}
+
+
+@router.put("/training/task-blueprints/draft")
+def put_task_blueprint_draft(body: dict[str, Any]) -> dict[str, Any]:
+    try:
+        saved = write_draft(body)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"blueprint": saved}
+
+
+@router.get("/training/task-blueprints")
+def list_task_blueprints() -> list[dict[str, Any]]:
+    return list_named_blueprints()
+
+
+@router.get("/training/task-blueprints/{blueprint_id}")
+def get_task_blueprint(blueprint_id: str) -> dict[str, Any]:
+    try:
+        return load_named(blueprint_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/training/task-blueprints")
+def create_task_blueprint(body: dict[str, Any]) -> dict[str, Any]:
+    name = str(body.get("name") or body.get("blueprint", {}).get("name") or "blueprint")
+    payload = body.get("blueprint") if isinstance(body.get("blueprint"), dict) else body
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Request body must be a blueprint object")
+    try:
+        return save_named(name, payload)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.delete("/training/task-blueprints/{blueprint_id}")
+def remove_task_blueprint(blueprint_id: str) -> dict[str, str]:
+    try:
+        delete_named(blueprint_id)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"status": "deleted", "id": blueprint_id}
 
 
 @router.get("/transformer/presets", response_model=list[TransformerPresetRead])
@@ -334,6 +394,11 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
     db.add(job)
     db.commit()
     db.refresh(job)
+    if payload.task_blueprint:
+        try:
+            save_job_blueprint(job.id, payload.task_blueprint)
+        except OSError as exc:
+            logger.warning("Could not write task_blueprint.json for job %s: %s", job.id, exc)
     enqueue_training_job(job.id)
     return _job_to_read(db, job)
 

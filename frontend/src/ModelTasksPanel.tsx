@@ -1,13 +1,21 @@
 import type { Project, TrainingDatasetConfig, TrainingJob, TransformerPreset, TokenizerBuildConfig } from "./api";
-import { BlueprintSection } from "./BlueprintSection";
+import { api } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
+import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
 import { ProjectJobsHierarchy } from "./ProjectJobsHierarchy";
-import { TrainingBlueprintChecklist } from "./TrainingBlueprintChecklist";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 import { ValidatedNumberField } from "./ValidatedNumberField";
-import { blueprintReady, buildTrainingBlueprint, type BlueprintStep } from "./trainingBlueprint";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  buildModelTaskBlueprint,
+  downloadBlueprintJson,
+  parseModelTaskBlueprintFile,
+  type ModelTaskBlueprintFile,
+  type ModelTaskWizardState,
+} from "./modelTaskBlueprint";
+import { blueprintReady, buildTrainingBlueprint, type BlueprintStep, type DatasetPreview } from "./trainingBlueprint";
+import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type Props = {
   presets: TransformerPreset[];
@@ -47,7 +55,7 @@ type Props = {
   onJobWorkersChange: (n: number) => void;
   jobGpus: number;
   onJobGpusChange: (n: number) => void;
-  onCreateJob: () => void;
+  onCreateJob: (blueprint: ModelTaskBlueprintFile) => void | Promise<void>;
   startBusy: boolean;
   dataset: TrainingDatasetConfig;
   onDatasetChange: (d: TrainingDatasetConfig) => void;
@@ -65,23 +73,27 @@ type Props = {
   tieWordEmbeddings: boolean;
   baseModel?: string | null;
   useLora?: boolean;
+  onApplyBlueprint: (file: ModelTaskBlueprintFile) => void;
 };
 
-const STEP_ORDER = [
-  "project",
-  "mode",
-  "dataset",
-  "tokenizer",
-  "architecture",
-  "training",
-  "compute",
-  "register",
-] as const;
-
-function dependentsOf(stepId: string): string[] {
-  const idx = STEP_ORDER.indexOf(stepId as (typeof STEP_ORDER)[number]);
-  if (idx < 0) return [];
-  return STEP_ORDER.slice(idx + 1);
+function WizardStepCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <article className="card model-task-wizard-step-card">
+      <header className="model-task-wizard-step-header">
+        <h3>{title}</h3>
+        {description && <p className="hint blueprint-step-description">{description}</p>}
+      </header>
+      {children}
+    </article>
+  );
 }
 
 export function ModelTasksPanel(props: Props) {
@@ -141,44 +153,140 @@ export function ModelTasksPanel(props: Props) {
     tieWordEmbeddings,
     baseModel,
     useLora,
+    onApplyBlueprint,
   } = props;
 
-  const [confirmedSteps, setConfirmedSteps] = useState<Set<string>>(() => new Set());
-  const [blueprintSteps, setBlueprintSteps] = useState<BlueprintStep[]>([]);
-  const [selectedBlueprintStepId, setSelectedBlueprintStepId] = useState<string>("mode");
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [preview, setPreview] = useState<DatasetPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [minCorpusChars, setMinCorpusChars] = useState<number | null>(null);
+  const [savedBlueprints, setSavedBlueprints] = useState<
+    { id: string; name: string; updated_at?: string }[]
+  >([]);
+  const [blueprintMessage, setBlueprintMessage] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
-  const invalidateFrom = useCallback((stepId: string) => {
-    setConfirmedSteps((prev) => {
-      const next = new Set(prev);
-      next.delete(stepId);
-      for (const id of dependentsOf(stepId)) {
-        next.delete(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const confirmStep = useCallback((stepId: string) => {
-    setConfirmedSteps((prev) => new Set(prev).add(stepId));
-  }, []);
-
-  const scrollToStep = useCallback((stepId: string) => {
-    setSelectedBlueprintStepId(stepId);
-    document.getElementById(`blueprint-step-${stepId}`)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  }, []);
-
-  const ready = blueprintReady(blueprintSteps, confirmedSteps);
-
-  const stepById = useMemo(
-    () => new Map(blueprintSteps.map((s) => [s.id, s])),
-    [blueprintSteps],
+  const wizardState: ModelTaskWizardState = useMemo(
+    () => ({
+      preset,
+      project_id: selectedProjectId,
+      job_name: jobName,
+      openai_model_id: openaiModelId,
+      num_workers: jobWorkers,
+      gpus_per_worker: jobGpus,
+      max_steps: maxSteps,
+      init_mode: initMode,
+      task_type: taskType,
+      arch_family: archFamily,
+      vocab_size: vocabSize,
+      hidden_size: hiddenSize,
+      layers,
+      heads,
+      max_position: maxPosition,
+      intermediate_size: intermediateSize,
+      tie_word_embeddings: tieWordEmbeddings,
+      tokenizer,
+      dataset,
+    }),
+    [
+      preset,
+      selectedProjectId,
+      jobName,
+      openaiModelId,
+      jobWorkers,
+      jobGpus,
+      maxSteps,
+      initMode,
+      taskType,
+      archFamily,
+      vocabSize,
+      hiddenSize,
+      layers,
+      heads,
+      maxPosition,
+      intermediateSize,
+      tieWordEmbeddings,
+      tokenizer,
+      dataset,
+    ],
   );
 
-  const stepDescriptions = useMemo(() => {
-    const stub = buildTrainingBlueprint({
+  const blueprintFile = useMemo(
+    () => buildModelTaskBlueprint(wizardState, jobName || "model-task"),
+    [wizardState, jobName],
+  );
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      api.putTaskBlueprintDraft(blueprintFile).catch(() => {});
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [blueprintFile]);
+
+  useEffect(() => {
+    api.listTaskBlueprints().then(setSavedBlueprints).catch(() => setSavedBlueprints([]));
+  }, []);
+
+  useEffect(() => {
+    if (initMode !== "from_scratch") {
+      setMinCorpusChars(null);
+      return;
+    }
+    api
+      .fromScratchGuidance({
+        init_mode: "from_scratch",
+        task_type: "causal_lm",
+        architecture: {
+          family: "gpt2",
+          vocab_size: vocabSize,
+          hidden_size: hiddenSize,
+          num_hidden_layers: layers,
+          num_attention_heads: heads,
+          max_position_embeddings: 512,
+          tie_word_embeddings: true,
+        },
+        tokenizer,
+        max_steps: maxSteps,
+        dataset,
+      })
+      .then((g) => setMinCorpusChars((g.min_corpus_characters as number) ?? null))
+      .catch(() => setMinCorpusChars(null));
+  }, [initMode, tokenizer, vocabSize, hiddenSize, layers, heads, maxSteps, dataset]);
+
+  useEffect(() => {
+    api
+      .datasetPreview(dataset)
+      .then((p) => {
+        setPreview(p);
+        setPreviewError(null);
+      })
+      .catch((e) => {
+        setPreview(null);
+        setPreviewError(e instanceof Error ? e.message : String(e));
+      });
+  }, [dataset]);
+
+  const blueprintSteps: BlueprintStep[] = useMemo(
+    () =>
+      buildTrainingBlueprint({
+        initMode,
+        tokenizer,
+        vocabSize,
+        hiddenSize,
+        layers,
+        heads,
+        maxSteps,
+        jobWorkers,
+        jobGpus,
+        dataset,
+        selectedProjectId,
+        jobName,
+        openaiModelId,
+        paramEstimate,
+        datasetPreview: preview,
+        minCorpusChars,
+      }),
+    [
       initMode,
       tokenizer,
       vocabSize,
@@ -192,362 +300,328 @@ export function ModelTasksPanel(props: Props) {
       selectedProjectId,
       jobName,
       openaiModelId,
-      paramEstimate: null,
-      datasetPreview: null,
-      minCorpusChars: null,
-    });
-    return new Map(stub.map((s) => [s.id, s.description]));
-  }, [
-    initMode,
-    tokenizer,
-    vocabSize,
-    hiddenSize,
-    layers,
-    heads,
-    maxSteps,
-    jobWorkers,
-    jobGpus,
-    dataset,
-    selectedProjectId,
-    jobName,
-    openaiModelId,
-  ]);
+      paramEstimate,
+      preview,
+      minCorpusChars,
+    ],
+  );
 
-  function section(
-    stepId: string,
-    title: string,
-    canConfirm: boolean,
-    confirmHint: string | undefined,
-    children: ReactNode,
-  ) {
-    return (
-      <BlueprintSection
-        stepId={stepId}
-        title={title}
-        description={stepDescriptions.get(stepId)}
-        canConfirm={canConfirm}
-        confirmed={confirmedSteps.has(stepId)}
-        confirmHint={confirmHint}
-        onConfirm={() => confirmStep(stepId)}
-      >
-        {children}
-      </BlueprintSection>
-    );
+  const stepById = useMemo(
+    () => new Map(blueprintSteps.map((s) => [s.id, s])),
+    [blueprintSteps],
+  );
+
+  const currentStep = MODEL_TASK_WIZARD_STEPS[currentStepIndex];
+  const currentBlueprintStep = stepById.get(currentStep.id);
+  const canGoNext = currentBlueprintStep?.done ?? false;
+  const ready = blueprintReady(blueprintSteps);
+  const isLastStep = currentStepIndex >= MODEL_TASK_WIZARD_STEPS.length - 1;
+
+  const stepDescription = currentBlueprintStep?.description;
+
+  const loadSavedBlueprint = useCallback(
+    async (id: string) => {
+      const raw = await api.getTaskBlueprint(id);
+      const parsed = parseModelTaskBlueprintFile(raw);
+      onApplyBlueprint(parsed);
+      setBlueprintMessage(`Loaded blueprint “${parsed.name ?? id}”`);
+    },
+    [onApplyBlueprint],
+  );
+
+  const handleUpload = useCallback(
+    (file: File) => {
+      file
+        .text()
+        .then((text) => {
+          const parsed = parseModelTaskBlueprintFile(JSON.parse(text));
+          onApplyBlueprint(parsed);
+          setBlueprintMessage(`Imported ${file.name}`);
+          setCurrentStepIndex(0);
+        })
+        .catch((e) => {
+          setBlueprintMessage(e instanceof Error ? e.message : String(e));
+        });
+    },
+    [onApplyBlueprint],
+  );
+
+  function renderStepBody(stepId: string): ReactNode {
+    switch (stepId) {
+      case "project":
+        return (
+          <ProjectJobsHierarchy
+            projects={projects}
+            jobs={jobs}
+            selectedProjectId={selectedProjectId}
+            onSelectedProjectIdChange={onSelectedProjectIdChange}
+            newProjectName={newProjectName}
+            onNewProjectNameChange={onNewProjectNameChange}
+            newProjectDescription={newProjectDescription}
+            onNewProjectDescriptionChange={onNewProjectDescriptionChange}
+            onCreateProject={onCreateProject}
+            onUpdateProject={onUpdateProject}
+            onDeleteProject={onDeleteProject}
+            onUpdateJobName={onUpdateJobName}
+            onDeleteJob={onDeleteJob}
+            onRerunJob={onRerunJob}
+            projectBusy={projectBusy}
+            jobBusy={jobBusy}
+            onInvalidateBlueprint={() => {}}
+          />
+        );
+      case "mode":
+        return (
+          <FromScratchConfigFields
+            section="mode"
+            initMode={initMode}
+            onInitModeChange={onInitModeChange}
+            tokenizer={tokenizer}
+            onTokenizerChange={onTokenizerChange}
+            vocabSize={vocabSize}
+            onVocabSizeChange={onVocabSizeChange}
+            maxSteps={maxSteps}
+            hiddenSize={hiddenSize}
+            layers={layers}
+          />
+        );
+      case "dataset":
+        return (
+          <>
+            {previewError && dataset.source !== "builtin" && (
+              <p className="hint blueprint-warn">Dataset preview: {previewError}</p>
+            )}
+            {preview && (
+              <p className="hint">
+                Preview: {preview.examples.toLocaleString()} examples ·{" "}
+                {preview.total_characters.toLocaleString()} characters
+              </p>
+            )}
+            <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
+          </>
+        );
+      case "tokenizer":
+        return (
+          <FromScratchConfigFields
+            section="tokenizer"
+            initMode={initMode}
+            onInitModeChange={onInitModeChange}
+            tokenizer={tokenizer}
+            onTokenizerChange={onTokenizerChange}
+            vocabSize={vocabSize}
+            onVocabSizeChange={onVocabSizeChange}
+            maxSteps={maxSteps}
+            hiddenSize={hiddenSize}
+            layers={layers}
+          />
+        );
+      case "architecture":
+        return (
+          <>
+            <label>
+              Preset
+              <select value={preset} onChange={(e) => onPresetChange(e.target.value)}>
+                {presets.map((p) => (
+                  <option key={p.name} value={p.name}>{p.title}</option>
+                ))}
+              </select>
+            </label>
+            <TransformerArchitectureDiagram
+              presetTitle={selectedPreset?.title}
+              family={archFamily}
+              initMode={initMode}
+              taskType={taskType}
+              baseModel={baseModel}
+              useLora={useLora}
+              hiddenSize={hiddenSize}
+              layers={layers}
+              heads={heads}
+              vocabSize={vocabSize}
+              maxPosition={maxPosition}
+              intermediateSize={intermediateSize}
+              tieWordEmbeddings={tieWordEmbeddings}
+              paramEstimate={paramEstimate}
+              onHiddenSizeChange={onHiddenSizeChange}
+              onLayersChange={onLayersChange}
+              onHeadsChange={onHeadsChange}
+            />
+            <div className="arch-grid arch-grid-compact">
+              <label>
+                Hidden size
+                <ValidatedNumberField value={hiddenSize} min={1} max={8192} onChange={onHiddenSizeChange} />
+              </label>
+              <label>
+                Layers
+                <ValidatedNumberField value={layers} min={1} max={128} onChange={onLayersChange} />
+              </label>
+              <label>
+                Attention heads
+                <ValidatedNumberField value={heads} min={1} max={128} onChange={onHeadsChange} />
+              </label>
+              <label>
+                Max positions
+                <ValidatedNumberField value={maxPosition} min={128} max={32768} onChange={onMaxPositionChange} />
+              </label>
+            </div>
+          </>
+        );
+      case "training":
+        return (
+          <label>
+            Training steps (max_steps)
+            <ValidatedNumberField value={maxSteps} min={10} max={500_000} onChange={onMaxStepsChange} />
+          </label>
+        );
+      case "compute":
+        return (
+          <div className="arch-grid">
+            <label>
+              Ray / CDSW workers for new jobs
+              <ValidatedNumberField value={jobWorkers} min={1} max={32} onChange={onJobWorkersChange} />
+            </label>
+            <label>
+              GPUs per worker
+              <ValidatedNumberField value={jobGpus} min={0} max={8} onChange={onJobGpusChange} />
+            </label>
+          </div>
+        );
+      case "register":
+        return (
+          <>
+            <label>
+              OpenAI model id
+              <input value={openaiModelId} onChange={(e) => onOpenaiModelIdChange(e.target.value)} />
+            </label>
+            <label>
+              Job name
+              <input value={jobName} onChange={(e) => onJobNameChange(e.target.value)} />
+            </label>
+          </>
+        );
+      default:
+        return null;
+    }
   }
 
   return (
-    <div className="settings-page model-tasks-page">
+    <div className="settings-page model-tasks-page model-task-wizard">
       <header className="main-panel-header">
         <h2>Model Tasks</h2>
         <p className="hint">
-          Build a task blueprint step by step. Confirm each section on the right; when the checklist
-          is complete, start training from the left.
+          Step through the wizard to configure a training task. Settings are saved to{" "}
+          <code>data/blueprints/_draft.json</code> as you edit.
         </p>
       </header>
 
-      <div className="model-tasks-blueprint-layout">
-        <aside className="blueprint-layout-sidebar">
-          <TrainingBlueprintChecklist
-            initMode={initMode}
-            tokenizer={tokenizer}
-            vocabSize={vocabSize}
-            hiddenSize={hiddenSize}
-            layers={layers}
-            heads={heads}
-            maxSteps={maxSteps}
-            jobWorkers={jobWorkers}
-            jobGpus={jobGpus}
-            dataset={dataset}
-            selectedExp={selectedProjectId}
-            jobName={jobName}
-            openaiModelId={openaiModelId}
-            paramEstimate={paramEstimate}
-            confirmedStepIds={confirmedSteps}
-            selectedStepId={selectedBlueprintStepId}
-            onStepSelect={scrollToStep}
-            onStepsChange={setBlueprintSteps}
-            canStart={ready}
-            onStartTask={onCreateJob}
-            startBusy={startBusy}
+      <div className="model-task-wizard-toolbar card">
+        <div className="model-task-wizard-toolbar-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => downloadBlueprintJson(blueprintFile)}
+          >
+            Download JSON
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => uploadRef.current?.click()}
+          >
+            Upload JSON
+          </button>
+          <input
+            ref={uploadRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+              e.target.value = "";
+            }}
           />
-        </aside>
-
-        <div className="blueprint-layout-config">
-          {section(
-            "project",
-            "Project & jobs",
-            stepById.get("project")?.done ?? false,
-            "Create or select a project first.",
-            <ProjectJobsHierarchy
-              projects={projects}
-              jobs={jobs}
-              selectedProjectId={selectedProjectId}
-              onSelectedProjectIdChange={onSelectedProjectIdChange}
-              newProjectName={newProjectName}
-              onNewProjectNameChange={onNewProjectNameChange}
-              newProjectDescription={newProjectDescription}
-              onNewProjectDescriptionChange={onNewProjectDescriptionChange}
-              onCreateProject={onCreateProject}
-              onUpdateProject={onUpdateProject}
-              onDeleteProject={onDeleteProject}
-              onUpdateJobName={onUpdateJobName}
-              onDeleteJob={onDeleteJob}
-              onRerunJob={onRerunJob}
-              projectBusy={projectBusy}
-              jobBusy={jobBusy}
-              onInvalidateBlueprint={() => invalidateFrom("project")}
-            />,
-          )}
-
-          {section(
-            "mode",
-            "Training mode",
-            stepById.get("mode")?.done ?? false,
-            undefined,
-            <FromScratchConfigFields
-              section="mode"
-              initMode={initMode}
-              onInitModeChange={(m) => {
-                invalidateFrom("mode");
-                onInitModeChange(m);
-              }}
-              tokenizer={tokenizer}
-              onTokenizerChange={(t) => {
-                invalidateFrom("tokenizer");
-                onTokenizerChange(t);
-              }}
-              vocabSize={vocabSize}
-              onVocabSizeChange={(n) => {
-                invalidateFrom("tokenizer");
-                onVocabSizeChange(n);
-              }}
-              maxSteps={maxSteps}
-              hiddenSize={hiddenSize}
-              layers={layers}
-            />,
-          )}
-
-          {section(
-            "dataset",
-            "Training dataset",
-            stepById.get("dataset")?.done ?? false,
-            "Fix dataset source and wait for preview if required.",
-            <DatasetConfigFields
-              value={dataset}
-              onChange={(d) => {
-                invalidateFrom("dataset");
-                onDatasetChange(d);
-              }}
-            />,
-          )}
-
-          {section(
-            "tokenizer",
-            "Tokenizer & vocabulary",
-            stepById.get("tokenizer")?.done ?? false,
-            "Match vocab to corpus size and architecture.",
-            <FromScratchConfigFields
-              section="tokenizer"
-              initMode={initMode}
-              onInitModeChange={onInitModeChange}
-              tokenizer={tokenizer}
-              onTokenizerChange={(t) => {
-                invalidateFrom("tokenizer");
-                onTokenizerChange(t);
-              }}
-              vocabSize={vocabSize}
-              onVocabSizeChange={(n) => {
-                invalidateFrom("tokenizer");
-                onVocabSizeChange(n);
-              }}
-              maxSteps={maxSteps}
-              hiddenSize={hiddenSize}
-              layers={layers}
-            />,
-          )}
-
-          {section(
-            "architecture",
-            "Transformer geometry",
-            stepById.get("architecture")?.done ?? false,
-            "hidden_size must divide evenly by attention heads.",
-            <>
-              <label>
-                Preset
-                <select
-                  value={preset}
-                  onChange={(e) => {
-                    invalidateFrom("architecture");
-                    onPresetChange(e.target.value);
-                  }}
-                >
-                  {presets.map((p) => (
-                    <option key={p.name} value={p.name}>{p.title}</option>
-                  ))}
-                </select>
-              </label>
-              <TransformerArchitectureDiagram
-                presetTitle={selectedPreset?.title}
-                family={archFamily}
-                initMode={initMode}
-                taskType={taskType}
-                baseModel={baseModel}
-                useLora={useLora}
-                hiddenSize={hiddenSize}
-                layers={layers}
-                heads={heads}
-                vocabSize={vocabSize}
-                maxPosition={maxPosition}
-                intermediateSize={intermediateSize}
-                tieWordEmbeddings={tieWordEmbeddings}
-                paramEstimate={paramEstimate}
-                onHiddenSizeChange={(n) => {
-                  invalidateFrom("architecture");
-                  onHiddenSizeChange(n);
-                }}
-                onLayersChange={(n) => {
-                  invalidateFrom("architecture");
-                  onLayersChange(n);
-                }}
-                onHeadsChange={(n) => {
-                  invalidateFrom("architecture");
-                  onHeadsChange(n);
-                }}
-              />
-              <div className="arch-grid arch-grid-compact">
-                <label>
-                  Hidden size
-                  <ValidatedNumberField
-                    value={hiddenSize}
-                    min={1}
-                    max={8192}
-                    onChange={(n) => {
-                      invalidateFrom("architecture");
-                      onHiddenSizeChange(n);
-                    }}
-                  />
-                </label>
-                <label>
-                  Layers
-                  <ValidatedNumberField
-                    value={layers}
-                    min={1}
-                    max={128}
-                    onChange={(n) => {
-                      invalidateFrom("architecture");
-                      onLayersChange(n);
-                    }}
-                  />
-                </label>
-                <label>
-                  Attention heads
-                  <ValidatedNumberField
-                    value={heads}
-                    min={1}
-                    max={128}
-                    onChange={(n) => {
-                      invalidateFrom("architecture");
-                      onHeadsChange(n);
-                    }}
-                  />
-                </label>
-                <label>
-                  Max positions
-                  <ValidatedNumberField
-                    value={maxPosition}
-                    min={128}
-                    max={32768}
-                    onChange={(n) => {
-                      invalidateFrom("architecture");
-                      onMaxPositionChange(n);
-                    }}
-                  />
-                </label>
-              </div>
-            </>,
-          )}
-
-          {section(
-            "training",
-            "Optimization schedule",
-            stepById.get("training")?.done ?? false,
-            "Set max_steps between 10 and 500,000.",
-            <label>
-              Training steps (max_steps)
-              <ValidatedNumberField
-                value={maxSteps}
-                min={10}
-                max={500_000}
-                onChange={(n) => {
-                  invalidateFrom("training");
-                  onMaxStepsChange(n);
-                }}
-              />
-            </label>,
-          )}
-
-          {section(
-            "compute",
-            "Ray / CDSW compute",
-            stepById.get("compute")?.done ?? false,
-            undefined,
-            <div className="arch-grid">
-              <label>
-                Ray / CDSW workers for new jobs
-                <ValidatedNumberField
-                  value={jobWorkers}
-                  min={1}
-                  max={32}
-                  onChange={(n) => {
-                    invalidateFrom("compute");
-                    onJobWorkersChange(n);
-                  }}
-                />
-              </label>
-              <label>
-                GPUs per worker
-                <ValidatedNumberField
-                  value={jobGpus}
-                  min={0}
-                  max={8}
-                  onChange={(n) => {
-                    invalidateFrom("compute");
-                    onJobGpusChange(n);
-                  }}
-                />
-              </label>
-            </div>,
-          )}
-
-          {section(
-            "register",
-            "Job metadata & /v1 id",
-            stepById.get("register")?.done ?? false,
-            "Job name and OpenAI model id (letters, digits, . _ -).",
-            <>
-              <label>
-                OpenAI model id
-                <input
-                  value={openaiModelId}
-                  onChange={(e) => {
-                    invalidateFrom("register");
-                    onOpenaiModelIdChange(e.target.value);
-                  }}
-                />
-              </label>
-              <label>
-                Job name
-                <input
-                  value={jobName}
-                  onChange={(e) => {
-                    invalidateFrom("register");
-                    onJobNameChange(e.target.value);
-                  }}
-                />
-              </label>
-            </>,
-          )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={async () => {
+              const name = window.prompt("Blueprint name", jobName || "my-blueprint");
+              if (!name?.trim()) return;
+              const file = buildModelTaskBlueprint(wizardState, name.trim());
+              await api.saveTaskBlueprint(file);
+              setBlueprintMessage(`Saved blueprint “${name.trim()}”`);
+              const list = await api.listTaskBlueprints();
+              setSavedBlueprints(list);
+            }}
+          >
+            Save blueprint
+          </button>
         </div>
+        {savedBlueprints.length > 0 && (
+          <label className="model-task-wizard-load">
+            Load saved blueprint
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id) void loadSavedBlueprint(id);
+                e.target.value = "";
+              }}
+            >
+              <option value="">Choose…</option>
+              {savedBlueprints.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {blueprintMessage && <p className="hint model-task-wizard-msg">{blueprintMessage}</p>}
+      </div>
+
+      <ModelTaskWizardStepper
+        steps={[...MODEL_TASK_WIZARD_STEPS]}
+        blueprintSteps={blueprintSteps}
+        currentIndex={currentStepIndex}
+        onSelectIndex={setCurrentStepIndex}
+      />
+
+      <div className="model-task-wizard-body">
+        <WizardStepCard
+          title={currentStep.title}
+          description={stepDescription}
+        >
+          {currentBlueprintStep && !currentBlueprintStep.done && currentBlueprintStep.requirement && (
+            <p className="hint blueprint-warn">{currentBlueprintStep.requirement}</p>
+          )}
+          {renderStepBody(currentStep.id)}
+        </WizardStepCard>
+
+        <footer className="model-task-wizard-footer">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={currentStepIndex === 0}
+            onClick={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
+          >
+            Back
+          </button>
+          {!isLastStep ? (
+            <button
+              type="button"
+              disabled={!canGoNext}
+              onClick={() => setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))}
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!ready || startBusy}
+              onClick={() => void onCreateJob(blueprintFile)}
+            >
+              {startBusy ? "Starting…" : "Start job"}
+            </button>
+          )}
+        </footer>
       </div>
     </div>
   );

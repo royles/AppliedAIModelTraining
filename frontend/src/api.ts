@@ -301,6 +301,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body ?? { resume: true }),
     }),
+  getTaskBlueprintDraft: () =>
+    request<{ blueprint: Record<string, unknown> | null }>("/api/training/task-blueprints/draft"),
+  putTaskBlueprintDraft: (blueprint: Record<string, unknown>) =>
+    request<{ blueprint: Record<string, unknown> }>("/api/training/task-blueprints/draft", {
+      method: "PUT",
+      body: JSON.stringify(blueprint),
+    }),
+  listTaskBlueprints: () =>
+    request<{ id: string; name: string; updated_at?: string; preset?: string }[]>(
+      "/api/training/task-blueprints",
+    ),
+  getTaskBlueprint: (id: string) =>
+    request<Record<string, unknown>>(`/api/training/task-blueprints/${encodeURIComponent(id)}`),
+  saveTaskBlueprint: (blueprint: Record<string, unknown>) =>
+    request<{ id: string; name: string; updated_at?: string }>("/api/training/task-blueprints", {
+      method: "POST",
+      body: JSON.stringify(blueprint),
+    }),
+  deleteTaskBlueprint: (id: string) =>
+    request<{ status: string }>(`/api/training/task-blueprints/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
   createJob: (body: {
     experiment_id: number;
     name: string;
@@ -310,6 +332,7 @@ export const api = {
     num_workers?: number;
     gpus_per_worker?: number;
     max_steps?: number;
+    task_blueprint?: Record<string, unknown>;
   }) =>
     request<TrainingJob>("/api/jobs", {
       method: "POST",

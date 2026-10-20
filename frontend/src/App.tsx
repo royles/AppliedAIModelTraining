@@ -28,6 +28,11 @@ import {
   DEFAULT_TOKENIZER,
   DEFAULT_VOCAB_SIZE,
 } from "./modelTaskDefaults";
+import {
+  parseModelTaskBlueprintFile,
+  wizardStateFromBlueprint,
+  type ModelTaskBlueprintFile,
+} from "./modelTaskBlueprint";
 
 type NavView = "tasks" | "registry" | "framework" | "model-tasks";
 
@@ -129,7 +134,45 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  useEffect(() => {
+    if (nav !== "model-tasks" || draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    api
+      .getTaskBlueprintDraft()
+      .then((r) => {
+        if (r.blueprint) {
+          applyModelTaskBlueprint(parseModelTaskBlueprintFile(r.blueprint));
+        }
+      })
+      .catch(() => {});
+  }, [nav, applyModelTaskBlueprint]);
+
   const appliedPresetRef = useRef<string | null>(null);
+  const draftLoadedRef = useRef(false);
+
+  const applyModelTaskBlueprint = useCallback((b: ModelTaskBlueprintFile) => {
+    const s = wizardStateFromBlueprint(b);
+    appliedPresetRef.current = s.preset;
+    setPreset(s.preset);
+    if (s.project_id != null) setSelectedExp(s.project_id);
+    setJobName(s.job_name);
+    setOpenaiModelId(s.openai_model_id);
+    setJobWorkers(s.num_workers);
+    setJobGpus(s.gpus_per_worker);
+    setMaxSteps(s.max_steps);
+    setInitMode(s.init_mode);
+    setTaskType(s.task_type);
+    setArchFamily(s.arch_family);
+    setVocabSize(s.vocab_size);
+    setHiddenSize(s.hidden_size);
+    setLayers(s.layers);
+    setHeads(s.heads);
+    setMaxPosition(s.max_position);
+    setIntermediateSize(s.intermediate_size);
+    setTieWordEmbeddings(s.tie_word_embeddings);
+    setTokenizer(s.tokenizer);
+    setDataset(s.dataset);
+  }, []);
 
   useEffect(() => {
     const p = presets.find((x) => x.name === preset);
@@ -285,7 +328,7 @@ export default function App() {
     }
   }
 
-  async function onCreateJob() {
+  async function onCreateJob(blueprint: ModelTaskBlueprintFile) {
     if (!selectedExp) return;
     setStartBusy(true);
     try {
@@ -297,6 +340,7 @@ export default function App() {
       num_workers: jobWorkers,
       gpus_per_worker: jobGpus,
       max_steps: maxSteps,
+      task_blueprint: blueprint,
       transformer: {
         init_mode: initMode,
         task_type: taskType,
@@ -532,6 +576,7 @@ export default function App() {
             jobGpus={jobGpus}
             onJobGpusChange={setJobGpus}
             onCreateJob={onCreateJob}
+            onApplyBlueprint={applyModelTaskBlueprint}
             dataset={dataset}
             onDatasetChange={setDataset}
             initMode={initMode}

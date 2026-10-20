@@ -77,12 +77,12 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
       id: "dataset",
       title: "Training dataset",
       description:
-        "Point training at inline text, files under data/datasets, or a Hugging Face split. " +
-        "From-scratch BPE training needs enough real text—built-in demo data is only for smoke tests.",
+        "Point training at inline text, files under data/datasets, Hugging Face, Iceberg tables, " +
+        "or Parquet on S3. From-scratch BPE needs enough real text—built-in demo is for smoke tests only.",
       dependsOn: ["mode"],
       requirement:
         ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset"
-          ? "Non-demo corpus: inline text, data/datasets file, or Hugging Face split."
+          ? "Non-demo corpus: files, HF, Iceberg, or S3 Parquet with a successful preview."
           : "Any configured source (builtin OK for smoke tests).",
       volumetrics: ctx.datasetPreview
         ? `${ctx.datasetPreview.examples.toLocaleString()} examples · ${corpusChars(ctx).toLocaleString()} characters (after repeat)`
@@ -98,7 +98,12 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
           return (ctx.dataset.texts?.length ?? 0) > 0;
         }
         if (ctx.dataset.source === "builtin") return true;
-        return Boolean(ctx.dataset.path || ctx.dataset.hf_dataset);
+        return Boolean(
+          ctx.dataset.path ||
+            ctx.dataset.hf_dataset ||
+            ctx.dataset.iceberg_table ||
+            ctx.dataset.parquet_uri,
+        );
       })(),
     },
     {
