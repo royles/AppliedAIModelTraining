@@ -37,7 +37,11 @@ from app.services.job_log import build_job_logs
 from app.services.job_lifecycle import restart_training_job
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.model_registry import get_trained_model_for_job, openai_model_ids_for_jobs
-from app.services.platform_settings import get_platform_settings, update_platform_settings
+from app.services.platform_settings import (
+    ensure_platform_settings,
+    get_platform_settings,
+    update_platform_settings,
+)
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.dataset_config import TrainingDatasetConfig
 from app.config import REPO_ROOT
@@ -275,12 +279,16 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
         raise HTTPException(status_code=404, detail="Project not found")
 
     cfg = _build_config(payload)
+    platform = ensure_platform_settings(db)
+    gpus_per_worker = payload.gpus_per_worker
+    if gpus_per_worker <= 0 and platform.gpus_per_worker > 0:
+        gpus_per_worker = platform.gpus_per_worker
     job = TrainingJob(
         experiment_id=payload.experiment_id,
         name=payload.name,
         model_name=cfg.to_train_dict(job_id=0, artifact_dir=".")["model_name"],
         num_workers=payload.num_workers,
-        gpus_per_worker=payload.gpus_per_worker,
+        gpus_per_worker=gpus_per_worker,
         epochs=payload.epochs,
         batch_size=cfg.per_device_train_batch_size,
         learning_rate=cfg.learning_rate,

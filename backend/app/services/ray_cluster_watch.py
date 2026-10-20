@@ -95,22 +95,20 @@ def log_ray_nodes_snapshot(log: LogFn, label: str) -> int:
     return len(nodes)
 
 
-def count_alive_ray_nodes_subprocess(
+def ray_cluster_snapshot_subprocess(
     gcs_address: str,
     *,
     auth_token: str | None = None,
     timeout_sec: float = 45.0,
-) -> int | None:
+) -> dict[str, float] | None:
     """
-    Count alive Ray nodes without ``ray.init`` in the API / job-runner process.
-
-    Spawns a short-lived child Python process so the FastAPI pod never becomes a
-    Ray driver client (avoids co-located head/driver bugs on CAI).
+    Cluster node/GPU snapshot without ``ray.init`` in the API / job-runner process.
     """
     from app.services.ray_driver_connect import ensure_ray_auth_token
 
     token = (auth_token or ensure_ray_auth_token() or "").strip()
     script = f"""
+import json
 import os
 import ray
 
@@ -118,8 +116,17 @@ os.environ["RAY_ADDRESS"] = {json.dumps(gcs_address)}
 if {json.dumps(token)}:
     os.environ["RAY_AUTH_TOKEN"] = {json.dumps(token)}
 ray.init(address=os.environ["RAY_ADDRESS"], ignore_reinit_error=True)
-alive = sum(1 for n in ray.nodes() if n.get("Alive"))
-print(alive)
+alive = 0
+gpu = 0.0
+cpu = 0.0
+for n in ray.nodes():
+    if not n.get("Alive"):
+        continue
+    alive += 1
+    res = n.get("Resources") or {{}}
+    gpu += float(res.get("GPU", 0) or 0)
+    cpu += float(res.get("CPU", 0) or 0)
+print(json.dumps({{"alive": alive, "gpu": gpu, "cpu": cpu}}))
 ray.shutdown()
 """
     try:
@@ -138,9 +145,30 @@ ray.shutdown()
     if not lines:
         return None
     try:
-        return int(lines[-1])
-    except ValueError:
+        data = json.loads(lines[-1])
+        if not isinstance(data, dict):
+            return None
+        return {
+            "alive": float(data.get("alive", 0)),
+            "gpu": float(data.get("gpu", 0)),
+            "cpu": float(data.get("cpu", 0)),
+        }
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None
+
+
+def count_alive_ray_nodes_subprocess(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 45.0,
+) -> int | None:
+    snap = ray_cluster_snapshot_subprocess(
+        gcs_address, auth_token=auth_token, timeout_sec=timeout_sec
+    )
+    if snap is None:
+        return None
+    return int(snap["alive"])
 
 
 def wait_for_cluster_nodes_subprocess(
@@ -148,38 +176,56 @@ def wait_for_cluster_nodes_subprocess(
     log: LogFn,
     *,
     min_alive: int,
+    min_gpu: float = 0.0,
     timeout_sec: float = 600.0,
     poll_sec: float = 8.0,
     auth_token: str | None = None,
 ) -> int:
-    """Poll Ray GCS until ``min_alive`` nodes are up (head + CDSW workers)."""
+    """Poll Ray GCS until ``min_alive`` nodes (and optional GPUs) are available."""
     seen_counts: set[int] = set()
     deadline = time.monotonic() + timeout_sec
+    need_gpu = min_gpu > 0
     log(
         framework_line(
             "ray",
-            f"Waiting for Ray cluster nodes (need >={min_alive}, timeout {int(timeout_sec)}s)…",
+            f"Waiting for Ray cluster (need >={min_alive} node(s)"
+            + (f", >={min_gpu:g} GPU" if need_gpu else "")
+            + f", timeout {int(timeout_sec)}s)…",
         )
     )
     while time.monotonic() < deadline:
-        count = count_alive_ray_nodes_subprocess(
+        snap = ray_cluster_snapshot_subprocess(
             gcs_address, auth_token=auth_token, timeout_sec=40.0
         )
-        if count is not None and count not in seen_counts:
-            seen_counts.add(count)
-            log(framework_line("ray", f"Cluster reports {count} alive node(s)"))
-        if count is not None and count >= min_alive:
-            log(ray_cluster_ready_line(count))
-            return count
+        if snap is not None:
+            count = int(snap["alive"])
+            if count not in seen_counts:
+                seen_counts.add(count)
+                log(
+                    framework_line(
+                        "ray",
+                        f"Cluster reports {count} alive node(s), "
+                        f"GPU={snap['gpu']:g} CPU={snap['cpu']:g}",
+                    )
+                )
+            nodes_ok = count >= min_alive
+            gpu_ok = not need_gpu or snap["gpu"] >= min_gpu
+            if nodes_ok and gpu_ok:
+                log(ray_cluster_ready_line(count))
+                return count
         time.sleep(poll_sec)
-    final = count_alive_ray_nodes_subprocess(
+    final = ray_cluster_snapshot_subprocess(
         gcs_address, auth_token=auth_token, timeout_sec=40.0
     )
-    final_n = final if final is not None else 0
+    final_n = int(final["alive"]) if final else 0
+    final_gpu = final["gpu"] if final else 0.0
     log(
         framework_line(
             "warn",
-            f"Cluster wait timeout: {final_n} node(s) alive (wanted >={min_alive})",
+            f"Cluster wait timeout: {final_n} node(s), {final_gpu:g} GPU "
+            f"(wanted >={min_alive} nodes"
+            + (f", >={min_gpu:g} GPU" if need_gpu else "")
+            + ")",
         )
     )
     return final_n

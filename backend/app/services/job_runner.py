@@ -137,7 +137,19 @@ def run_training_job(job_id: int) -> None:
 
         platform = ensure_platform_settings(db)
         head = resolved_ray_head(platform)
-        pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": job.gpus_per_worker}
+        gpus_per_worker = job.gpus_per_worker
+        if gpus_per_worker <= 0 and platform.gpus_per_worker > 0:
+            gpus_per_worker = platform.gpus_per_worker
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    f"Job GPUs/worker was 0; using platform default {gpus_per_worker}.",
+                ),
+            )
+        pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": gpus_per_worker}
         pool = CdswRayWorkerPool(**pool_kwargs)
 
         worker_group = WorkerGroup(
@@ -188,32 +200,6 @@ def run_training_job(job_id: int) -> None:
             )
             train_config["expected_cdsw_worker_nodes"] = job.num_workers
             train_config["ray_head_address"] = head
-
-            from app.services.ray_cluster_watch import wait_for_cluster_nodes_subprocess
-            from app.services.ray_driver_connect import ensure_ray_auth_token
-
-            min_cluster_nodes = 1 + job.num_workers
-            auth_token = ensure_ray_auth_token()
-            gcs_wait = ray_driver_init_address(head) if head else None
-            if gcs_wait:
-                waited = wait_for_cluster_nodes_subprocess(
-                    gcs_wait,
-                    lambda msg: append_job_log(db, job_id, "framework", msg),
-                    min_alive=min_cluster_nodes,
-                    timeout_sec=600.0,
-                    auth_token=auth_token,
-                )
-                if waited < min_cluster_nodes:
-                    append_job_log(
-                        db,
-                        job_id,
-                        "framework",
-                        framework_line(
-                            "warn",
-                            f"Proceeding with {waited}/{min_cluster_nodes} Ray nodes "
-                            "(workers may still be joining)",
-                        ),
-                    )
 
         from app.services.cdsw_workers import wait_for_gcs_port
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
@@ -266,11 +252,31 @@ def run_training_job(job_id: int) -> None:
         if ray_addr:
             os.environ["RAY_ADDRESS"] = ray_addr
 
-        use_gpu = job.gpus_per_worker > 0
+        use_gpu = gpus_per_worker > 0
         if platform.ray_local_mode and not pool.is_remote:
             ray_addr = None
 
         cdsw_engines = job.num_workers if launch_cdsw_workers else 0
+
+        if use_gpu and not launch_cdsw_workers:
+            if low_memory_mode:
+                detail = (
+                    "GPU training needs CDSW worker engines. Turn off "
+                    "'non-distributed low memory mode' in Framework settings."
+                )
+            elif not pool.is_remote:
+                detail = (
+                    "CDSW/CML workers API is not available in this process "
+                    "(expected cml.workers_v1, cdsw.workers, or cdsw.launch_workers)."
+                )
+            elif job.num_workers < 1:
+                detail = "Set Workers >= 1 for distributed GPU training."
+            elif not head:
+                detail = "No Ray head address; run scripts/start.py on the master session."
+            else:
+                detail = "CDSW worker launch was skipped."
+            append_job_log(db, job_id, "framework", framework_line("fail", detail))
+            raise RuntimeError(detail)
 
         mem_err = ray_train_session_memory_error(
             cdsw_worker_engines=cdsw_engines,
@@ -290,6 +296,40 @@ def run_training_job(job_id: int) -> None:
             )
         train_config["ray_train_workers_scheduled"] = train_workers
         train_config["cdsw_worker_engines"] = cdsw_engines
+
+        if launch_cdsw_workers and head:
+            from app.services.ray_cluster_watch import (
+                ray_cluster_snapshot_subprocess,
+                wait_for_cluster_nodes_subprocess,
+            )
+            from app.services.ray_driver_connect import ensure_ray_auth_token
+
+            gcs_wait = ray_driver_init_address(head)
+            min_cluster_nodes = 1 + cdsw_engines
+            min_gpu = float(train_workers * max(1, gpus_per_worker)) if use_gpu else 0.0
+            auth_token = ensure_ray_auth_token()
+            if gcs_wait:
+                wait_for_cluster_nodes_subprocess(
+                    gcs_wait,
+                    lambda msg: append_job_log(db, job_id, "framework", msg),
+                    min_alive=min_cluster_nodes,
+                    min_gpu=min_gpu,
+                    timeout_sec=900.0 if use_gpu else 600.0,
+                    auth_token=auth_token,
+                )
+                snap = ray_cluster_snapshot_subprocess(gcs_wait, auth_token=auth_token)
+                if use_gpu and (snap is None or snap["gpu"] < min_gpu):
+                    detail = (
+                        f"Ray cluster reports {snap['gpu'] if snap else 0:g} GPU but "
+                        f"Ray Train needs {min_gpu:g} ({train_workers} rank(s) × "
+                        f"{max(1, gpus_per_worker)} GPU). "
+                        "CDSW workers must join with `ray start --block` and "
+                        "nvidia_gpu>0 (check worker logs for gpus=1, GPU profile, "
+                        "CML_ACCELERATOR_LABEL_ID)."
+                    )
+                    append_job_log(db, job_id, "framework", framework_line("fail", detail))
+                    raise RuntimeError(detail)
+
         if train_workers < job.num_workers and not low_memory_mode:
             append_job_log(
                 db,

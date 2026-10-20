@@ -58,11 +58,19 @@ def _import_workers_client() -> WorkersClient | None:
     except ImportError:
         pass
     try:
+        import cdsw.workers as workers  # type: ignore[import-untyped]
+
+        return workers
+    except ImportError:
+        pass
+    try:
         import cdsw  # type: ignore[import-untyped]
 
-        return cdsw
+        if hasattr(cdsw, "launch_workers"):
+            return cdsw
     except ImportError:
-        return None
+        pass
+    return None
 
 
 def cdsw_available() -> bool:
@@ -372,9 +380,11 @@ class CdswRayWorkerPool:
         log_worker_launch_memory(worker_mem, worker_gpus)
         raw = self._client.launch_workers(**kwargs)
         worker_ids = _extract_worker_ids(raw)
+        if self._launched and self._launched.worker_ids:
+            worker_ids = self._launched.worker_ids + worker_ids
         self._launched = LaunchedWorkers(worker_ids=worker_ids, raw=raw)
         logger.info("Launched %s CDSW workers for Ray head %s", count, head_address)
-        return self._launched
+        return LaunchedWorkers(worker_ids=worker_ids[-count:], raw=raw)
 
     def list_workers_safe(self) -> list[dict[str, Any]]:
         if self._client is None:
