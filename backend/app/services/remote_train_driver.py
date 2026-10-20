@@ -32,15 +32,21 @@ def write_remote_train_payload(
     num_workers: int,
     use_gpu: bool,
     train_config: dict[str, Any],
+    ray_head_address: str | None = None,
+    ray_auth_token: str | None = None,
 ) -> Path:
     path = remote_payload_path(artifact_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload: dict[str, Any] = {
         "ray_address": ray_address,
         "num_workers": num_workers,
         "use_gpu": use_gpu,
         "train_config": train_config,
     }
+    if ray_head_address:
+        payload["ray_head_address"] = ray_head_address
+    if ray_auth_token:
+        payload["ray_auth_token"] = ray_auth_token
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
@@ -120,17 +126,35 @@ try:
     os.environ["RAY_ADDRESS"] = head
     print(f"[platform] Remote Ray Train driver job={{JOB_ID}} head={{head}} node_ip={{node_ip}}", flush=True)
 
-    import ray
-    token_path = Path.home() / ".ray" / "auth_token"
-    if token_path.is_file():
-        os.environ["RAY_AUTH_TOKEN"] = token_path.read_text(encoding="utf-8").strip()
-    ray.init(address=head, _node_ip_address=node_ip.strip(), ignore_reinit_error=True)
-    print(f"[platform] ray.init OK nodes={{len(ray.nodes())}}", flush=True)
+    token = (payload.get("ray_auth_token") or "").strip()
+    if token:
+        os.environ["RAY_AUTH_TOKEN"] = token
+    else:
+        token_path = Path.home() / ".ray" / "auth_token"
+        if token_path.is_file():
+            os.environ["RAY_AUTH_TOKEN"] = token_path.read_text(encoding="utf-8").strip()
+
+    from app.services.ray_driver_connect import init_ray_train_driver
+
+    worker_head = payload.get("ray_head_address") or head
+
+    def _flog(msg: str) -> None:
+        print(f"[platform] {{msg}}", flush=True)
+
+    gcs = init_ray_train_driver(
+        payload["ray_address"],
+        worker_head=worker_head,
+        session_only=False,
+        framework_log=_flog,
+    )
+    print(f"[platform] Ray driver connected at {{gcs}}", flush=True)
 
     from app.training.transformer_job import run_transformer_training
 
     tc = dict(payload["train_config"])
     tc["remote_driver_engine"] = True
+    if worker_head:
+        tc["ray_head_address"] = worker_head
     result = run_transformer_training(
         ray_address=payload["ray_address"],
         num_workers=int(payload["num_workers"]),

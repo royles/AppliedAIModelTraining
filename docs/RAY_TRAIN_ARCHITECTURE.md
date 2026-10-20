@@ -31,9 +31,10 @@ When **`num_workers > 0`** and **non-distributed low memory mode is off**:
 
 1. Session starts / keeps **Ray head** only.
 2. Platform launches **N GPU CDSW workers** (raylets) — unchanged.
-3. Platform launches **one extra CDSW engine** that runs **only the Ray Train driver** (no `ray start --block` on that engine).
-4. That engine calls `ray.init(address=MASTER:6379)` **from a remote pod** — the same networking model as workers joining.
-5. Session API **polls** the driver result file and updates the job; it does **not** call `ray.init` for Train.
+3. Session waits until Ray reports **head + N worker nodes** (subprocess poll; API process never calls `ray.init`).
+4. Platform launches **one extra CDSW engine** that runs **only the Ray Train driver** (no `ray start --block` on that engine).
+5. That engine uses the shared **`init_ray_train_driver`** path with the GCS **auth token** from the session payload (not only `~/.ray` on the worker home).
+6. Session API **polls** the driver result file and updates the job; it does **not** call `ray.init` for Train.
 
 ## Session-only / low-memory mode
 

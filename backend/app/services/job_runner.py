@@ -189,6 +189,33 @@ def run_training_job(job_id: int) -> None:
             train_config["expected_cdsw_worker_nodes"] = job.num_workers
             train_config["ray_head_address"] = head
 
+            from app.services.cdsw_workers import ray_driver_init_address
+            from app.services.ray_cluster_watch import wait_for_cluster_nodes_subprocess
+            from app.services.ray_driver_connect import ensure_ray_auth_token
+
+            min_cluster_nodes = 1 + job.num_workers
+            auth_token = ensure_ray_auth_token()
+            gcs_wait = ray_driver_init_address(head) if head else None
+            if gcs_wait:
+                waited = wait_for_cluster_nodes_subprocess(
+                    gcs_wait,
+                    lambda msg: append_job_log(db, job_id, "framework", msg),
+                    min_alive=min_cluster_nodes,
+                    timeout_sec=600.0,
+                    auth_token=auth_token,
+                )
+                if waited < min_cluster_nodes:
+                    append_job_log(
+                        db,
+                        job_id,
+                        "framework",
+                        framework_line(
+                            "warn",
+                            f"Proceeding with {waited}/{min_cluster_nodes} Ray nodes "
+                            "(workers may still be joining)",
+                        ),
+                    )
+
         from app.services.cdsw_workers import wait_for_gcs_port
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
@@ -370,12 +397,16 @@ def run_training_job(job_id: int) -> None:
                     "engine (session keeps Ray head only; avoids co-located ray.init).",
                 ),
             )
+            from app.services.ray_driver_connect import ensure_ray_auth_token
+
             write_remote_train_payload(
                 artifact_dir,
                 ray_address=ray_addr,
                 num_workers=train_workers,
                 use_gpu=use_gpu,
                 train_config=train_config,
+                ray_head_address=head,
+                ray_auth_token=ensure_ray_auth_token(),
             )
             driver_head = head
             pool.launch(
@@ -383,7 +414,7 @@ def run_training_job(job_id: int) -> None:
                 driver_head,
                 code=build_remote_train_driver_code(job_id, driver_head),
                 cpu=2.0,
-                memory_gb=8.0,
+                memory_gb=12.0,
                 gpus_per_worker=0,
             )
             append_job_log(
@@ -419,9 +450,9 @@ def run_training_job(job_id: int) -> None:
                     job_id,
                     "framework",
                     framework_line(
-                        "warn",
-                        "Train driver on session pod (set PLATFORM_TRAIN_DRIVER_ON_SESSION=1 "
-                        "to force). Prefer distributed remote driver (default).",
+                        "train",
+                        "Train driver on session pod (PLATFORM_TRAIN_DRIVER_ON_SESSION=1). "
+                        "Unset that env var to use the remote CDSW driver (default).",
                     ),
                 )
             result = run_transformer_training(

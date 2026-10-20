@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
+import sys
 import time
 from typing import Any, Callable
 
@@ -90,6 +93,96 @@ def log_ray_nodes_snapshot(log: LogFn, label: str) -> int:
     for i, node in enumerate(nodes, start=1):
         log(framework_line("info", f"  node {i}: {_node_label(node)}"))
     return len(nodes)
+
+
+def count_alive_ray_nodes_subprocess(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 45.0,
+) -> int | None:
+    """
+    Count alive Ray nodes without ``ray.init`` in the API / job-runner process.
+
+    Spawns a short-lived child Python process so the FastAPI pod never becomes a
+    Ray driver client (avoids co-located head/driver bugs on CAI).
+    """
+    from app.services.ray_driver_connect import ensure_ray_auth_token
+
+    token = (auth_token or ensure_ray_auth_token() or "").strip()
+    script = f"""
+import os
+import ray
+
+os.environ["RAY_ADDRESS"] = {json.dumps(gcs_address)}
+if {json.dumps(token)}:
+    os.environ["RAY_AUTH_TOKEN"] = {json.dumps(token)}
+ray.init(address=os.environ["RAY_ADDRESS"], ignore_reinit_error=True)
+alive = sum(1 for n in ray.nodes() if n.get("Alive"))
+print(alive)
+ray.shutdown()
+"""
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    lines = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    try:
+        return int(lines[-1])
+    except ValueError:
+        return None
+
+
+def wait_for_cluster_nodes_subprocess(
+    gcs_address: str,
+    log: LogFn,
+    *,
+    min_alive: int,
+    timeout_sec: float = 600.0,
+    poll_sec: float = 8.0,
+    auth_token: str | None = None,
+) -> int:
+    """Poll Ray GCS until ``min_alive`` nodes are up (head + CDSW workers)."""
+    seen_counts: set[int] = set()
+    deadline = time.monotonic() + timeout_sec
+    log(
+        framework_line(
+            "ray",
+            f"Waiting for Ray cluster nodes (need >={min_alive}, timeout {int(timeout_sec)}s)…",
+        )
+    )
+    while time.monotonic() < deadline:
+        count = count_alive_ray_nodes_subprocess(
+            gcs_address, auth_token=auth_token, timeout_sec=40.0
+        )
+        if count is not None and count not in seen_counts:
+            seen_counts.add(count)
+            log(framework_line("ray", f"Cluster reports {count} alive node(s)"))
+        if count is not None and count >= min_alive:
+            log(ray_cluster_ready_line(count))
+            return count
+        time.sleep(poll_sec)
+    final = count_alive_ray_nodes_subprocess(
+        gcs_address, auth_token=auth_token, timeout_sec=40.0
+    )
+    final_n = final if final is not None else 0
+    log(
+        framework_line(
+            "warn",
+            f"Cluster wait timeout: {final_n} node(s) alive (wanted >={min_alive})",
+        )
+    )
+    return final_n
 
 
 def wait_for_ray_nodes(

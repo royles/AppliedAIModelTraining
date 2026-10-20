@@ -20,11 +20,19 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20e"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20f"
 
 
 def _ray_cli(*args: str) -> list[str]:
     return [sys.executable, "-m", "ray.scripts.scripts", *args]
+
+
+def ensure_ray_auth_token() -> str | None:
+    """Load Ray GCS auth token from env, file, or ``ray get-auth-token``."""
+    apply_ray_auth_from_session()
+    _sync_auth_from_cli()
+    token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
+    return token or None
 
 
 def apply_ray_auth_from_session() -> bool:
