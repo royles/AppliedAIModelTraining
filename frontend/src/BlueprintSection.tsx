@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 type Props = {
   stepId: string;
   title: string;
+  description?: string;
   children: ReactNode;
   canConfirm: boolean;
   confirmed: boolean;
@@ -10,9 +11,10 @@ type Props = {
   confirmHint?: string;
 };
 
-export function RecipeSection({
+export function BlueprintSection({
   stepId,
   title,
+  description,
   children,
   canConfirm,
   confirmed,
@@ -21,15 +23,16 @@ export function RecipeSection({
 }: Props) {
   return (
     <article
-      id={`recipe-step-${stepId}`}
-      className={`card recipe-section ${confirmed ? "recipe-section-confirmed" : ""}`}
+      id={`blueprint-step-${stepId}`}
+      className={`card blueprint-section ${confirmed ? "blueprint-section-confirmed" : ""}`}
     >
-      <header className="recipe-section-header">
-        <p className="recipe-step-label">Recipe step: {title}</p>
+      <header className="blueprint-section-header">
+        <p className="blueprint-step-label">Blueprint step</p>
         <h3>{title}</h3>
+        {description && <p className="blueprint-step-description">{description}</p>}
       </header>
       {children}
-      <div className="recipe-section-actions">
+      <div className="blueprint-section-actions">
         <button
           type="button"
           className={confirmed ? "btn-secondary" : ""}
@@ -39,7 +42,7 @@ export function RecipeSection({
           {confirmed ? "Confirmed — edit to unlock" : "Confirm step"}
         </button>
         {!canConfirm && confirmHint && (
-          <p className="hint recipe-section-hint">{confirmHint}</p>
+          <p className="hint blueprint-section-hint">{confirmHint}</p>
         )}
       </div>
     </article>

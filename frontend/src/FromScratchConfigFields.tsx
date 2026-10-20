@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type TokenizerBuildConfig } from "./api";
+import { ValidatedNumberField } from "./ValidatedNumberField";
 
 type Props = {
   section?: "mode" | "tokenizer" | "all";
@@ -71,7 +72,7 @@ export function FromScratchConfigFields({
   const Wrapper = wrapper as "article" | "div";
 
   return (
-    <Wrapper className={section === "all" ? "card" : "recipe-section-fields"}>
+    <Wrapper className={section === "all" ? "card" : "blueprint-section-fields"}>
       {showMode && (
         <>
           {section === "all" && <h3>Training mode</h3>}
@@ -124,25 +125,23 @@ export function FromScratchConfigFields({
             <div className="arch-grid arch-grid-compact">
               <label>
                 Target vocab size
-                <input
-                  type="number"
-                  min={256}
-                  max={256000}
+                <ValidatedNumberField
                   value={tokenizer.vocab_size ?? vocabSize}
-                  onChange={(e) =>
-                    patchTokenizer({ vocab_size: Number(e.target.value) })
-                  }
+                  min={256}
+                  max={256_000}
+                  onChange={(n) => {
+                    patchTokenizer({ vocab_size: n });
+                    onVocabSizeChange(n);
+                  }}
                 />
               </label>
               <label>
                 BPE min frequency
-                <input
-                  type="number"
-                  min={1}
+                <ValidatedNumberField
                   value={tokenizer.min_frequency ?? 2}
-                  onChange={(e) =>
-                    patchTokenizer({ min_frequency: Number(e.target.value) })
-                  }
+                  min={1}
+                  max={10_000}
+                  onChange={(n) => patchTokenizer({ min_frequency: n })}
                 />
               </label>
             </div>

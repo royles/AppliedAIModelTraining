@@ -12,6 +12,11 @@ class ExperimentCreate(BaseModel):
     description: str | None = None
 
 
+class ExperimentUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+
+
 class ExperimentRead(BaseModel):
     id: int
     name: str
@@ -48,6 +53,12 @@ class JobRestartRequest(BaseModel):
         default=True,
         description="When true, continue from progress.json / last epoch checkpoint if present.",
     )
+
+
+class TrainingJobUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    experiment_id: int | None = None
+    openai_model_id: str | None = Field(default=None, max_length=64)
 
 
 class TrainingJobRead(BaseModel):

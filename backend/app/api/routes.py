@@ -11,11 +11,13 @@ from app.models import Experiment, TrainingJob
 from app.schemas import (
     ArchitectureSummary,
     ExperimentCreate,
+    ExperimentUpdate,
     ExperimentRead,
     HealthResponse,
     ScaleWorkersRequest,
     JobRestartRequest,
     TrainingJobCreate,
+    TrainingJobUpdate,
     TrainingJobRead,
     JobLogsRead,
     UiBuildInfoRead,
@@ -33,10 +35,15 @@ from app.services.cai_networking import (
     ray_worker_head_address,
 )
 from app.services.job_delete import delete_training_job
+from app.services.project_delete import delete_project
 from app.services.job_log import build_job_logs
 from app.services.job_lifecycle import restart_training_job
 from app.services.job_runner import enqueue_training_job, scale_job_workers
-from app.services.model_registry import get_trained_model_for_job, openai_model_ids_for_jobs
+from app.services.model_registry import (
+    get_trained_model_for_job,
+    openai_model_ids_for_jobs,
+    validate_openai_model_id,
+)
 from app.services.platform_settings import (
     ensure_platform_settings,
     get_platform_settings,
@@ -259,6 +266,33 @@ def create_project(payload: ExperimentCreate, db: Session = Depends(get_db)) -> 
     return exp
 
 
+@router.patch("/experiments/{project_id}", response_model=ExperimentRead, include_in_schema=False)
+@router.patch("/projects/{project_id}", response_model=ExperimentRead)
+def update_project(
+    project_id: int, payload: ExperimentUpdate, db: Session = Depends(get_db)
+) -> Experiment:
+    exp = db.get(Experiment, project_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if payload.name is not None:
+        exp.name = payload.name.strip()
+    if payload.description is not None:
+        exp.description = payload.description
+    db.commit()
+    db.refresh(exp)
+    return exp
+
+
+@router.delete("/experiments/{project_id}", include_in_schema=False)
+@router.delete("/projects/{project_id}")
+def remove_project(project_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
+    try:
+        delete_project(db, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": "deleted", "project_id": str(project_id)}
+
+
 @router.get("/jobs", response_model=list[TrainingJobRead])
 def list_jobs(db: Session = Depends(get_db)) -> list[TrainingJobRead]:
     jobs = list(db.scalars(select(TrainingJob).order_by(TrainingJob.created_at.desc())))
@@ -327,6 +361,36 @@ def restart_job(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _job_to_read(db, job)
+
+
+@router.patch("/jobs/{job_id}", response_model=TrainingJobRead)
+def update_job(
+    job_id: int, payload: TrainingJobUpdate, db: Session = Depends(get_db)
+) -> TrainingJobRead:
+    job = db.get(TrainingJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if payload.experiment_id is not None:
+        exp = db.get(Experiment, payload.experiment_id)
+        if not exp:
+            raise HTTPException(status_code=404, detail="Project not found")
+        job.experiment_id = payload.experiment_id
+    if payload.name is not None:
+        job.name = payload.name.strip()
+    if payload.openai_model_id is not None:
+        model_id = validate_openai_model_id(payload.openai_model_id.strip())
+        if job.config_json:
+            try:
+                cfg = json.loads(job.config_json)
+            except json.JSONDecodeError:
+                cfg = {}
+        else:
+            cfg = {}
+        cfg["openai_model_id"] = model_id
+        job.config_json = json.dumps(cfg)
+    db.commit()
+    db.refresh(job)
     return _job_to_read(db, job)
 
 

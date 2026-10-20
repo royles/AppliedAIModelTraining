@@ -6,7 +6,7 @@ export type DatasetPreview = {
   source: string;
 };
 
-export type RecipeContext = {
+export type BlueprintContext = {
   initMode: "from_scratch" | "pretrained";
   tokenizer: TokenizerBuildConfig;
   vocabSize: number;
@@ -25,9 +25,10 @@ export type RecipeContext = {
   minCorpusChars: number | null;
 };
 
-export type RecipeStep = {
+export type BlueprintStep = {
   id: string;
   title: string;
+  description: string;
   dependsOn: string[];
   requirement: string;
   volumetrics: string;
@@ -37,16 +38,19 @@ export type RecipeStep = {
 
 const OPENAI_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 
-function corpusChars(ctx: RecipeContext): number {
+function corpusChars(ctx: BlueprintContext): number {
   if (!ctx.datasetPreview) return 0;
   return ctx.datasetPreview.total_characters;
 }
 
-export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
-  const steps: Omit<RecipeStep, "waitingOn">[] = [
+export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
+  const steps: Omit<BlueprintStep, "waitingOn">[] = [
     {
       id: "project",
-      title: "Project",
+      title: "Project & tasks",
+      description:
+        "A project groups related training tasks (jobs) in one place. Create or select a project, then manage existing tasks under it. " +
+        "The blueprint on the right configures a new task; starting training submits it to Ray under the active project.",
       dependsOn: [],
       requirement: "Select a project to group model tasks (create one if empty).",
       volumetrics: "One project record in the platform database.",
@@ -55,6 +59,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "mode",
       title: "Training mode",
+      description:
+        "Choose whether to train from random weights or fine-tune a Hugging Face checkpoint. " +
+        "From scratch needs a corpus-fit tokenizer; fine-tuning reuses preset weights and is usually faster to useful quality.",
       dependsOn: [],
       requirement:
         ctx.initMode === "from_scratch"
@@ -69,6 +76,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "dataset",
       title: "Training dataset",
+      description:
+        "Point training at inline text, files under data/datasets, or a Hugging Face split. " +
+        "From-scratch BPE training needs enough real text—built-in demo data is only for smoke tests.",
       dependsOn: ["mode"],
       requirement:
         ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset"
@@ -94,6 +104,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "tokenizer",
       title: "Tokenizer & vocabulary",
+      description:
+        "The tokenizer maps text to token ids your model will use. " +
+        "Train byte-pair encoding on your corpus or reuse GPT-2 vocabulary; vocab size must match the architecture step.",
       dependsOn: ["dataset"],
       requirement:
         ctx.tokenizer.mode === "train_bpe_from_dataset"
@@ -114,6 +127,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "architecture",
       title: "Transformer geometry",
+      description:
+        "Set hidden size, layer count, and attention heads (hidden size must divide evenly by heads). " +
+        "Presets provide starting points; the diagram summarizes capacity and parameter count.",
       dependsOn: ["tokenizer"],
       requirement: "hidden_size divisible by num_attention_heads; GPT-2 family for scratch causal LM.",
       volumetrics: `d=${ctx.hiddenSize} · L=${ctx.layers} · H=${ctx.heads} · ~${
@@ -128,16 +144,15 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
         if (ctx.initMode === "pretrained") {
           return geomOk;
         }
-        return (
-          geomOk &&
-          ctx.paramEstimate !== null &&
-          ctx.paramEstimate < 500_000_000
-        );
+        return geomOk && ctx.paramEstimate !== null && ctx.paramEstimate < 500_000_000;
       })(),
     },
     {
       id: "training",
       title: "Optimization schedule",
+      description:
+        "max_steps caps how many optimizer updates Ray Train will run. " +
+        "Short runs are fine for plumbing checks; meaningful from-scratch models usually need thousands of steps or more.",
       dependsOn: ["architecture"],
       requirement: "max_steps and learning rate set; logging_steps implied by preset.",
       volumetrics: `max_steps ${ctx.maxSteps.toLocaleString()} (typical scratch smoke: 40–500 · serious: 5k–50k+)`,
@@ -146,6 +161,9 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "compute",
       title: "Ray / CDSW compute",
+      description:
+        "Workers and GPUs per worker control distributed Ray Train and optional Cloudera AI engines. " +
+        "Larger models generally need at least one GPU per worker unless you stay on a single worker.",
       dependsOn: ["training"],
       requirement: "Workers and GPUs per worker for Ray Train + optional CDSW engines.",
       volumetrics: `${ctx.jobWorkers} worker(s) · ${ctx.jobGpus} GPU/worker (GPU recommended when params > ~50M)`,
@@ -160,11 +178,13 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
     {
       id: "register",
       title: "Task metadata & /v1 id",
+      description:
+        "Give the task a human-readable name and an OpenAI-compatible model id for registration after a successful run. " +
+        "The id is what clients pass to /v1/chat/completions once the model is in the registry.",
       dependsOn: ["compute"],
       requirement: "Job name and OpenAI-compatible model id for registration after success.",
       volumetrics: "model id 1–64 chars: letters, digits, . _ -",
-      done:
-        ctx.jobName.trim().length > 0 && OPENAI_ID.test(ctx.openaiModelId.trim()),
+      done: ctx.jobName.trim().length > 0 && OPENAI_ID.test(ctx.openaiModelId.trim()),
     },
   ];
 
@@ -178,9 +198,10 @@ export function buildTrainingRecipe(ctx: RecipeContext): RecipeStep[] {
   });
 }
 
-export function recipeReady(steps: RecipeStep[], confirmedStepIds?: ReadonlySet<string>): boolean {
+export function blueprintReady(
+  steps: BlueprintStep[],
+  confirmedStepIds?: ReadonlySet<string>,
+): boolean {
   if (steps.length === 0) return false;
-  return steps.every(
-    (s) => s.done && (confirmedStepIds ? confirmedStepIds.has(s.id) : true),
-  );
+  return steps.every((s) => s.done && (confirmedStepIds ? confirmedStepIds.has(s.id) : true));
 }

@@ -1,6 +1,6 @@
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
 
-/** Sane defaults for a local / CAI from-scratch smoke run that can pass the training recipe. */
+/** Sane defaults for a local / CAI from-scratch smoke run that can pass the task blueprint. */
 export const DEFAULT_PRESET = "scratch_gpt2_tiny";
 
 export const DEFAULT_DATASET: TrainingDatasetConfig = {

@@ -42,7 +42,11 @@ export default function App() {
   const [presets, setPresets] = useState<TransformerPreset[]>([]);
   const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [paramEstimate, setParamEstimate] = useState<number | null>(null);
-  const [projectName, setProjectName] = useState(DEFAULT_PROJECT_NAME);
+  const [newProjectName, setNewProjectName] = useState(DEFAULT_PROJECT_NAME);
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [jobBusy, setJobBusy] = useState(false);
+  const [startBusy, setStartBusy] = useState(false);
   const [jobName, setJobName] = useState(DEFAULT_JOB_NAME);
   const [openaiModelId, setOpenaiModelId] = useState(DEFAULT_OPENAI_MODEL_ID);
   const [selectedExp, setSelectedExp] = useState<number | null>(null);
@@ -198,13 +202,87 @@ export default function App() {
   }, []);
 
   async function onCreateProject() {
-    await api.createProject({ name: projectName });
-    setProjectName("");
-    await refresh();
+    const name = newProjectName.trim();
+    if (!name) return;
+    setProjectBusy(true);
+    try {
+      const created = await api.createProject({
+        name,
+        description: newProjectDescription.trim() || undefined,
+      });
+      setNewProjectName("");
+      setNewProjectDescription("");
+      setSelectedExp(created.id);
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProjectBusy(false);
+    }
+  }
+
+  async function onUpdateProject(projectId: number, name: string) {
+    setProjectBusy(true);
+    try {
+      await api.updateProject(projectId, { name });
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProjectBusy(false);
+    }
+  }
+
+  async function onDeleteProject(projectId: number) {
+    if (!window.confirm("Delete this project and all tasks in it?")) return;
+    setProjectBusy(true);
+    try {
+      await api.deleteProject(projectId);
+      if (selectedExp === projectId) {
+        setSelectedExp(null);
+      }
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProjectBusy(false);
+    }
+  }
+
+  async function onUpdateJobName(jobId: number, name: string) {
+    setJobBusy(true);
+    try {
+      await api.updateJob(jobId, { name });
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setJobBusy(false);
+    }
+  }
+
+  async function onDeleteJobFromBlueprint(jobId: number) {
+    if (!window.confirm("Delete this task and its artifacts?")) return;
+    setJobBusy(true);
+    try {
+      await api.deleteJob(jobId);
+      await refresh();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setJobBusy(false);
+    }
   }
 
   async function onCreateJob() {
     if (!selectedExp) return;
+    setStartBusy(true);
+    try {
     await api.createJob({
       experiment_id: selectedExp,
       name: jobName,
@@ -237,6 +315,12 @@ export default function App() {
     await refresh();
     setNav("tasks");
     setSelectedJobId(null);
+    setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStartBusy(false);
+    }
   }
 
   function openTask(jobId: number) {
@@ -416,11 +500,21 @@ export default function App() {
             onHeadsChange={setHeads}
             onMaxStepsChange={setMaxSteps}
             projects={projects}
+            jobs={jobs}
             selectedProjectId={selectedExp}
             onSelectedProjectIdChange={setSelectedExp}
-            projectName={projectName}
-            onProjectNameChange={setProjectName}
+            newProjectName={newProjectName}
+            onNewProjectNameChange={setNewProjectName}
+            newProjectDescription={newProjectDescription}
+            onNewProjectDescriptionChange={setNewProjectDescription}
             onCreateProject={onCreateProject}
+            onUpdateProject={onUpdateProject}
+            onDeleteProject={onDeleteProject}
+            onUpdateJobName={onUpdateJobName}
+            onDeleteJob={onDeleteJobFromBlueprint}
+            projectBusy={projectBusy}
+            jobBusy={jobBusy}
+            startBusy={startBusy}
             jobName={jobName}
             onJobNameChange={setJobName}
             openaiModelId={openaiModelId}

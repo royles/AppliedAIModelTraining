@@ -246,6 +246,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateProject: (projectId: number, body: { name?: string; description?: string | null }) =>
+    request<Project>(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteProject: (projectId: number) =>
+    request<{ status: string; project_id: string }>(`/api/projects/${projectId}`, {
+      method: "DELETE",
+    }),
   /** @deprecated Use listProjects */
   listExperiments: () => request<Project[]>("/api/experiments"),
   /** @deprecated Use createProject */
@@ -260,6 +269,11 @@ export const api = {
   deleteJob: (jobId: number) =>
     request<{ status: string; job_id: string }>(`/api/jobs/${jobId}`, {
       method: "DELETE",
+    }),
+  updateJob: (jobId: number, body: { name?: string; experiment_id?: number; openai_model_id?: string }) =>
+    request<TrainingJob>(`/api/jobs/${jobId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
     }),
   restartJob: (jobId: number, body?: { resume?: boolean }) =>
     request<TrainingJob>(`/api/jobs/${jobId}/restart`, {

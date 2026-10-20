@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import {
-  buildTrainingRecipe,
+  blueprintReady,
+  buildTrainingBlueprint,
+  type BlueprintContext,
   type DatasetPreview,
-  type RecipeContext,
-  recipeReady,
-} from "./trainingRecipe";
+} from "./trainingBlueprint";
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
 
 type Props = {
@@ -19,16 +19,19 @@ type Props = {
   jobWorkers: number;
   jobGpus: number;
   dataset: TrainingDatasetConfig;
-  selectedExp: number | null; // project id
+  selectedExp: number | null;
   jobName: string;
   openaiModelId: string;
   paramEstimate: number | null;
   confirmedStepIds: ReadonlySet<string>;
   onStepSelect?: (stepId: string) => void;
-  onStepsChange?: (steps: ReturnType<typeof buildTrainingRecipe>) => void;
+  onStepsChange?: (steps: ReturnType<typeof buildTrainingBlueprint>) => void;
+  canStart: boolean;
+  onStartTask: () => void;
+  startBusy?: boolean;
 };
 
-export function TrainingRecipeChecklist(props: Props) {
+export function TrainingBlueprintChecklist(props: Props) {
   const {
     initMode,
     tokenizer,
@@ -47,6 +50,9 @@ export function TrainingRecipeChecklist(props: Props) {
     confirmedStepIds,
     onStepSelect,
     onStepsChange,
+    canStart,
+    onStartTask,
+    startBusy,
   } = props;
 
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
@@ -101,7 +107,7 @@ export function TrainingRecipeChecklist(props: Props) {
     };
   }, [dataset]);
 
-  const ctx: RecipeContext = useMemo(
+  const ctx: BlueprintContext = useMemo(
     () => ({
       initMode,
       tokenizer,
@@ -140,33 +146,31 @@ export function TrainingRecipeChecklist(props: Props) {
     ],
   );
 
-  const steps = useMemo(() => buildTrainingRecipe(ctx), [ctx]);
-  const ready = recipeReady(steps, confirmedStepIds);
+  const steps = useMemo(() => buildTrainingBlueprint(ctx), [ctx]);
+  const ready = blueprintReady(steps, confirmedStepIds);
 
   useEffect(() => {
     onStepsChange?.(steps);
   }, [steps, onStepsChange]);
 
-  const doneCount = steps.filter(
-    (s) => s.done && confirmedStepIds.has(s.id),
-  ).length;
+  const doneCount = steps.filter((s) => s.done && confirmedStepIds.has(s.id)).length;
 
   return (
-    <article className="card recipe-checklist">
-      <header className="recipe-header">
-        <h3>Training recipe</h3>
-        <span className="recipe-progress">
+    <article className="card blueprint-checklist">
+      <header className="blueprint-header">
+        <h3>Task blueprint</h3>
+        <span className="blueprint-progress">
           {doneCount}/{steps.length} confirmed
         </span>
       </header>
       <p className="hint">
-        Steps unlock top to bottom. Click a step to jump to its config. Use{" "}
-        <strong>Confirm step</strong> on the right when values are final.
+        A blueprint is the full configuration for one training task. Steps unlock top to bottom;
+        click a step to jump to its fields. Confirm each step on the right when values are final.
       </p>
       {previewError && dataset.source !== "builtin" && (
-        <p className="hint recipe-warn">Dataset preview: {previewError}</p>
+        <p className="hint blueprint-warn">Dataset preview: {previewError}</p>
       )}
-      <ol className="recipe-steps">
+      <ol className="blueprint-steps">
         {steps.map((step) => {
           const confirmed = confirmedStepIds.has(step.id);
           const complete = step.done && confirmed;
@@ -174,25 +178,25 @@ export function TrainingRecipeChecklist(props: Props) {
             <li key={step.id}>
               <button
                 type="button"
-                className={`recipe-step recipe-step-button ${complete ? "done" : ""} ${
+                className={`blueprint-step blueprint-step-button ${complete ? "done" : ""} ${
                   step.waitingOn.length ? "blocked" : ""
                 } ${confirmed && !complete ? "confirmed-pending" : ""}`}
                 onClick={() => onStepSelect?.(step.id)}
               >
-                <span className="recipe-tick" aria-hidden>
+                <span className="blueprint-tick" aria-hidden>
                   {complete ? "✓" : confirmed ? "◐" : "○"}
                 </span>
-                <div className="recipe-step-body">
+                <div className="blueprint-step-body">
                   <strong>{step.title}</strong>
-                  <p className="recipe-req">{step.requirement}</p>
-                  <p className="hint recipe-vol">{step.volumetrics}</p>
+                  <p className="blueprint-req">{step.requirement}</p>
+                  <p className="hint blueprint-vol">{step.volumetrics}</p>
                   {step.waitingOn.length > 0 && (
-                    <p className="hint recipe-dep">
+                    <p className="hint blueprint-dep">
                       Waiting on: {step.waitingOn.join(", ")}
                     </p>
                   )}
                   {step.done && !confirmed && (
-                    <p className="hint recipe-confirm-hint">Ready — confirm on the right →</p>
+                    <p className="hint blueprint-confirm-hint">Ready — confirm on the right →</p>
                   )}
                 </div>
               </button>
@@ -200,7 +204,17 @@ export function TrainingRecipeChecklist(props: Props) {
           );
         })}
       </ol>
-      {ready && <p className="hint recipe-all-ready">All steps confirmed — you can start the task.</p>}
+      <div className="blueprint-start-actions">
+        <button type="button" disabled={!canStart || startBusy} onClick={onStartTask}>
+          {startBusy ? "Starting…" : "Start model task"}
+        </button>
+        {!canStart && (
+          <p className="hint">Confirm every blueprint step before starting training.</p>
+        )}
+        {ready && canStart && (
+          <p className="hint blueprint-all-ready">Blueprint complete — ready to start.</p>
+        )}
+      </div>
     </article>
   );
 }

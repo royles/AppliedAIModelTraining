@@ -273,7 +273,12 @@ body {
   font-size: 0.8rem;
 }
 
-.recipe-step-label {
+.model-tasks-page {
+  max-width: none;
+  width: 100%;
+}
+
+.blueprint-step-label {
   margin: 0 0 0.35rem;
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -282,32 +287,35 @@ body {
   font-weight: 600;
 }
 
-.recipe-step-label-wrap {
-  margin-top: 0.5rem;
+.blueprint-step-description {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #9fb0c9;
 }
 
-.recipe-checklist {
+.blueprint-checklist {
   border-color: #3b82f6;
 }
 
-.recipe-header {
+.blueprint-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 1rem;
 }
 
-.recipe-header h3 {
+.blueprint-header h3 {
   margin: 0;
 }
 
-.recipe-progress {
+.blueprint-progress {
   font-size: 0.85rem;
   color: #60a5fa;
   font-weight: 600;
 }
 
-.recipe-steps {
+.blueprint-steps {
   list-style: none;
   margin: 0.75rem 0 0;
   padding: 0;
@@ -316,7 +324,7 @@ body {
   gap: 0.65rem;
 }
 
-.recipe-step {
+.blueprint-step {
   display: flex;
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
@@ -325,16 +333,16 @@ body {
   background: #0b1220;
 }
 
-.recipe-step.done {
+.blueprint-step.done {
   border-color: #14532d;
   background: #0a1510;
 }
 
-.recipe-step.blocked:not(.done) {
+.blueprint-step.blocked:not(.done) {
   opacity: 0.72;
 }
 
-.recipe-tick {
+.blueprint-tick {
   flex-shrink: 0;
   width: 1.25rem;
   height: 1.25rem;
@@ -348,67 +356,82 @@ body {
   color: #9fb0c9;
 }
 
-.recipe-step.done .recipe-tick {
+.blueprint-step.done .blueprint-tick {
   background: #14532d;
   color: #bbf7d0;
 }
 
-.recipe-step-body {
+.blueprint-step-body {
   flex: 1;
   min-width: 0;
 }
 
-.recipe-step-body strong {
+.blueprint-step-body strong {
   display: block;
   margin-bottom: 0.2rem;
 }
 
-.recipe-req {
+.blueprint-req {
   margin: 0;
   font-size: 0.85rem;
   color: #b8c5da;
 }
 
-.recipe-vol {
+.blueprint-vol {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
 }
 
-.recipe-dep,
-.recipe-warn {
+.blueprint-dep,
+.blueprint-warn {
   margin: 0.25rem 0 0;
   color: #fbbf24;
   font-size: 0.78rem;
 }
 
-.recipe-confirm-hint {
+.blueprint-confirm-hint {
   margin: 0.35rem 0 0;
   color: #60a5fa;
   font-size: 0.78rem;
 }
 
-.recipe-all-ready {
-  margin: 0.75rem 0 0;
+.blueprint-all-ready {
+  margin: 0.5rem 0 0;
   color: #86efac;
   font-weight: 600;
 }
 
-.model-tasks-recipe-layout {
+.blueprint-start-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #243049;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.blueprint-start-actions button {
+  min-width: 12rem;
+}
+
+.model-tasks-blueprint-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   gap: 1.25rem;
   align-items: start;
   margin-top: 0.5rem;
+  width: 100%;
 }
 
-.recipe-layout-sidebar {
+.blueprint-layout-sidebar {
   position: sticky;
   top: 0.75rem;
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
 }
 
-.recipe-layout-config {
+.blueprint-layout-config {
   min-width: 0;
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
@@ -418,15 +441,15 @@ body {
   padding-right: 0.25rem;
 }
 
-.recipe-section-confirmed {
+.blueprint-section-confirmed {
   border-color: #14532d;
 }
 
-.recipe-section-header h3 {
-  margin: 0 0 0.75rem;
+.blueprint-section-header h3 {
+  margin: 0 0 0.35rem;
 }
 
-.recipe-section-actions {
+.blueprint-section-actions {
   margin-top: 1rem;
   display: flex;
   flex-direction: column;
@@ -434,21 +457,21 @@ body {
   align-items: flex-start;
 }
 
-.recipe-section-hint {
+.blueprint-section-hint {
   margin: 0;
 }
 
-.recipe-section-fields {
+.blueprint-section-fields {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
 }
 
-.recipe-steps li {
+.blueprint-steps li {
   list-style: none;
 }
 
-.recipe-step-button {
+.blueprint-step-button {
   width: 100%;
   text-align: left;
   cursor: pointer;
@@ -456,21 +479,99 @@ body {
   color: inherit;
 }
 
-.recipe-step-button:hover {
+.blueprint-step-button:hover {
   border-color: #3b82f6;
 }
 
-.recipe-step.confirmed-pending {
+.blueprint-step.confirmed-pending {
   border-color: #1e3a8a;
 }
 
+.validated-number-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+}
+
+.validated-number-field input.input-invalid {
+  border-color: #f87171;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: #f87171;
+}
+
+.project-tasks-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.project-tasks-create {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-tasks-manage.nested-card {
+  padding: 0.75rem;
+  background: #070d18;
+}
+
+.project-job-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-job-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.project-job-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.project-job-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+button.btn-danger {
+  background: #7f1d1d;
+  border-color: #991b1b;
+}
+
+button.btn-danger:hover:not(:disabled) {
+  background: #991b1b;
+}
+
 @media (max-width: 960px) {
-  .model-tasks-recipe-layout {
+  .model-tasks-blueprint-layout {
     grid-template-columns: 1fr;
   }
 
-  .recipe-layout-sidebar,
-  .recipe-layout-config {
+  .blueprint-layout-sidebar,
+  .blueprint-layout-config {
     max-height: none;
     position: static;
   }
