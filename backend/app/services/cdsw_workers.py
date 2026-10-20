@@ -241,9 +241,13 @@ def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
             time.sleep(2.0)
     return False
 
-HEAD = resolve_head()
+HEAD, HEAD_VIA = resolve_head_with_meta()
 host, _, port_s = HEAD.partition(":")
 port = int(port_s or "6379")
+print(
+    f"[platform] Worker→master Ray GCS {{HEAD}} (via {{HEAD_VIA}}; not worker CDSW_IP_ADDRESS)",
+    flush=True,
+)
 print(f"[platform] Waiting for Ray GCS at {{HEAD}} (up to 600s)…", flush=True)
 if not wait_for_gcs(host, port):
     print(f"[platform] ERROR: GCS not reachable at {{HEAD}}", flush=True)

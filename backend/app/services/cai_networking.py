@@ -151,9 +151,9 @@ def ray_driver_gcs_address(worker_head: str | None = None) -> str | None:
     return os.environ.get("RAY_ADDRESS")
 
 
-def resolve_worker_ray_head_address(fallback_head: str) -> str:
+def resolve_worker_ray_head_address_with_source(fallback_head: str) -> tuple[str, str]:
     """
-    GCS ``host:port`` for CDSW workers (`ray start --block` / ``ray.init``).
+    GCS ``host:port`` for CDSW workers and which env key selected it.
 
     Cloudera workers connect to the **master** using ``CDSW_MASTER_IP`` (see CDSW worker
     network communications). The session pins ``PLATFORM_RAY_HEAD_ADDRESS`` at
@@ -168,10 +168,15 @@ def resolve_worker_ray_head_address(fallback_head: str) -> str:
             continue
         if pin_host and ip != pin_host:
             break
-        return format_ray_head(ip, port)
+        return format_ray_head(ip, port), key
     if pinned:
-        return pinned if ":" in pinned else format_ray_head(pin_host or pinned, port)
-    return fallback_head.strip()
+        addr = pinned if ":" in pinned else format_ray_head(pin_host or pinned, port)
+        return addr, "PLATFORM_RAY_HEAD_ADDRESS"
+    return fallback_head.strip(), "FALLBACK_HEAD"
+
+
+def resolve_worker_ray_head_address(fallback_head: str) -> str:
+    return resolve_worker_ray_head_address_with_source(fallback_head)[0]
 
 
 def worker_ray_head_from_env(fallback_head: str) -> str:

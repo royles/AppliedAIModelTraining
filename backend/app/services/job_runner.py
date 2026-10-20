@@ -213,13 +213,17 @@ def run_training_job(job_id: int) -> None:
             bind_gcs_auth_for_address(head, required=True)
             worker_group.head_address = head
             db.commit()
+            from app.services.cai_networking import resolve_worker_ray_head_address_with_source
+
+            worker_dial, worker_dial_via = resolve_worker_ray_head_address_with_source(head)
             append_job_log(
                 db,
                 job_id,
                 "framework",
                 framework_line(
                     "worker",
-                    f"Launching {job.num_workers} CDSW GPU engine(s) toward Ray head {head}",
+                    f"Launching {job.num_workers} CDSW GPU engine(s); workers dial master GCS "
+                    f"{worker_dial} (Cloudera CDSW_MASTER_IP→master, session via {worker_dial_via})",
                 ),
             )
             probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
@@ -273,7 +277,8 @@ def run_training_job(job_id: int) -> None:
                 "framework",
                 framework_line(
                     "ray",
-                    f"Worker connectivity OK (nodes={probe.get('nodes', '?')}); launching GPU workers",
+                    f"Worker connectivity OK: master GCS {probe.get('head')} via "
+                    f"{probe.get('head_via', '?')} (nodes={probe.get('nodes', '?')}); launching GPU workers",
                 ),
             )
             launched = pool.launch(job.num_workers, head)

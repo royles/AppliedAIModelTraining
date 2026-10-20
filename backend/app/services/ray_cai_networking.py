@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 LogFn = Callable[[str], None]
 
 # Bump when worker probe semantics change (visible in probe JSON + framework logs).
-WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20b"
+WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20c"
 
 
 def worker_connectivity_probe_passed(probe: dict) -> bool:
@@ -283,10 +283,11 @@ def main():
     os.chdir(root)
     py = pick_python(root)
     ensure_ray(py, root)
-    head = resolve_head()
+    head, head_via = resolve_head_with_meta()
     out = {{
         "probe_revision": {json.dumps(WORKER_CONNECTIVITY_PROBE_REVISION)},
         "head": head,
+        "head_via": head_via,
         "tcp": False,
         "ray_ok": False,
         "python": py,

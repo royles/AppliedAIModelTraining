@@ -14,8 +14,8 @@ def embedded_worker_resolve_head_source() -> str:
     at launch; if CAI's ``CDSW_MASTER_IP`` disagrees, use the launch pin.
     """
     default_port = resolve_ray_gcs_port()
-    return f'''def resolve_head() -> str:
-    """Ray GCS on master — connect via CDSW_MASTER_IP (Cloudera worker networking)."""
+    return f'''def resolve_head_with_meta() -> tuple[str, str]:
+    """Ray GCS on master — worker dials CDSW_MASTER_IP (Cloudera parallel computing doc)."""
     pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip() or FALLBACK_HEAD
     pin_host = pinned.split(":")[0].strip() if pinned else ""
     port_s = pinned.split(":", 1)[1].strip() if ":" in pinned else ""
@@ -33,8 +33,12 @@ def embedded_worker_resolve_head_source() -> str:
                 flush=True,
             )
             break
-        return f"{{ip}}:{{port}}"
+        return f"{{ip}}:{{port}}", key
     if pinned:
-        return pinned if ":" in pinned else f"{{pin_host}}:{{port}}"
-    return FALLBACK_HEAD
+        addr = pinned if ":" in pinned else f"{{pin_host}}:{{port}}"
+        return addr, "PLATFORM_RAY_HEAD_ADDRESS"
+    return FALLBACK_HEAD, "FALLBACK_HEAD"
+
+def resolve_head() -> str:
+    return resolve_head_with_meta()[0]
 '''

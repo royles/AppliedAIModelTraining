@@ -2,7 +2,8 @@
 
 This platform follows Cloudera’s distributed-computing and engine networking model. Official references:
 
-- [CDSW 1.10.5 — Worker network communications (example)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) — each worker gets **`CDSW_MASTER_IP`** (fully routable master engine IP); workers open TCP **to the master** (doc uses port 6000; Ray GCS uses **6379** the same way).
+- [CDSW 1.10.5 — Parallel computing (PDF)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/cdsw-parallel-computing.pdf) — worker engines receive **`CDSW_MASTER_IP`** and open TCP **to the master** (example port 6000; Ray GCS uses **6379** the same way).
+- [CDSW 1.10.5 — Worker network communications (example)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) — same pattern as the PDF socket example.
 - [Worker network communication (CML cloud)](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html) — same idea on CAI: **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`**.
 - [Engine environment variables](https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html) — **`CDSW_IP_ADDRESS`** is how *other engines* reach *this* engine; HTTP on **`CDSW_APP_PORT`** / **`CDSW_READONLY_PORT`** should bind **`127.0.0.1`** inside the pod.
 - [Workers API](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html) — `launch_workers(..., code=...)` runs `ray start --block` on worker engines.
