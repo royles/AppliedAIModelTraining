@@ -95,6 +95,6 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
             framework_line("queue", "Job restart: same parameters, fresh training run"),
         )
 
-    enqueue_training_job(job_id, resume=resume)
+    enqueue_training_job(job_id, resume=resume, force_ray_head_restart=True)
     db.refresh(job)
     return job

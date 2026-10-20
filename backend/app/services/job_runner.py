@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 _job_threads: dict[int, threading.Thread] = {}
 _job_thread_lock = threading.Lock()
 _pending_resume: dict[int, bool] = {}
+_pending_ray_force_head: dict[int, bool] = {}
 
 
 def job_is_running(job_id: int) -> bool:
@@ -53,6 +54,11 @@ def job_is_running(job_id: int) -> bool:
 def _pop_resume_flag(job_id: int) -> bool:
     with _job_thread_lock:
         return _pending_resume.pop(job_id, False)
+
+
+def _pop_ray_force_head(job_id: int) -> bool:
+    with _job_thread_lock:
+        return _pending_ray_force_head.pop(job_id, False)
 
 
 def _update_job(db: Session, job_id: int, **fields) -> None:
@@ -105,6 +111,7 @@ def run_training_job(job_id: int) -> None:
         from app.services.job_progress import apply_resume_to_train_config
 
         resume_run = _pop_resume_flag(job_id)
+        force_ray_head_restart = _pop_ray_force_head(job_id)
         train_config = apply_resume_to_train_config(
             train_config, artifact_dir, resume=resume_run
         )
@@ -123,22 +130,16 @@ def run_training_job(job_id: int) -> None:
         def framework_log(msg: str) -> None:
             append_job_log(db, job_id, "framework", msg)
 
-        if cfg.init_mode == "from_scratch":
-            try:
-                train_config = prepare_from_scratch_training(
-                    cfg,
-                    train_config,
-                    log=framework_log,
-                    skip_tokenizer_if_present=bool(train_config.get("resume")),
-                )
-            except ValueError as exc:
-                append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
-                raise
-
         platform = ensure_platform_settings(db)
-        head = resolved_ray_head(platform)
-        from app.services.cai_networking import format_ray_head, master_engine_ip, parse_gcs_host_port
+        from app.services.cai_networking import (
+            format_ray_head,
+            master_engine_ip,
+            parse_gcs_host_port,
+            reconcile_live_ray_head_env,
+        )
 
+        reconcile_live_ray_head_env()
+        head = resolved_ray_head(platform)
         live_ip = master_engine_ip()
         if live_ip and head:
             head_host, _ = parse_gcs_host_port(head)
@@ -176,12 +177,23 @@ def run_training_job(job_id: int) -> None:
             from app.services.ray_cai_networking import ensure_ray_head_for_workers
             from app.services.ray_gcs_auth import bind_gcs_auth_for_address
 
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line("ray", "Starting Ray head for this model task…"),
-            )
+            if force_ray_head_restart:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "ray",
+                        "Task restart: refreshing Ray head (ray stop --force, ray start --head)…",
+                    ),
+                )
+            else:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line("ray", "Starting Ray head for this model task…"),
+                )
 
             def _ray_head_log(msg: str) -> None:
                 append_job_log(
@@ -193,9 +205,33 @@ def run_training_job(job_id: int) -> None:
 
             head = ensure_ray_head_for_workers(
                 framework_log=_ray_head_log,
-                force_restart=False,
+                force_restart=force_ray_head_restart,
             )
             bind_gcs_auth_for_address(head, required=True)
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("ray", f"Ray head is up at {head} — continuing task setup"),
+            )
+
+        if cfg.init_mode == "from_scratch":
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("train", "From-scratch prep (tokenizer / dataset checks)…"),
+            )
+            try:
+                train_config = prepare_from_scratch_training(
+                    cfg,
+                    train_config,
+                    log=framework_log,
+                    skip_tokenizer_if_present=bool(train_config.get("resume")),
+                )
+            except ValueError as exc:
+                append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
+                raise
 
         worker_group = WorkerGroup(
             job_id=job.id,
@@ -698,12 +734,18 @@ def run_training_job(job_id: int) -> None:
         db.close()
 
 
-def enqueue_training_job(job_id: int, *, resume: bool = False) -> None:
+def enqueue_training_job(
+    job_id: int,
+    *,
+    resume: bool = False,
+    force_ray_head_restart: bool = False,
+) -> None:
     with _job_thread_lock:
         existing = _job_threads.get(job_id)
         if existing is not None and existing.is_alive():
             raise RuntimeError(f"Training job {job_id} is already running")
         _pending_resume[job_id] = resume
+        _pending_ray_force_head[job_id] = force_ray_head_restart
         thread = threading.Thread(
             target=run_training_job,
             args=(job_id,),

@@ -94,8 +94,23 @@ def platform_ray_status() -> dict[str, Any]:
     return out
 
 
-def cached_platform_ray_status() -> dict[str, Any]:
+def cached_platform_ray_status(*, active_job_count: int = 0) -> dict[str, Any]:
     """TTL cache so /api/health polling does not spawn Ray clients every few seconds."""
+    if active_job_count > 0:
+        gcs = (
+            ray_worker_head_address()
+            or os.environ.get("RAY_HEAD_ADDRESS")
+            or os.environ.get("RAY_ADDRESS")
+        )
+        return {
+            "gcs_address": gcs,
+            "cdsw_available": cdsw_workers.cdsw_available(),
+            "gcs_reachable": None,
+            "alive_nodes": None,
+            "gpu_capacity": None,
+            "state": "provisioning",
+        }
+
     now = time.monotonic()
     with _ray_status_cache_lock:
         expires = float(_ray_status_cache.get("expires") or 0)

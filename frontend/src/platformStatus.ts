@@ -67,6 +67,13 @@ export function rayIndicatorFromHealth(health: Health | null, apiOk: boolean): {
       title: "Training uses an in-process Ray runtime on this machine",
     };
   }
+  if (ray.state === "provisioning") {
+    return {
+      tone: "warn",
+      label: "Ray (task)",
+      title: `A model task is starting or running Ray on ${addr ?? "session"} — see task framework log`,
+    };
+  }
   if (!ray.gcs_reachable) {
     if (ray.state === "deferred") {
       return {

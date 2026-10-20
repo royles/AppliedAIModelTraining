@@ -161,7 +161,9 @@ def health() -> HealthResponse:
             "ray_head_driver": ray_driver_gcs_address(ray_worker_head_address())
             if cdsw_workers.cdsw_available()
             else None,
-            "platform_ray": cached_platform_ray_status(),
+            "platform_ray": cached_platform_ray_status(
+                active_job_count=int(jobs_summary.get("count") or 0),
+            ),
             "active_jobs": jobs_summary,
             "master_engine_ip": master_engine_ip(),
             "networking_doc": "docs/CAI_RAY_NETWORKING.md",
