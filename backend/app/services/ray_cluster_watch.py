@@ -104,9 +104,13 @@ def ray_cluster_snapshot_subprocess(
     """
     Cluster node/GPU snapshot without ``ray.init`` in the API / job-runner process.
     """
-    from app.services.ray_driver_connect import ensure_ray_auth_token
+    from app.services.ray_driver_connect import (
+        co_located_subprocess_ray_init_kwargs,
+        ensure_ray_auth_token,
+    )
 
-    token = (auth_token or ensure_ray_auth_token() or "").strip()
+    token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip()
+    init_kw = co_located_subprocess_ray_init_kwargs(gcs_address)
     script = f"""
 import json
 import os
@@ -115,7 +119,7 @@ import ray
 os.environ["RAY_ADDRESS"] = {json.dumps(gcs_address)}
 if {json.dumps(token)}:
     os.environ["RAY_AUTH_TOKEN"] = {json.dumps(token)}
-ray.init(address=os.environ["RAY_ADDRESS"], ignore_reinit_error=True)
+ray.init(**{json.dumps(init_kw)})
 alive = 0
 gpu = 0.0
 cpu = 0.0

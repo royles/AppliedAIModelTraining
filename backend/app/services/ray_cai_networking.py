@@ -79,7 +79,7 @@ def ensure_ray_head_for_workers(
         logger.info(msg)
 
     if force_restart is None:
-        force_restart = os.environ.get("PLATFORM_RAY_FORCE_HEAD_RESTART", "1").strip().lower() in (
+        force_restart = os.environ.get("PLATFORM_RAY_FORCE_HEAD_RESTART", "0").strip().lower() in (
             "1",
             "true",
             "yes",

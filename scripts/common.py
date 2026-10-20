@@ -648,7 +648,7 @@ def start_ray_head() -> None:
     from app.services.ray_cai_networking import ensure_ray_head_for_workers
 
     reconcile_live_ray_head_env()
-    force = os.environ.get("PLATFORM_RAY_FORCE_HEAD_RESTART", "1").strip().lower() not in (
+    force = os.environ.get("PLATFORM_RAY_FORCE_HEAD_RESTART", "0").strip().lower() not in (
         "0",
         "false",
         "no",

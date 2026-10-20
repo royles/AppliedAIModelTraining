@@ -52,5 +52,20 @@ Legacy remote-only steps (opt-in):
 
 1. Framework: **turn off** “non-distributed low memory mode” for distributed jobs.
 2. `ray stop --force` only when debugging a stuck cluster; distributed jobs should not restart the head from the driver path.
-3. Confirm `/api/health` shows current `ray_driver_connect_revision`.
-4. Framework log should say **“Launching Ray Train driver on CDSW worker engine”** for distributed jobs.
+3. Confirm `/api/health` shows current `ray_driver_connect_revision` and worker probe revision.
+4. **Default distributed path**: Train driver on the **session** (framework log: driver connect revision, co-located `ray.init`).  
+   **Optional**: set `PLATFORM_USE_REMOTE_TRAIN_DRIVER=1` to run the driver on a dedicated CDSW engine (framework log: remote driver launch).
+5. After `ray stop` or session reschedule, restart with `python3 scripts/start.py` so GCS auth token (`data/.ray_gcs_auth_token`) matches the live head.
+
+## Best-practice alignment (summary)
+
+| Practice | Platform behavior |
+|----------|-------------------|
+| Head on routable master IP | `ray start --head --node-ip-address=$CDSW_IP_ADDRESS` |
+| Workers dial master, not loopback | `ray start --block` with `CDSW_MASTER_IP` / `PLATFORM_RAY_HEAD_ADDRESS` |
+| Ray 2.59+ GCS auth | Token synced via `ray get-auth-token`, shared to workers; invalidated on head restart |
+| Session co-located clients | Train driver + cluster polls use `_node_ip_address` = master pod IP |
+| Train ranks on GPU raylets | `TorchTrainer` workers scheduled on CDSW worker nodes |
+| API process stays light | Cluster readiness uses subprocess snapshots, not `ray.init` in FastAPI |
+| NCCL on multi-GPU | `PLATFORM_NCCL_DEFAULTS=1` (default) in worker + Train runtime env |
+| Production head stability | `PLATFORM_RAY_FORCE_HEAD_RESTART=0` by default; restart only when GCS RPC unhealthy |

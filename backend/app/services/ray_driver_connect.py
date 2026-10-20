@@ -21,7 +21,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20k"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20l"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -212,6 +212,19 @@ def ensure_session_ray_head(
     if gcs and _ray_status_ok(gcs, timeout_sec=15.0):
         return
     restart_co_located_ray_head(framework_log=framework_log)
+
+
+def co_located_subprocess_ray_init_kwargs(gcs_address: str) -> dict[str, Any]:
+    """
+    ``ray.init`` kwargs for a child process on the master session pod (cluster polls).
+
+    Matches Train driver co-location: pod IP node identity + GCS auth, not loopback-only.
+    """
+    master = master_ip_from_context(gcs_address)
+    kwargs: dict[str, Any] = {"address": gcs_address, "ignore_reinit_error": True}
+    if master:
+        kwargs["_node_ip_address"] = master
+    return kwargs
 
 
 def _init_attempts(connect: str, master: str | None) -> list[dict[str, Any]]:

@@ -52,7 +52,13 @@ def _ray_session(ray_address: str | None) -> Iterator[bool]:
             if connect != ray_address:
                 os.environ["RAY_ADDRESS"] = connect
             apply_ray_auth_from_session()
-            ray.init(address=connect, ignore_reinit_error=True, logging_level="error")
+            from app.services.ray_driver_connect import co_located_subprocess_ray_init_kwargs
+
+            init_kw = {
+                **co_located_subprocess_ray_init_kwargs(connect),
+                "logging_level": "error",
+            }
+            ray.init(**init_kw)
             connected = ray.is_initialized()
         except Exception:  # noqa: BLE001
             connected = False
