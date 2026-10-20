@@ -63,24 +63,21 @@ def is_cai_master_session() -> bool:
 
 def coerce_session_driver_ray_address(address: str | None) -> str | None:
     """
-    Ray Train driver on the master session must use loopback for GCS (port 6379).
+    Normalize driver GCS address on the CAI master session.
 
-    Workers continue to use ``CDSW_IP_ADDRESS:6379``; only the in-pod driver is rewritten.
+    Ray 2.x on Linux rewrites ``127.0.0.1`` to the pod IP during ``ray.init`` anyway
+    (``resolve_ip_for_localhost``). Use the master engine IP explicitly with
+    ``_node_ip_address`` in ``ray_driver_connect.init_ray_train_driver``.
     """
-    if not address:
-        if is_cai_master_session():
-            return ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+    if not is_cai_master_session():
         return address
-
-    host, port = parse_gcs_host_port(address)
-    if host in ("127.0.0.1", "localhost"):
-        return format_ray_head("127.0.0.1", port)
-
-    if not is_cai_master_session() or port != RAY_GCS_PORT:
+    master = master_engine_ip()
+    if not master:
         return address
-
-    # Co-located Ray head on this session — pod IP triggers "No node info found" in ray.init.
-    return format_ray_head("127.0.0.1", RAY_GCS_PORT)
+    port = RAY_GCS_PORT
+    if address:
+        _, port = parse_gcs_host_port(address)
+    return format_ray_head(master, port)
 
 
 def apply_master_session_ray_driver_env() -> str | None:
@@ -110,10 +107,9 @@ def ray_worker_head_address(explicit: str | None = None) -> str | None:
 
 def ray_driver_gcs_address(worker_head: str | None = None) -> str | None:
     """
-    Address for ray.init() / Ray Train driver in the **master session pod**.
+    GCS address for ``ray.init`` on the master session (same host:port workers use).
 
-    HTTP services in an engine should bind 127.0.0.1 (CDSW_APP_PORT docs); the
-    driver uses loopback to reach the co-located Ray head GCS.
+    Pair with ``_node_ip_address=master_engine_ip()`` when connecting the driver.
     """
     port = RAY_GCS_PORT
     if worker_head and ":" in worker_head:
@@ -121,10 +117,12 @@ def ray_driver_gcs_address(worker_head: str | None = None) -> str | None:
             port = int(worker_head.partition(":")[2] or str(RAY_GCS_PORT))
         except ValueError:
             port = RAY_GCS_PORT
-    env = os.environ.get("RAY_ADDRESS")
-    if env and env.startswith("127.0.0.1"):
-        return env
-    return format_ray_head("127.0.0.1", port)
+    master = master_engine_ip()
+    if master:
+        return format_ray_head(master, port)
+    if worker_head:
+        return worker_head
+    return os.environ.get("RAY_ADDRESS")
 
 
 def worker_ray_head_from_env(fallback_head: str) -> str:

@@ -90,41 +90,20 @@ def _local_gcs_reachable(port: int = 6379) -> bool:
 
 
 def ray_driver_init_address(head: str | None) -> str | None:
-    """
-    Address for ray.init() from the master session driver (see docs/CAI_RAY_NETWORKING.md).
+    """GCS address for the Train driver (see docs/CAI_RAY_NETWORKING.md)."""
+    from app.services.ray_driver_connect import resolve_driver_gcs_address
 
-    Ray must not use the pod IP from the same session — use loopback when GCS is local.
-    """
-    from app.services.cai_networking import (
-        coerce_session_driver_ray_address,
-        format_ray_head,
-        parse_gcs_host_port,
-        ray_driver_gcs_address,
-    )
-
-    if not head:
-        if cdsw_available():
-            return coerce_session_driver_ray_address(
-                ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
-            )
-        env = os.environ.get("RAY_ADDRESS")
-        return coerce_session_driver_ray_address(env)
-
-    host, port_i = parse_gcs_host_port(head if ":" in head else f"{head}:6379")
-
+    if head:
+        return resolve_driver_gcs_address(head)
+    env = os.environ.get("RAY_ADDRESS")
+    resolved = resolve_driver_gcs_address(env)
+    if resolved:
+        return resolved
     if cdsw_available():
-        resolved = coerce_session_driver_ray_address(ray_driver_gcs_address(head))
-        if resolved:
-            return resolved
+        from app.services.cai_networking import ray_driver_gcs_address
 
-    coerced = coerce_session_driver_ray_address(head)
-    if coerced and coerced != head:
-        return coerced
-
-    if _local_gcs_reachable(port_i):
-        return format_ray_head("127.0.0.1", port_i)
-
-    return coerced or head
+        return ray_driver_gcs_address(os.environ.get("RAY_HEAD_ADDRESS"))
+    return env
 
 
 def _parse_gcs_port(address: str, default: int = 6379) -> int:

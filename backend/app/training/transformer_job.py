@@ -403,30 +403,28 @@ def run_transformer_training(
             pass
 
     if ray_address:
-        from app.services.cai_networking import coerce_session_driver_ray_address
         from app.services.cdsw_workers import ray_driver_init_address
+        from app.services.ray_driver_connect import init_ray_train_driver, resolve_driver_gcs_address
 
         raw_ray_address = ray_address
-        ray_address = ray_driver_init_address(ray_address) or ray_address
-        ray_address = coerce_session_driver_ray_address(ray_address) or ray_address
-        os.environ["RAY_ADDRESS"] = ray_address
-        if raw_ray_address != ray_address:
-            _framework(
-                framework_line(
-                    "ray",
-                    f"Driver Ray address {raw_ray_address} → {ray_address} (master session loopback)",
-                )
-            )
+        ray_address = resolve_driver_gcs_address(
+            ray_driver_init_address(ray_address) or ray_address
+        ) or ray_address
         worker_head = train_config.get("ray_head_address")
         if worker_head and worker_head != ray_address:
             _framework(
                 framework_line(
                     "ray",
-                    f"Driver connecting via {ray_address} (CDSW workers join {worker_head})",
+                    f"Driver GCS {ray_address} (workers join {worker_head})",
                 )
             )
-        else:
-            _framework(framework_line("ray", f"Driver connecting to Ray at {ray_address}"))
+        elif raw_ray_address != ray_address:
+            _framework(
+                framework_line(
+                    "ray",
+                    f"Driver Ray address {raw_ray_address} → {ray_address}",
+                )
+            )
         from app.services.cdsw_workers import wait_for_gcs_port
 
         host, _, port_s = ray_address.partition(":")
@@ -434,7 +432,11 @@ def run_transformer_training(
         if not wait_for_gcs_port(host, port, timeout_sec=180.0):
             raise RuntimeError(f"Ray GCS not reachable at {ray_address} before ray.init")
         if not ray.is_initialized():
-            ray.init(address=ray_address, ignore_reinit_error=True)
+
+            def _ray_log(msg: str) -> None:
+                _framework(framework_line("ray", msg))
+
+            ray_address = init_ray_train_driver(ray_address, framework_log=_ray_log)
     else:
         _framework(framework_line("ray", "Starting local Ray runtime"))
         if not ray.is_initialized():
