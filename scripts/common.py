@@ -677,10 +677,8 @@ def _sync_ray_auth_env() -> None:
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
-    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, sync_ray_gcs_auth_token
+    from app.services.ray_gcs_auth import sync_ray_gcs_auth_token
 
-    if load_gcs_auth_token_from_disk():
-        return
     gcs = os.environ.get("RAY_HEAD_ADDRESS") or os.environ.get("RAY_ADDRESS")
     if gcs:
         sync_ray_gcs_auth_token(gcs, required=False)

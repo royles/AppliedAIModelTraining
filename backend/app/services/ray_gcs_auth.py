@@ -96,31 +96,44 @@ def load_gcs_auth_token_from_disk() -> str | None:
     return None
 
 
-def sync_ray_gcs_auth_token(
-    gcs_address: str,
-    *,
-    generate_if_missing: bool = True,
-    required: bool = False,
-) -> str | None:
-    """
-    Refresh ``RAY_AUTH_TOKEN`` from the running Ray head at ``gcs_address``.
-
-    No external services — only the local ``ray`` CLI talking to GCS on the session.
-    """
-    gcs_address = (gcs_address or "").strip()
-    if not gcs_address:
-        if required:
-            raise RuntimeError("Cannot sync Ray GCS auth token: GCS address is empty")
-        return load_gcs_auth_token_from_disk()
-
+def _ray_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 25.0) -> bool:
+    """True when ``ray status`` succeeds against GCS with the given token (if any)."""
     env = os.environ.copy()
     env["RAY_ADDRESS"] = gcs_address
+    if token:
+        env["RAY_AUTH_TOKEN"] = token
+    else:
+        env.pop("RAY_AUTH_TOKEN", None)
+    try:
+        proc = subprocess.run(
+            _ray_cli("status"),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    if proc.returncode != 0:
+        return False
+    return "active" in (proc.stdout or "").lower()
+
+
+def _fetch_token_from_head_cli(gcs_address: str, *, generate_if_missing: bool) -> tuple[str | None, str]:
+    """
+    Call ``ray get-auth-token`` without sending a possibly stale ``RAY_AUTH_TOKEN``.
+
+    A wrong token in the environment makes GCS return InvalidAuthToken and breaks refresh.
+    """
+    env = os.environ.copy()
+    env["RAY_ADDRESS"] = gcs_address
+    env.pop("RAY_AUTH_TOKEN", None)
 
     attempts: list[list[str]] = [["get-auth-token"]]
     if generate_if_missing:
         attempts.append(["get-auth-token", "--generate"])
 
-    token: str | None = None
     last_err = ""
     for args in attempts:
         try:
@@ -138,11 +151,72 @@ def sync_ray_gcs_auth_token(
         if proc.returncode == 0:
             token = _parse_cli_token(proc.stdout or "")
             if token:
-                break
+                return token, last_err
         last_err = (proc.stderr or proc.stdout or "")[-400:]
+    return None, last_err
+
+
+def _load_verified_disk_token(gcs_address: str) -> str | None:
+    """Use on-disk token only if it still works against the live head."""
+    saved_env = os.environ.get("RAY_AUTH_TOKEN")
+    try:
+        for path in (
+            os.environ.get("RAY_AUTH_TOKEN_PATH", "").strip(),
+            os.environ.get("PLATFORM_RAY_GCS_AUTH_FILE", "").strip(),
+            str(project_gcs_auth_token_path()),
+            str(Path.home() / ".ray" / "auth_token"),
+        ):
+            if not path:
+                continue
+            candidate = _read_token_file(Path(path))
+            if candidate and _ray_status_ok(gcs_address, candidate):
+                os.environ["RAY_AUTH_TOKEN"] = candidate
+                return candidate
+    finally:
+        if saved_env is None:
+            os.environ.pop("RAY_AUTH_TOKEN", None)
+        else:
+            os.environ["RAY_AUTH_TOKEN"] = saved_env
+    return None
+
+
+def sync_ray_gcs_auth_token(
+    gcs_address: str,
+    *,
+    generate_if_missing: bool = True,
+    required: bool = False,
+) -> str | None:
+    """
+    Refresh ``RAY_AUTH_TOKEN`` from the running Ray head at ``gcs_address``.
+
+    No external services — only the local ``ray`` CLI talking to GCS on the session.
+    """
+    gcs_address = (gcs_address or "").strip()
+    if not gcs_address:
+        if required:
+            raise RuntimeError("Cannot sync Ray GCS auth token: GCS address is empty")
+        return load_gcs_auth_token_from_disk()
+
+    env_token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
+    if env_token and _ray_status_ok(gcs_address, env_token):
+        _persist_gcs_auth_token(env_token)
+        return env_token
+
+    token, last_err = _fetch_token_from_head_cli(
+        gcs_address, generate_if_missing=generate_if_missing
+    )
 
     if not token:
-        token = load_gcs_auth_token_from_disk()
+        token = _load_verified_disk_token(gcs_address)
+
+    if not token:
+        invalidate_stored_gcs_auth_tokens()
+        os.environ.pop("RAY_AUTH_TOKEN", None)
+        token, retry_err = _fetch_token_from_head_cli(
+            gcs_address, generate_if_missing=True
+        )
+        if retry_err:
+            last_err = retry_err or last_err
 
     if not token:
         msg = (

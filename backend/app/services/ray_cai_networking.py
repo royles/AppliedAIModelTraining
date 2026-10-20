@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 LogFn = Callable[[str], None]
 
 # Bump when worker probe semantics change (visible in probe JSON + framework logs).
-WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20a"
+WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20b"
 
 
 def worker_connectivity_probe_passed(probe: dict) -> bool:
@@ -87,14 +87,17 @@ def ensure_ray_head_for_workers(
 
     host, _ = parse_gcs_host_port(gcs)
     from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
-    from app.services.ray_driver_connect import ensure_ray_auth_token, restart_co_located_ray_head
-
-    token = ensure_ray_auth_token()
+    from app.services.ray_driver_connect import restart_co_located_ray_head
+    from app.services.ray_gcs_auth import require_ray_gcs_auth_token
 
     def _rpc_ready(timeout: float) -> bool:
+        try:
+            fresh_token = require_ray_gcs_auth_token(gcs)
+        except RuntimeError:
+            return False
         return (
             gcs_tcp_reachable(host, timeout_sec=2.0)
-            and wait_for_gcs_rpc_subprocess(gcs, auth_token=token, timeout_sec=timeout)
+            and wait_for_gcs_rpc_subprocess(gcs, auth_token=fresh_token, timeout_sec=timeout)
         )
 
     if force_restart:

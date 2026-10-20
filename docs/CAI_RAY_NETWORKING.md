@@ -42,7 +42,7 @@ If a connectivity probe shows **`tcp: true`** to `CDSW_MASTER_IP:<GCS>`, CAI **w
 | `PLATFORM_RAY_HEAD_ADDRESS` | Worker engines at launch | Master `host:6379` pinned by the session when `launch_workers` runs. |
 | `RAY_HEAD_ADDRESS` | Session after `start_ray_head` | Cached `CDSW_IP_ADDRESS:6379` for workers and UI. |
 | `RAY_ADDRESS` | Session driver | Set to **`CDSW_IP_ADDRESS:6379`** after head is up (same GCS as workers). |
-| `RAY_AUTH_TOKEN` | Session + workers | Ray 2.59+ **local** GCS token (no external IdP). Synced via `ray get-auth-token` after head start; copied to `data/.ray_gcs_auth_token` (project mount) and passed to CDSW workers. |
+| `RAY_AUTH_TOKEN` | Session + workers | Ray 2.59+ **local** GCS token (no external IdP). Synced via `ray get-auth-token` after head start; copied to `data/.ray_gcs_auth_token` (project mount) and passed to CDSW workers. **After `ray stop` or session reschedule**, old tokens in that file or in `~/.ray/auth_token` are invalid — run `ray stop --force` and `python3 scripts/start.py` so the platform refreshes the token (do not reuse a stale file). |
 | `PLATFORM_RAY_GCS_AUTH_FILE` | Worker engines | Path to `data/.ray_gcs_auth_token` on the project. |
 | `PLATFORM_NCCL_DEFAULTS` | Session + workers | Default **`1`**: apply NCCL / `TORCH_NCCL` env (`NCCL_ASYNC_ERROR_HANDLING`, socket interface `^docker0,lo`, etc.). Set **`0`** to skip. |
 
