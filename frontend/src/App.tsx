@@ -134,19 +134,6 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  useEffect(() => {
-    if (nav !== "model-tasks" || draftLoadedRef.current) return;
-    draftLoadedRef.current = true;
-    api
-      .getTaskBlueprintDraft()
-      .then((r) => {
-        if (r.blueprint) {
-          applyModelTaskBlueprint(parseModelTaskBlueprintFile(r.blueprint));
-        }
-      })
-      .catch(() => {});
-  }, [nav, applyModelTaskBlueprint]);
-
   const appliedPresetRef = useRef<string | null>(null);
   const draftLoadedRef = useRef(false);
 
@@ -173,6 +160,19 @@ export default function App() {
     setTokenizer(s.tokenizer);
     setDataset(s.dataset);
   }, []);
+
+  useEffect(() => {
+    if (nav !== "model-tasks" || draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    api
+      .getTaskBlueprintDraft()
+      .then((r) => {
+        if (r.blueprint) {
+          applyModelTaskBlueprint(parseModelTaskBlueprintFile(r.blueprint));
+        }
+      })
+      .catch(() => {});
+  }, [nav, applyModelTaskBlueprint]);
 
   useEffect(() => {
     const p = presets.find((x) => x.name === preset);
