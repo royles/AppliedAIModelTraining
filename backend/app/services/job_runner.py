@@ -231,11 +231,9 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
             from app.services.ray_cai_networking import WORKER_CONNECTIVITY_PROBE_REVISION
-            from app.services.ray_driver_connect import ensure_ray_auth_token
+            from app.services.ray_gcs_auth import project_gcs_auth_token_path, require_ray_gcs_auth_token
 
-            probe_token = ensure_ray_auth_token()
-            if probe_token:
-                os.environ["RAY_AUTH_TOKEN"] = probe_token
+            probe_token = require_ray_gcs_auth_token(head)
             append_job_log(
                 db,
                 job_id,
@@ -243,7 +241,7 @@ def run_training_job(job_id: int) -> None:
                 framework_line(
                     "ray",
                     f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
-                    f"GCS auth token {'present' if probe_token else 'MISSING — ray status/join will fail'}",
+                    f"GCS auth token synced ({project_gcs_auth_token_path().name})",
                 ),
             )
             pool.launch(

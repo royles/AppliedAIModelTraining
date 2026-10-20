@@ -104,6 +104,9 @@ def ensure_ray_head_for_workers(
         os.environ["RAY_HEAD_ADDRESS"] = gcs
         os.environ["RAY_ADDRESS"] = gcs
         assert_master_gcs_worker_routable()
+        from app.services.ray_gcs_auth import require_ray_gcs_auth_token
+
+        require_ray_gcs_auth_token(gcs)
         _log(f"Ray head healthy at {gcs}")
         return gcs
 
@@ -121,6 +124,9 @@ def ensure_ray_head_for_workers(
     os.environ["RAY_HEAD_ADDRESS"] = gcs
     os.environ["RAY_ADDRESS"] = gcs
     assert_master_gcs_worker_routable()
+    from app.services.ray_gcs_auth import require_ray_gcs_auth_token
+
+    require_ray_gcs_auth_token(gcs)
     _log(f"Ray head ready at {gcs} (workers join via CDSW_MASTER_IP:{resolve_ray_gcs_port()})")
     return gcs
 
@@ -239,9 +245,12 @@ def apply_auth(out: dict) -> None:
     if not token:
         token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
     if not token:
-        path = os.environ.get("RAY_AUTH_TOKEN_PATH", "").strip()
-        if path and os.path.isfile(path):
-            token = Path(path).read_text(encoding="utf-8").strip()
+        for key in ("PLATFORM_RAY_GCS_AUTH_FILE", "RAY_AUTH_TOKEN_PATH"):
+            path = os.environ.get(key, "").strip()
+            if path and os.path.isfile(path):
+                token = Path(path).read_text(encoding="utf-8").strip()
+                if token:
+                    break
     if token:
         os.environ["RAY_AUTH_TOKEN"] = token
     out["auth_configured"] = bool(token)

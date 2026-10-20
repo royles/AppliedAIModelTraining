@@ -305,6 +305,15 @@ def worker_launch_env(
     from app.services.cai_networking import master_engine_ip, parse_gcs_host_port, resolve_ray_gcs_port
 
     env["PLATFORM_RAY_GCS_PORT"] = str(resolve_ray_gcs_port(ray_head_address))
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, project_gcs_auth_token_path
+
+    auth_path = project_gcs_auth_token_path()
+    env["PLATFORM_RAY_GCS_AUTH_FILE"] = str(auth_path)
+    if auth_path.is_file():
+        env["RAY_AUTH_TOKEN_PATH"] = str(auth_path)
+    token = load_gcs_auth_token_from_disk()
+    if token:
+        env["RAY_AUTH_TOKEN"] = token
     head = (ray_head_address or "").strip()
     if head:
         env["PLATFORM_RAY_HEAD_ADDRESS"] = head

@@ -669,33 +669,17 @@ def start_ray_head() -> None:
 
 
 def _sync_ray_auth_env() -> None:
-    """Propagate Ray GCS auth token to API/train driver processes (Ray 2.59+)."""
-    if os.environ.get("RAY_AUTH_TOKEN", "").strip():
+    """Propagate Ray GCS auth token after Ray head start (Ray 2.59+; local only)."""
+    backend = REPO_ROOT / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, sync_ray_gcs_auth_token
+
+    if load_gcs_auth_token_from_disk():
         return
-    token_path = Path.home() / ".ray" / "auth_token"
-    if token_path.is_file():
-        token = token_path.read_text(encoding="utf-8").strip()
-        if token:
-            os.environ["RAY_AUTH_TOKEN"] = token
-            return
-    try:
-        result = subprocess.run(
-            venv_ray_argv("get-auth-token"),
-            env=venv_subprocess_env(),
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=str(REPO_ROOT),
-        )
-    except FileNotFoundError:
-        return
-    if result.returncode != 0:
-        return
-    for line in reversed((result.stdout or "").splitlines()):
-        token = line.strip()
-        if token and not token.startswith("Usage"):
-            os.environ["RAY_AUTH_TOKEN"] = token
-            return
+    gcs = os.environ.get("RAY_HEAD_ADDRESS") or os.environ.get("RAY_ADDRESS")
+    if gcs:
+        sync_ray_gcs_auth_token(gcs, required=False)
 
 
 def start_background_process(

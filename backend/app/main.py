@@ -15,6 +15,7 @@ from app.database import SessionLocal, init_db
 from app.services.job_lifecycle import reconcile_stale_jobs
 from app.services.model_registry import backfill_registry_entries
 from app.services.ray_driver_connect import apply_ray_auth_from_session
+from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, sync_ray_gcs_auth_token
 from app.services.cai_networking import (
     apply_master_session_ray_driver_env,
     reconcile_live_ray_head_env,
@@ -32,6 +33,8 @@ async def lifespan(_app: FastAPI):
     init_db()
     apply_ray_auth_from_session()
     live_head = reconcile_live_ray_head_env()
+    if live_head and not load_gcs_auth_token_from_disk():
+        sync_ray_gcs_auth_token(live_head, required=False)
     driver_ray = apply_master_session_ray_driver_env()
     if live_head:
         logging.getLogger(__name__).info("CAI live Ray head (workers): %s", live_head)

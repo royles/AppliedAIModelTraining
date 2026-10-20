@@ -21,40 +21,37 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20i"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20j"
 
 
 def _ray_cli(*args: str) -> list[str]:
     return [sys.executable, "-m", "ray.scripts.scripts", *args]
 
 
-def ensure_ray_auth_token() -> str | None:
-    """Load Ray GCS auth token from env, file, or ``ray get-auth-token``."""
-    apply_ray_auth_from_session()
-    _sync_auth_from_cli()
-    token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
-    return token or None
+def ensure_ray_auth_token(gcs_address: str | None = None) -> str | None:
+    """Load or refresh Ray GCS auth token (Ray 2.59+; local only, no external IdP)."""
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, sync_ray_gcs_auth_token
+
+    gcs = (
+        (gcs_address or "").strip()
+        or os.environ.get("RAY_ADDRESS", "").strip()
+        or os.environ.get("RAY_HEAD_ADDRESS", "").strip()
+    )
+    if gcs:
+        token = sync_ray_gcs_auth_token(gcs, required=False)
+        if token:
+            return token
+    load_gcs_auth_token_from_disk()
+    return os.environ.get("RAY_AUTH_TOKEN", "").strip() or None
 
 
 def apply_ray_auth_from_session() -> bool:
-    """Load Ray 2.59+ GCS auth token into the driver process if missing."""
+    """Load Ray GCS auth token into the current process if missing."""
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
+
     if os.environ.get("RAY_AUTH_TOKEN", "").strip():
         return True
-    token_path = os.environ.get("RAY_AUTH_TOKEN_PATH", "").strip()
-    candidates: list[Path] = []
-    if token_path:
-        candidates.append(Path(token_path))
-    candidates.append(Path.home() / ".ray" / "auth_token")
-    for path in candidates:
-        try:
-            if path.is_file():
-                token = path.read_text(encoding="utf-8").strip()
-                if token:
-                    os.environ["RAY_AUTH_TOKEN"] = token
-                    return True
-        except OSError:
-            continue
-    return False
+    return load_gcs_auth_token_from_disk() is not None
 
 
 def master_ip_from_context(worker_head: str | None = None) -> str | None:
@@ -155,6 +152,8 @@ def restart_co_located_ray_head(
             framework_log(msg)
         logger.info(msg)
 
+    from app.services.ray_gcs_auth import invalidate_stored_gcs_auth_tokens, require_ray_gcs_auth_token
+
     _log("Restarting co-located Ray head (ray stop --force, then ray start --head)…")
     subprocess.run(
         _ray_cli("stop", "--force"),
@@ -164,6 +163,7 @@ def restart_co_located_ray_head(
         timeout=120,
         check=False,
     )
+    invalidate_stored_gcs_auth_tokens()
     from app.resource_hints import ray_head_start_memory_args
     from app.services.ray_head_options import ray_head_dashboard_cli_args
 
@@ -193,32 +193,11 @@ def restart_co_located_ray_head(
     gcs = format_ray_head(ip)
     os.environ["RAY_ADDRESS"] = gcs
     os.environ["RAY_HEAD_ADDRESS"] = gcs
-    _sync_auth_from_cli()
+    require_ray_gcs_auth_token(gcs)
     if not _ray_status_ok(gcs, timeout_sec=90.0):
         raise RuntimeError(f"Ray head at {gcs} did not become active after restart")
     _log(f"Ray head active at {gcs}")
     return gcs
-
-
-def _sync_auth_from_cli() -> None:
-    try:
-        proc = subprocess.run(
-            _ray_cli("get-auth-token"),
-            env=os.environ.copy(),
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except OSError:
-        return
-    if proc.returncode != 0:
-        return
-    for line in reversed((proc.stdout or "").splitlines()):
-        token = line.strip()
-        if token and not token.startswith("Usage"):
-            os.environ["RAY_AUTH_TOKEN"] = token
-            return
 
 
 def ensure_session_ray_head(
@@ -351,14 +330,16 @@ def init_ray_train_driver(
 
 
 def health_ray_driver_info() -> dict[str, str | None]:
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, project_gcs_auth_token_path
+
     head = os.environ.get("RAY_HEAD_ADDRESS")
+    auth_path = project_gcs_auth_token_path()
     return {
         "ray_driver_connect_revision": RAY_DRIVER_CONNECT_REVISION,
         "master_engine_ip": master_engine_ip(),
         "resolved_driver_gcs": resolve_driver_gcs_address(
             os.environ.get("RAY_ADDRESS"), worker_head=head
         ),
-        "ray_auth_configured": "yes"
-        if os.environ.get("RAY_AUTH_TOKEN") or (Path.home() / ".ray" / "auth_token").is_file()
-        else "no",
+        "ray_gcs_auth_file": str(auth_path),
+        "ray_auth_configured": "yes" if load_gcs_auth_token_from_disk() else "no",
     }
