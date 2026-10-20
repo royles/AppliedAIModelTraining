@@ -136,12 +136,12 @@ export function ModelRegistryPanel() {
               </ul>
             </details>
 
-            <ModelRegistryChat model={selected} />
-
             <details className="registry-model-card-details">
               <summary>Model card (markdown)</summary>
               <pre className="model-card-md">{selected.model_card_markdown ?? "No card yet."}</pre>
             </details>
+
+            <ModelRegistryChat model={selected} />
           </section>
         )}
       </div>
