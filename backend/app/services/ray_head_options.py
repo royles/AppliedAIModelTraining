@@ -8,7 +8,15 @@ from urllib.request import urlopen
 
 
 def ray_dashboard_importable() -> bool:
+    """
+    True only when the dashboard can actually start (not just ``ray.dashboard`` present).
+
+    Minimal ``pip install ray`` often ships dashboard stubs but omits extras such as
+    ``aiohttp_cors``, which makes ``ray start --head --include-dashboard=true`` abort
+    the entire head process.
+    """
     try:
+        import aiohttp_cors  # noqa: F401
         import ray.dashboard.dashboard  # noqa: F401
     except ImportError:
         return False
