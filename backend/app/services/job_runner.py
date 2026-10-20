@@ -204,10 +204,13 @@ def run_training_job(job_id: int) -> None:
             def _fw(msg: str) -> None:
                 append_job_log(db, job_id, "framework", msg)
 
+            from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+
             head = ensure_ray_head_for_workers(
                 framework_log=lambda m: _fw(framework_line("ray", m)),
                 force_restart=False,
             )
+            bind_gcs_auth_for_address(head, required=True)
             worker_group.head_address = head
             db.commit()
             append_job_log(

@@ -21,7 +21,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20n"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20o"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -45,13 +45,18 @@ def ensure_ray_auth_token(gcs_address: str | None = None) -> str | None:
     return os.environ.get("RAY_AUTH_TOKEN", "").strip() or None
 
 
-def apply_ray_auth_from_session() -> bool:
-    """Load Ray GCS auth token into the current process if missing."""
-    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
+def apply_ray_auth_from_session(gcs_address: str | None = None) -> bool:
+    """Load or refresh Ray GCS auth for the live head (never unverified disk-only)."""
+    from app.services.ray_gcs_auth import sync_ray_gcs_auth_token
 
-    if os.environ.get("RAY_AUTH_TOKEN", "").strip():
-        return True
-    return load_gcs_auth_token_from_disk() is not None
+    gcs = (
+        (gcs_address or "").strip()
+        or os.environ.get("RAY_ADDRESS", "").strip()
+        or os.environ.get("RAY_HEAD_ADDRESS", "").strip()
+    )
+    if not gcs:
+        return False
+    return sync_ray_gcs_auth_token(gcs, required=False) is not None
 
 
 def master_ip_from_context(worker_head: str | None = None) -> str | None:
@@ -239,6 +244,12 @@ def restart_co_located_ray_head(
     os.environ["RAY_ADDRESS"] = gcs
     os.environ["RAY_HEAD_ADDRESS"] = gcs
     time.sleep(2.0)
+    from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+
+    try:
+        bind_gcs_auth_for_address(gcs, required=True)
+    except RuntimeError as exc:
+        _log(f"GCS auth sync after head start: {exc}")
     if not wait_for_head_gcs_ready(gcs, timeout_sec=180.0, framework_log=framework_log):
         detail = _ray_status_cli_tail(gcs)
         raise RuntimeError(
@@ -360,7 +371,6 @@ def init_ray_train_driver(
 
     _log(f"Ray driver connect {_driver_connect_diagnostics(worker_head)}")
 
-    apply_ray_auth_from_session()
     services.find_gcs_addresses.cache_clear()
 
     connect = resolve_driver_gcs_address(ray_address, worker_head=worker_head)
@@ -371,6 +381,9 @@ def init_ray_train_driver(
 
     master = master_ip_from_context(worker_head)
     os.environ["RAY_ADDRESS"] = connect
+    from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+
+    bind_gcs_auth_for_address(connect, required=True)
     attempts = _init_attempts(connect, master)
 
     try:

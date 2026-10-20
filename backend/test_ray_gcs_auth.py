@@ -42,7 +42,8 @@ def test_sync_persists_cli_token(tmp_path, monkeypatch):
             with patch.dict(os.environ, {"RAY_AUTH_TOKEN": "stale"}, clear=False):
                 token = sync_ray_gcs_auth_token("10.0.0.1:6379", required=True)
     assert token == "deadbeef"
-    assert path.read_text(encoding="utf-8").strip() == "deadbeef"
+    assert "RAY_AUTH_TOKEN=deadbeef" in path.read_text(encoding="utf-8")
+    assert "RAY_GCS_ADDRESS=10.0.0.1:6379" in path.read_text(encoding="utf-8")
 
 
 def test_sync_strips_stale_env_before_cli(tmp_path, monkeypatch):

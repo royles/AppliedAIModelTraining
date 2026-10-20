@@ -305,22 +305,25 @@ def worker_launch_env(
     from app.services.cai_networking import master_engine_ip, parse_gcs_host_port, resolve_ray_gcs_port
 
     env["PLATFORM_RAY_GCS_PORT"] = str(resolve_ray_gcs_port(ray_head_address))
-    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, project_gcs_auth_token_path
+    from app.services.ray_gcs_auth import bind_gcs_auth_for_address, project_gcs_auth_token_path
 
     auth_path = project_gcs_auth_token_path()
     env["PLATFORM_RAY_GCS_AUTH_FILE"] = str(auth_path)
-    if auth_path.is_file():
-        env["RAY_AUTH_TOKEN_PATH"] = str(auth_path)
-    token = load_gcs_auth_token_from_disk()
-    if token:
-        env["RAY_AUTH_TOKEN"] = token
+    env["RAY_AUTH_TOKEN_PATH"] = str(auth_path)
     head = (ray_head_address or "").strip()
     if head:
         env["PLATFORM_RAY_HEAD_ADDRESS"] = head
+        env["RAY_ADDRESS"] = head
         host, _ = parse_gcs_host_port(head)
         if host:
             env["CDSW_MASTER_IP"] = host
             env["CML_MASTER_IP"] = host
+        try:
+            token = bind_gcs_auth_for_address(head, required=True)
+            env["RAY_AUTH_TOKEN"] = token
+        except RuntimeError as exc:
+            logger.error("Worker launch env: %s", exc)
+            raise
     else:
         master = master_engine_ip()
         if master:
@@ -332,8 +335,6 @@ def worker_launch_env(
         "PATH",
         "PYTHONPATH",
         "CML_RESOURCE_PROFILE_ID",
-        "RAY_AUTH_TOKEN",
-        "RAY_AUTH_TOKEN_PATH",
     ):
         if os.environ.get(key):
             env[key] = os.environ[key]
@@ -398,9 +399,6 @@ class CdswRayWorkerPool:
             memory_gb=worker_mem,
             ray_head_address=head_address,
         )
-        for key in ("RAY_AUTH_TOKEN", "RAY_AUTH_TOKEN_PATH", "RAY_ADDRESS"):
-            if os.environ.get(key):
-                env[key] = os.environ[key]
         kwargs: dict[str, Any] = {
             "n": count,
             "cpu": worker_cpu,
