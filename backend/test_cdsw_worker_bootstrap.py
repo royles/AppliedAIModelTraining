@@ -17,4 +17,5 @@ def test_worker_bootstrap_resolves_head_from_master_ip_not_worker_ip() -> None:
     assert "wait_for_gcs" in code
     assert "FALLBACK_HEAD = \"100.100.59.179:6379\"" in code
     # Must not treat this worker's CDSW_IP_ADDRESS as the Ray head.
+    assert "PLATFORM_RAY_HEAD_ADDRESS" in code
     assert 'for key in ("CDSW_MASTER_IP", "CML_MASTER_IP")' in code

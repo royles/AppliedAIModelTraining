@@ -187,6 +187,28 @@ def run_training_job(job_id: int) -> None:
                     f"Launching {job.num_workers} CDSW engine(s) toward master {head}",
                 ),
             )
+            from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
+            from app.services.ray_driver_connect import ensure_ray_auth_token
+
+            gcs_probe = ray_driver_init_address(head) or head
+            if gcs_probe and not wait_for_gcs_rpc_subprocess(
+                gcs_probe,
+                auth_token=ensure_ray_auth_token(),
+                timeout_sec=120.0,
+            ):
+                detail = (
+                    f"Ray GCS at {gcs_probe} is not accepting RPC from the session "
+                    "(workers will see 'Failed to connect to GCS'). Run `ray stop --force` "
+                    "and restart scripts/start.py, or check start-user.log for head bind errors."
+                )
+                append_job_log(db, job_id, "framework", framework_line("fail", detail))
+                raise RuntimeError(detail)
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("ray", f"GCS RPC ready at {gcs_probe}; launching workers"),
+            )
             launched = pool.launch(job.num_workers, head)
             worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
             worker_group.status = "running"

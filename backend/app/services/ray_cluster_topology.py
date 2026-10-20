@@ -46,10 +46,12 @@ def _ray_session(ray_address: str | None) -> Iterator[bool]:
     if not already:
         try:
             from app.services.cai_networking import coerce_session_driver_ray_address
+            from app.services.ray_driver_connect import apply_ray_auth_from_session
 
             connect = coerce_session_driver_ray_address(ray_address) or ray_address
             if connect != ray_address:
                 os.environ["RAY_ADDRESS"] = connect
+            apply_ray_auth_from_session()
             ray.init(address=connect, ignore_reinit_error=True, logging_level="error")
             connected = ray.is_initialized()
         except Exception:  # noqa: BLE001

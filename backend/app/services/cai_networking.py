@@ -9,9 +9,25 @@ Based on:
 from __future__ import annotations
 
 import os
+import socket
 from pathlib import Path
 
 RAY_GCS_PORT = 6379
+
+
+def gcs_tcp_reachable(
+    host: str,
+    port: int = RAY_GCS_PORT,
+    *,
+    timeout_sec: float = 2.0,
+) -> bool:
+    if not host:
+        return False
+    try:
+        with socket.create_connection((host, port), timeout=timeout_sec):
+            return True
+    except OSError:
+        return False
 
 
 def master_engine_ip() -> str | None:

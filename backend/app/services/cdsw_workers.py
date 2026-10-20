@@ -225,6 +225,9 @@ def worker_node_ip() -> str:
     return ""
 
 def resolve_head() -> str:
+    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip()
+    if pinned:
+        return pinned
     for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
         ip = os.environ.get(key)
         if ip:
@@ -284,6 +287,7 @@ def worker_launch_env(
     cpus: float | None = None,
     gpus: int | None = None,
     memory_gb: float | None = None,
+    ray_head_address: str | None = None,
 ) -> dict[str, str]:
     root = (project_root or REPO_ROOT).resolve()
     env: dict[str, str] = {
@@ -303,12 +307,20 @@ def worker_launch_env(
         mem_gb = float(os.environ.get("PLATFORM_WORKER_MEMORY_GB", "8") or 8)
     env["PLATFORM_WORKER_MEMORY_GB"] = str(mem_gb)
     env.update(worker_ray_memory_env(mem_gb))
-    from app.services.cai_networking import master_engine_ip
+    from app.services.cai_networking import master_engine_ip, parse_gcs_host_port
 
-    master = master_engine_ip()
-    if master:
-        env["CDSW_MASTER_IP"] = master
-        env["CML_MASTER_IP"] = master
+    head = (ray_head_address or "").strip()
+    if head:
+        env["PLATFORM_RAY_HEAD_ADDRESS"] = head
+        host, _ = parse_gcs_host_port(head)
+        if host:
+            env["CDSW_MASTER_IP"] = host
+            env["CML_MASTER_IP"] = host
+    else:
+        master = master_engine_ip()
+        if master:
+            env["CDSW_MASTER_IP"] = master
+            env["CML_MASTER_IP"] = master
     for key in (
         "CDSW_WORKING_DIRECTORY",
         "HOME",
@@ -379,6 +391,7 @@ class CdswRayWorkerPool:
             cpus=worker_cpu,
             gpus=worker_gpus,
             memory_gb=worker_mem,
+            ray_head_address=head_address,
         )
         for key in ("RAY_AUTH_TOKEN", "RAY_AUTH_TOKEN_PATH", "RAY_ADDRESS"):
             if os.environ.get(key):

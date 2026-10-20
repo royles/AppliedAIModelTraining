@@ -171,6 +171,24 @@ def count_alive_ray_nodes_subprocess(
     return int(snap["alive"])
 
 
+def wait_for_gcs_rpc_subprocess(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 120.0,
+    poll_sec: float = 3.0,
+) -> bool:
+    """True when a subprocess can complete ``ray.init`` + list nodes (not just TCP)."""
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if ray_cluster_snapshot_subprocess(
+            gcs_address, auth_token=auth_token, timeout_sec=45.0
+        ) is not None:
+            return True
+        time.sleep(poll_sec)
+    return False
+
+
 def wait_for_cluster_nodes_subprocess(
     gcs_address: str,
     log: LogFn,
@@ -184,6 +202,7 @@ def wait_for_cluster_nodes_subprocess(
     """Poll Ray GCS until ``min_alive`` nodes (and optional GPUs) are available."""
     seen_counts: set[int] = set()
     deadline = time.monotonic() + timeout_sec
+    last_heartbeat = time.monotonic()
     need_gpu = min_gpu > 0
     log(
         framework_line(
@@ -194,6 +213,15 @@ def wait_for_cluster_nodes_subprocess(
         )
     )
     while time.monotonic() < deadline:
+        now = time.monotonic()
+        if now - last_heartbeat >= 30.0:
+            last_heartbeat = now
+            log(
+                framework_line(
+                    "ray",
+                    "Still waiting for Ray cluster (GCS RPC + worker join)…",
+                )
+            )
         snap = ray_cluster_snapshot_subprocess(
             gcs_address, auth_token=auth_token, timeout_sec=40.0
         )
