@@ -230,23 +230,24 @@ def run_training_job(job_id: int) -> None:
                     "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
                 ),
             )
+            from app.services.ray_driver_connect import ensure_ray_auth_token
+
+            probe_token = ensure_ray_auth_token()
             pool.launch(
                 1,
                 head,
-                code=build_worker_connectivity_probe_code(head, probe_path),
+                code=build_worker_connectivity_probe_code(
+                    head, probe_path, ray_auth_token=probe_token
+                ),
                 cpu=1.0,
                 memory_gb=4.0,
                 gpus_per_worker=0,
             )
             probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
             if not probe.get("tcp") or not probe.get("ray_ok"):
-                detail = (
-                    "CDSW worker cannot reach Ray GCS on the master from the worker network "
-                    f"(head={head}). Probe: {probe}. "
-                    "This is a CAI engine networking issue (port 6379 master←worker) or Ray head "
-                    "not bound to the session pod IP. Run `ray stop --force` and "
-                    "`python3 scripts/start.py`, then retry."
-                )
+                from app.services.ray_cai_networking import describe_worker_probe_failure
+
+                detail = describe_worker_probe_failure(probe, head)
                 append_job_log(db, job_id, "framework", framework_line("fail", detail))
                 raise RuntimeError(detail)
             append_job_log(
