@@ -21,7 +21,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20o"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20p"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -141,18 +141,37 @@ def _ray_status_cli_tail(gcs_address: str) -> str:
     return " | ".join(parts)
 
 
+def gcs_client_ready(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    rpc_timeout_sec: float = 45.0,
+) -> bool:
+    """
+    True when the head accepts GCS clients.
+
+    Uses a subprocess ``ray.init`` snapshot when possible; falls back to ``ray status``
+    (same check as auth sync). The subprocess path can fail on a healthy co-located head
+    when ``_node_ip_address`` does not match the raylet yet, while ``ray status`` is OK.
+    """
+    from app.services.ray_cluster_watch import ray_cluster_snapshot_subprocess
+    from app.services.ray_gcs_auth import ensure_ray_auth_token, ray_gcs_status_ok
+
+    token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip() or None
+    if ray_cluster_snapshot_subprocess(
+        gcs_address, auth_token=token, timeout_sec=rpc_timeout_sec
+    ) is not None:
+        return True
+    return ray_gcs_status_ok(gcs_address, token)
+
+
 def wait_for_head_gcs_ready(
     gcs_address: str,
     *,
     timeout_sec: float = 180.0,
     framework_log: Callable[[str], None] | None = None,
 ) -> bool:
-    """
-    Wait until the co-located head accepts GCS RPC (ray.init snapshot in a subprocess).
-
-    Prefer this over parsing ``ray status`` text, which differs across Ray versions.
-    """
-    from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
+    """Wait until GCS accepts clients (subprocess snapshot or ``ray status``)."""
     from app.services.ray_gcs_auth import require_ray_gcs_auth_token
 
     def _log(msg: str) -> None:
@@ -170,11 +189,9 @@ def wait_for_head_gcs_ready(
             _log(f"GCS auth sync attempt {attempt}: {exc}")
             time.sleep(3.0)
             continue
-        if wait_for_gcs_rpc_subprocess(
-            gcs_address, auth_token=token, timeout_sec=min(60.0, timeout_sec)
-        ):
+        if gcs_client_ready(gcs_address, auth_token=token, rpc_timeout_sec=45.0):
             return True
-        _log(f"GCS RPC not ready (attempt {attempt}); retrying…")
+        _log(f"GCS not ready (attempt {attempt}); retrying…")
         time.sleep(3.0)
     return False
 

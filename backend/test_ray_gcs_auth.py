@@ -36,7 +36,7 @@ def test_sync_persists_cli_token(tmp_path, monkeypatch):
 
     with patch("app.services.ray_gcs_auth.subprocess.run", return_value=Proc()):
         with patch(
-            "app.services.ray_gcs_auth._ray_status_ok",
+            "app.services.ray_gcs_auth.ray_gcs_status_ok",
             side_effect=lambda _gcs, tok: tok == "deadbeef",
         ):
             with patch.dict(os.environ, {"RAY_AUTH_TOKEN": "stale"}, clear=False):
@@ -64,7 +64,7 @@ def test_sync_strips_stale_env_before_cli(tmp_path, monkeypatch):
         return Proc()
 
     with patch("app.services.ray_gcs_auth.subprocess.run", side_effect=fake_run):
-        with patch("app.services.ray_gcs_auth._ray_status_ok", return_value=False):
+        with patch("app.services.ray_gcs_auth.ray_gcs_status_ok", return_value=False):
             with patch.dict(os.environ, {"RAY_AUTH_TOKEN": "stale"}, clear=False):
                 token = sync_ray_gcs_auth_token("10.0.0.1:6379", required=True)
     assert token == "fresh"

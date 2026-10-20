@@ -86,7 +86,6 @@ def ensure_ray_head_for_workers(
         )
 
     host, _ = parse_gcs_host_port(gcs)
-    from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
     from app.services.ray_driver_connect import restart_co_located_ray_head
     from app.services.ray_gcs_auth import (
         invalidate_stored_gcs_auth_tokens,
@@ -95,10 +94,19 @@ def ensure_ray_head_for_workers(
     )
 
     def _rpc_ready(timeout: float) -> bool:
+        from app.services.ray_driver_connect import gcs_client_ready
+
         token = sync_ray_gcs_auth_token(gcs, required=False)
         if not token or not gcs_tcp_reachable(host, timeout_sec=2.0):
             return False
-        return wait_for_gcs_rpc_subprocess(gcs, auth_token=token, timeout_sec=timeout)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if gcs_client_ready(
+                gcs, auth_token=token, rpc_timeout_sec=min(45.0, max(5.0, timeout))
+            ):
+                return True
+            time.sleep(3.0)
+        return False
 
     def _finalize_head() -> str:
         os.environ["RAY_HEAD_ADDRESS"] = gcs

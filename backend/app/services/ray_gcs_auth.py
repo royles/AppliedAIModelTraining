@@ -142,7 +142,7 @@ def load_gcs_auth_token_from_disk() -> str | None:
     return None
 
 
-def _ray_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 25.0) -> bool:
+def ray_gcs_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 25.0) -> bool:
     """True when ``ray status`` succeeds against GCS with the given token (if any)."""
     env = os.environ.copy()
     env["RAY_ADDRESS"] = gcs_address
@@ -205,7 +205,7 @@ def _load_verified_disk_token(gcs_address: str) -> str | None:
     try:
         persisted_gcs, persisted_token = _read_persisted_bundle()
         if persisted_token and persisted_gcs == gcs_address:
-            if _ray_status_ok(gcs_address, persisted_token):
+            if ray_gcs_status_ok(gcs_address, persisted_token):
                 os.environ["RAY_AUTH_TOKEN"] = persisted_token
                 return persisted_token
         for path in (
@@ -217,7 +217,7 @@ def _load_verified_disk_token(gcs_address: str) -> str | None:
             if not path:
                 continue
             candidate = _read_token_file(Path(path))
-            if candidate and _ray_status_ok(gcs_address, candidate):
+            if candidate and ray_gcs_status_ok(gcs_address, candidate):
                 os.environ["RAY_AUTH_TOKEN"] = candidate
                 return candidate
     finally:
@@ -243,12 +243,12 @@ def sync_ray_gcs_auth_token(
     _invalidate_if_wrong_head(gcs_address)
 
     env_token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
-    if env_token and _ray_status_ok(gcs_address, env_token):
+    if env_token and ray_gcs_status_ok(gcs_address, env_token):
         _persist_gcs_auth_token(env_token, gcs_address)
         return env_token
 
     token = _read_head_session_auth_token()
-    if token and _ray_status_ok(gcs_address, token):
+    if token and ray_gcs_status_ok(gcs_address, token):
         _persist_gcs_auth_token(token, gcs_address)
         return token
 

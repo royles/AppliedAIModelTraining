@@ -111,6 +111,11 @@ def ray_cluster_snapshot_subprocess(
 
     token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip()
     init_kw = co_located_subprocess_ray_init_kwargs(gcs_address)
+    init_attempts: list[dict[str, Any]] = [
+        {"address": gcs_address, "ignore_reinit_error": True},
+    ]
+    if init_kw not in init_attempts:
+        init_attempts.append(init_kw)
     script = f"""
 import json
 import os
@@ -119,7 +124,18 @@ import ray
 os.environ["RAY_ADDRESS"] = {json.dumps(gcs_address)}
 if {json.dumps(token)}:
     os.environ["RAY_AUTH_TOKEN"] = {json.dumps(token)}
-ray.init(**{json.dumps(init_kw)})
+attempts = {json.dumps(init_attempts)}
+last_err = None
+for kwargs in attempts:
+    try:
+        ray.init(**kwargs)
+        break
+    except Exception as exc:
+        last_err = exc
+        if ray.is_initialized():
+            ray.shutdown()
+else:
+    raise SystemExit(1)
 alive = 0
 gpu = 0.0
 cpu = 0.0
