@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type RegistryLifecycleInfo, type RegistryModel } from "./api";
 import { ModelRegistryChat } from "./ModelRegistryChat";
 
@@ -10,6 +10,34 @@ const STATE_CLASS: Record<string, string> = {
   retired: "retired",
 };
 
+type ProjectGroup = {
+  key: string;
+  projectId: number | null;
+  projectName: string;
+  models: RegistryModel[];
+};
+
+function groupModelsByProject(models: RegistryModel[]): ProjectGroup[] {
+  const map = new Map<string, ProjectGroup>();
+  for (const m of models) {
+    const projectId = m.experiment_id;
+    const projectName = m.project_name?.trim() || "Unassigned project";
+    const key = projectId != null ? `project-${projectId}` : "unassigned";
+    let group = map.get(key);
+    if (!group) {
+      group = { key, projectId, projectName, models: [] };
+      map.set(key, group);
+    }
+    group.models.push(m);
+  }
+  const groups = Array.from(map.values());
+  groups.sort((a, b) => a.projectName.localeCompare(b.projectName));
+  for (const g of groups) {
+    g.models.sort((a, b) => b.created_at_unix - a.created_at_unix);
+  }
+  return groups;
+}
+
 export function ModelRegistryPanel() {
   const [models, setModels] = useState<RegistryModel[]>([]);
   const [lifecycle, setLifecycle] = useState<RegistryLifecycleInfo[]>([]);
@@ -18,6 +46,7 @@ export function ModelRegistryPanel() {
   const [busy, setBusy] = useState(false);
 
   const selected = models.find((m) => m.id === selectedId) ?? null;
+  const projectGroups = useMemo(() => groupModelsByProject(models), [models]);
 
   const load = useCallback(async () => {
     try {
@@ -25,9 +54,7 @@ export function ModelRegistryPanel() {
       setModels(m);
       setLifecycle(lc);
       setError(null);
-      if (selectedId === null && m.length > 0) {
-        setSelectedId(m[0].id);
-      }
+      setSelectedId((prev) => (prev === null && m.length > 0 ? m[0].id : prev));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -60,8 +87,8 @@ export function ModelRegistryPanel() {
       <header className="main-panel-header">
         <h2>Model registry</h2>
         <p className="hint">
-          Trained models are registered automatically with metadata and a model card. Manage
-          create → train → test → benchmark → production → retire here.
+          Models are grouped by <strong>project</strong> (the same collection used in Model Tasks).
+          Each model comes from a training <strong>job</strong>; re-run the job to train a new version.
         </p>
       </header>
 
@@ -69,27 +96,39 @@ export function ModelRegistryPanel() {
 
       <div className="registry-split">
         <aside className="registry-list card">
-          <h3>Models ({models.length})</h3>
+          <h3>Projects & models ({models.length})</h3>
           {models.length === 0 ? (
-            <p className="hint">No registered models yet. Complete a causal-LM training task.</p>
+            <p className="hint">No registered models yet. Complete a training job in Model Tasks.</p>
           ) : (
-            <ul className="registry-model-list">
-              {models.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    className={selectedId === m.id ? "registry-item active" : "registry-item"}
-                    onClick={() => setSelectedId(m.id)}
-                  >
-                    <span className="registry-item-title">{m.display_name ?? m.openai_model_id}</span>
-                    <span className={`pill registry-state ${STATE_CLASS[m.lifecycle_state] ?? ""}`}>
-                      {m.lifecycle_state}
-                    </span>
-                    <span className="hint registry-item-id">{m.openai_model_id}</span>
-                  </button>
-                </li>
+            <div className="registry-project-groups">
+              {projectGroups.map((group) => (
+                <section key={group.key} className="registry-project-group">
+                  <h4 className="registry-project-title">{group.projectName}</h4>
+                  <ul className="registry-model-list">
+                    {group.models.map((m) => (
+                      <li key={m.id}>
+                        <button
+                          type="button"
+                          className={selectedId === m.id ? "registry-item active" : "registry-item"}
+                          onClick={() => setSelectedId(m.id)}
+                        >
+                          <span className="registry-item-title">
+                            {m.display_name ?? m.openai_model_id}
+                          </span>
+                          <span className={`pill registry-state ${STATE_CLASS[m.lifecycle_state] ?? ""}`}>
+                            {m.lifecycle_state}
+                          </span>
+                          <span className="hint registry-item-id">
+                            {m.openai_model_id}
+                            {m.job_name ? ` · job ${m.job_name}` : ""}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
         </aside>
 
@@ -102,9 +141,13 @@ export function ModelRegistryPanel() {
               </span>
             </div>
             <ul className="kv registry-meta">
+              <li>
+                <span>Project</span>
+                <span>{selected.project_name ?? "—"}</span>
+              </li>
               <li><span>OpenAI id</span><span><code>{selected.openai_model_id}</code></span></li>
-              <li><span>Training job</span><span>#{selected.job_id} {selected.job_name ?? ""}</span></li>
-              <li><span>Task</span><span>{selected.task_type}</span></li>
+              <li><span>Job</span><span>#{selected.job_id} {selected.job_name ?? ""}</span></li>
+              <li><span>Task type</span><span>{selected.task_type}</span></li>
               <li><span>Base</span><span>{selected.base_model}</span></li>
             </ul>
 

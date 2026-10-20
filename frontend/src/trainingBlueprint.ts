@@ -47,12 +47,12 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
   const steps: Omit<BlueprintStep, "waitingOn">[] = [
     {
       id: "project",
-      title: "Project & tasks",
+      title: "Project & jobs",
       description:
-        "A project groups related training tasks (jobs) in one place. Create or select a project, then manage existing tasks under it. " +
-        "The blueprint on the right configures a new task; starting training submits it to Ray under the active project.",
+        "Projects are collections of models. Each job under a project runs training and can produce a registered model. " +
+        "Pick the active project here, then configure the blueprint below and start a new job—or re-run an existing job to train again.",
       dependsOn: [],
-      requirement: "Select a project to group model tasks (create one if empty).",
+      requirement: "Select a project for this job (create one if empty).",
       volumetrics: "One project record in the platform database.",
       done: ctx.selectedProjectId !== null,
     },
@@ -177,10 +177,10 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
     },
     {
       id: "register",
-      title: "Task metadata & /v1 id",
+      title: "Job metadata & /v1 id",
       description:
-        "Give the task a human-readable name and an OpenAI-compatible model id for registration after a successful run. " +
-        "The id is what clients pass to /v1/chat/completions once the model is in the registry.",
+        "Name the job and set the OpenAI-compatible model id used when this run registers in the registry. " +
+        "Re-running the job trains again; a new registry entry may be created depending on lifecycle rules.",
       dependsOn: ["compute"],
       requirement: "Job name and OpenAI-compatible model id for registration after success.",
       volumetrics: "model id 1–64 chars: letters, digits, . _ -",

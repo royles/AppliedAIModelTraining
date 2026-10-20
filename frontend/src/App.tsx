@@ -512,6 +512,7 @@ export default function App() {
             onDeleteProject={onDeleteProject}
             onUpdateJobName={onUpdateJobName}
             onDeleteJob={onDeleteJobFromBlueprint}
+            onRerunJob={(jobId) => restartTask(jobId, true)}
             projectBusy={projectBusy}
             jobBusy={jobBusy}
             startBusy={startBusy}

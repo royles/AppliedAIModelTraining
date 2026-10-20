@@ -206,7 +206,7 @@ export function TrainingBlueprintChecklist(props: Props) {
       </ol>
       <div className="blueprint-start-actions">
         <button type="button" disabled={!canStart || startBusy} onClick={onStartTask}>
-          {startBusy ? "Starting…" : "Start model task"}
+          {startBusy ? "Starting…" : "Start job"}
         </button>
         {!canStart && (
           <p className="hint">Confirm every blueprint step before starting training.</p>

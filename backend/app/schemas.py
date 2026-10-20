@@ -206,6 +206,11 @@ class RegistryModelRead(BaseModel):
     id: int
     job_id: int
     job_name: str | None = None
+    experiment_id: int | None = Field(
+        default=None,
+        description="Training project id (experiments table).",
+    )
+    project_name: str | None = None
     openai_model_id: str
     display_name: str | None
     description: str | None

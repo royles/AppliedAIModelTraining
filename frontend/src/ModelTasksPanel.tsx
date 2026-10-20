@@ -2,7 +2,7 @@ import type { Project, TrainingDatasetConfig, TrainingJob, TransformerPreset, To
 import { BlueprintSection } from "./BlueprintSection";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
-import { ProjectTasksFields } from "./ProjectTasksFields";
+import { ProjectJobsHierarchy } from "./ProjectJobsHierarchy";
 import { TrainingBlueprintChecklist } from "./TrainingBlueprintChecklist";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 import { ValidatedNumberField } from "./ValidatedNumberField";
@@ -36,6 +36,7 @@ type Props = {
   onDeleteProject: (projectId: number) => void;
   onUpdateJobName: (jobId: number, name: string) => void;
   onDeleteJob: (jobId: number) => void;
+  onRerunJob: (jobId: number) => void;
   projectBusy: boolean;
   jobBusy: boolean;
   jobName: string;
@@ -111,6 +112,7 @@ export function ModelTasksPanel(props: Props) {
     onDeleteProject,
     onUpdateJobName,
     onDeleteJob,
+    onRerunJob,
     projectBusy,
     jobBusy,
     jobName,
@@ -270,10 +272,10 @@ export function ModelTasksPanel(props: Props) {
         <div className="blueprint-layout-config">
           {section(
             "project",
-            "Project & tasks",
+            "Project & jobs",
             stepById.get("project")?.done ?? false,
             "Create or select a project first.",
-            <ProjectTasksFields
+            <ProjectJobsHierarchy
               projects={projects}
               jobs={jobs}
               selectedProjectId={selectedProjectId}
@@ -287,6 +289,7 @@ export function ModelTasksPanel(props: Props) {
               onDeleteProject={onDeleteProject}
               onUpdateJobName={onUpdateJobName}
               onDeleteJob={onDeleteJob}
+              onRerunJob={onRerunJob}
               projectBusy={projectBusy}
               jobBusy={jobBusy}
               onInvalidateBlueprint={() => invalidateFrom("project")}
@@ -515,7 +518,7 @@ export function ModelTasksPanel(props: Props) {
 
           {section(
             "register",
-            "Task metadata & /v1 id",
+            "Job metadata & /v1 id",
             stepById.get("register")?.done ?? false,
             "Job name and OpenAI model id (letters, digits, . _ -).",
             <>

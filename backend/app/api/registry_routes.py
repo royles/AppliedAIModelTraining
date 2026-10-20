@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import TrainingJob
+from app.models import Experiment, TrainingJob
 from app.schemas import (
     RegistryLifecycleInfo,
     RegistryModelRead,
@@ -25,6 +25,13 @@ router = APIRouter(prefix="/registry", tags=["registry"])
 
 def _to_read(db: Session, record) -> RegistryModelRead:
     job = db.get(TrainingJob, record.job_id)
+    project_name: str | None = None
+    experiment_id: int | None = None
+    if job:
+        experiment_id = job.experiment_id
+        exp = db.get(Experiment, job.experiment_id)
+        if exp:
+            project_name = exp.name
     meta = {}
     if record.metadata_json:
         try:
@@ -41,6 +48,8 @@ def _to_read(db: Session, record) -> RegistryModelRead:
         id=record.id,
         job_id=record.job_id,
         job_name=job.name if job else None,
+        experiment_id=experiment_id,
+        project_name=project_name,
         openai_model_id=record.openai_model_id,
         display_name=record.display_name,
         description=record.description,

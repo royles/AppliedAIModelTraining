@@ -152,6 +152,8 @@ export type RegistryModel = {
   id: number;
   job_id: number;
   job_name: string | null;
+  experiment_id: number | null;
+  project_name: string | null;
   openai_model_id: string;
   display_name: string | null;
   description: string | null;
