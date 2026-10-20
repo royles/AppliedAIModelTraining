@@ -344,12 +344,92 @@ def run_training_job(job_id: int) -> None:
                 f"(verify via GET /api/health → ray_driver_connect_revision)",
             ),
         )
-        result = run_transformer_training(
-            ray_address=ray_addr,
-            num_workers=train_workers,
-            use_gpu=use_gpu,
-            train_config=train_config,
+
+        from app.services.remote_train_driver import (
+            build_remote_train_driver_code,
+            poll_remote_driver_result,
+            remote_result_path,
+            use_remote_train_driver,
+            write_remote_train_payload,
         )
+
+        remote_result_path(artifact_dir).unlink(missing_ok=True)
+        use_remote = use_remote_train_driver(
+            launch_cdsw_workers=launch_cdsw_workers,
+            pool_is_remote=pool.is_remote,
+        )
+
+        if use_remote and ray_addr and head:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    "Distributed mode: launching Ray Train **driver** on a CDSW worker "
+                    "engine (session keeps Ray head only; avoids co-located ray.init).",
+                ),
+            )
+            write_remote_train_payload(
+                artifact_dir,
+                ray_address=ray_addr,
+                num_workers=train_workers,
+                use_gpu=use_gpu,
+                train_config=train_config,
+            )
+            driver_head = head
+            pool.launch(
+                1,
+                driver_head,
+                code=build_remote_train_driver_code(job_id, driver_head),
+                cpu=2.0,
+                memory_gb=8.0,
+                gpus_per_worker=0,
+            )
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    "Waiting for remote driver result (see CDSW worker logs if this stalls)…",
+                ),
+            )
+
+            def _poll_log(msg: str) -> None:
+                append_job_log(db, job_id, "framework", framework_line("ray", msg))
+
+            try:
+                outcome = poll_remote_driver_result(artifact_dir)
+            except TimeoutError as exc:
+                _poll_log(str(exc))
+                raise
+            if outcome.get("status") != "succeeded":
+                err = outcome.get("error") or "Remote Ray Train driver failed"
+                tb = outcome.get("traceback")
+                if tb:
+                    append_job_log(db, job_id, "framework", framework_line("fail", err))
+                    append_job_log(db, job_id, "framework", tb[-4000:])
+                raise RuntimeError(err)
+            result = outcome.get("result") or {"metrics": outcome.get("metrics")}
+        else:
+            if launch_cdsw_workers and not use_remote:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "warn",
+                        "Train driver on session pod (set PLATFORM_TRAIN_DRIVER_ON_SESSION=1 "
+                        "to force). Prefer distributed remote driver (default).",
+                    ),
+                )
+            result = run_transformer_training(
+                ray_address=ray_addr,
+                num_workers=train_workers,
+                use_gpu=use_gpu,
+                train_config=train_config,
+            )
         append_job_log(
             db,
             job_id,

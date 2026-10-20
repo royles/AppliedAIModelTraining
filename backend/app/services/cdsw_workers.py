@@ -315,11 +315,23 @@ class CdswRayWorkerPool:
     def is_remote(self) -> bool:
         return self._client is not None
 
-    def launch(self, count: int, head_address: str) -> LaunchedWorkers:
+    def launch(
+        self,
+        count: int,
+        head_address: str,
+        *,
+        code: str | None = None,
+        cpu: float | None = None,
+        memory_gb: float | None = None,
+        gpus_per_worker: int | None = None,
+    ) -> LaunchedWorkers:
         if count < 1:
             raise ValueError("count must be >= 1")
-        code = build_worker_start_code(
-            head_address, cpus=self.cpu, gpus=self.gpus_per_worker
+        worker_cpu = cpu if cpu is not None else self.cpu
+        worker_mem = memory_gb if memory_gb is not None else self.memory_gb
+        worker_gpus = gpus_per_worker if gpus_per_worker is not None else self.gpus_per_worker
+        code = code or build_worker_start_code(
+            head_address, cpus=worker_cpu, gpus=worker_gpus
         )
         if self._client is None:
             simulated = [f"local-sim-{i}" for i in range(count)]
@@ -329,17 +341,21 @@ class CdswRayWorkerPool:
             self._launched = LaunchedWorkers(worker_ids=simulated, raw=simulated)
             return self._launched
 
+        env = worker_launch_env(
+            cpus=worker_cpu,
+            gpus=worker_gpus,
+            memory_gb=worker_mem,
+        )
+        for key in ("RAY_AUTH_TOKEN", "RAY_AUTH_TOKEN_PATH", "RAY_ADDRESS"):
+            if os.environ.get(key):
+                env[key] = os.environ[key]
         kwargs: dict[str, Any] = {
             "n": count,
-            "cpu": self.cpu,
-            "memory": self.memory_gb,
-            "nvidia_gpu": self.gpus_per_worker,
+            "cpu": worker_cpu,
+            "memory": worker_mem,
+            "nvidia_gpu": worker_gpus,
             "code": code,
-            "env": worker_launch_env(
-                cpus=self.cpu,
-                gpus=self.gpus_per_worker,
-                memory_gb=self.memory_gb,
-            ),
+            "env": env,
         }
         optional = {
             "accelerator_label_id": self._accelerator_label_id
@@ -353,7 +369,7 @@ class CdswRayWorkerPool:
             if val is not None and str(val).strip():
                 kwargs[key] = int(val)
 
-        log_worker_launch_memory(self.memory_gb, self.gpus_per_worker)
+        log_worker_launch_memory(worker_mem, worker_gpus)
         raw = self._client.launch_workers(**kwargs)
         worker_ids = _extract_worker_ids(raw)
         self._launched = LaunchedWorkers(worker_ids=worker_ids, raw=raw)

@@ -437,16 +437,43 @@ def run_transformer_training(
             def _ray_log(msg: str) -> None:
                 _framework(framework_line("ray", msg))
 
-            session_only = int(train_config.get("cdsw_worker_engines") or 0) == 0
-            from app.services.ray_driver_connect import ensure_session_ray_head
+            if train_config.get("remote_driver_engine"):
+                import os
 
-            ensure_session_ray_head(session_only=session_only, framework_log=_ray_log)
-            ray_address = init_ray_train_driver(
-                ray_address,
-                worker_head=worker_head,
-                session_only=session_only,
-                framework_log=_ray_log,
-            )
+                import ray as ray_mod
+
+                node_ip = (
+                    os.environ.get("CDSW_IP_ADDRESS")
+                    or os.environ.get("CML_IP_ADDRESS")
+                    or (ray_address.split(":")[0] if ray_address else None)
+                )
+                _framework(
+                    framework_line(
+                        "ray",
+                        f"Remote driver engine ray.init address={ray_address} node_ip={node_ip}",
+                    )
+                )
+                from app.services.ray_driver_connect import apply_ray_auth_from_session
+
+                apply_ray_auth_from_session()
+                init_kwargs: dict = {
+                    "address": ray_address,
+                    "ignore_reinit_error": True,
+                }
+                if node_ip:
+                    init_kwargs["_node_ip_address"] = node_ip.strip()
+                ray_mod.init(**init_kwargs)
+            else:
+                session_only = int(train_config.get("cdsw_worker_engines") or 0) == 0
+                from app.services.ray_driver_connect import ensure_session_ray_head
+
+                ensure_session_ray_head(session_only=session_only, framework_log=_ray_log)
+                ray_address = init_ray_train_driver(
+                    ray_address,
+                    worker_head=worker_head,
+                    session_only=session_only,
+                    framework_log=_ray_log,
+                )
     else:
         _framework(framework_line("ray", "Starting local Ray runtime"))
         if not ray.is_initialized():
