@@ -43,10 +43,29 @@ Set `NCCL_DEBUG=INFO` in the project/session if you need NCCL logs (not set by d
 - `app/services/cdsw_workers.py` — `build_worker_start_code`, `launch_workers`.
 - `scripts/common.py` — `start_ray_head()`, `cai_session_ip()`.
 
+## Why workers join but Ray Train fails
+
+These are **different connection roles** on CAI:
+
+| Step | Process | Mechanism | Address | Typical result |
+|------|---------|-----------|---------|----------------|
+| 1 | Session | `ray start --head` | GCS on `:6379` | Head registers with **pod IP** (`CDSW_IP_ADDRESS`) |
+| 2 | CDSW worker engine | `ray start --block --address=…` | **`CDSW_MASTER_IP:6379`** (master pod IP) | **Succeeds** — remote engine → routable master IP |
+| 3 | Training driver | `ray.init(address=…)` in **same pod as head** | Must be **`127.0.0.1:6379`** | **Fails** if set to pod IP (`No node info found` / `Failed to connect … at <pod-ip>:6379`) |
+
+The cluster map can look healthy while Train still fails:
+
+- **TCP checks** to `100.100.x.x:6379` succeed (GCS listens on all interfaces).
+- **Worker nodes** appear in `ray.nodes()` because they used the correct **worker** address.
+- **Ray Train** alone runs `ray.init` on the master pod; that code path must use **loopback**, not the address workers use.
+
+Framework log should show **`Driver connecting via 127.0.0.1:6379`** and **`workers join 100.100.x.x:6379`**. If the traceback still cites the pod IP, the session is not running the loopback coercion (pull latest `main`, restart the API).
+
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|--------|
+| Workers OK, Train fails with `No node info found` / connect to `<pod-ip>:6379` | Driver used worker head address; confirm framework log shows `127.0.0.1:6379` for the driver. |
 | `Failed to connect to the observability pubsub at address <pod-ip>:6379` | Driver is using pod IP; upgrade and confirm logs show `driver=127.0.0.1:6379`. |
 | `Ray GCS not reachable at 127.0.0.1:6379` | Head not running — `ss -ltn \| grep 6379`, rerun `python3 scripts/start.py`, inspect `start-user.log`. |
 | Workers `scheduling` forever | Resource profile / GPU labels; worker code never reaches `ray start --block`. |

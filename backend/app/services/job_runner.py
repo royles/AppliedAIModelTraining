@@ -194,6 +194,10 @@ def run_training_job(job_id: int) -> None:
 
         worker_head = head
         ray_addr = ray_driver_init_address(head) if head else resolve_ray_address(None)
+        if ray_addr:
+            from app.services.cai_networking import coerce_session_driver_ray_address
+
+            ray_addr = coerce_session_driver_ray_address(ray_addr) or ray_addr
         if head and ray_addr is None:
             from app.services.cdsw_workers import ray_client_address
 
@@ -209,18 +213,19 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
 
-        if head and ray_addr and ray_addr.startswith("127.0.0.1:"):
-            port = int(ray_addr.split(":")[1])
+        if head and ray_addr:
+            gcs_host, _, port_s = ray_addr.partition(":")
+            port = int(port_s or "6379")
             append_job_log(
                 db,
                 job_id,
                 "framework",
                 framework_line(
                     "ray",
-                    f"Waiting for Ray GCS on {ray_addr} (workers use head {worker_head})…",
+                    f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
                 ),
             )
-            if not wait_for_gcs_port("127.0.0.1", port, timeout_sec=180.0):
+            if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
                 append_job_log(
                     db,
                     job_id,

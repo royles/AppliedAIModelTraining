@@ -7,7 +7,11 @@ import socket
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
-from app.services.cai_networking import master_engine_ip
+from app.services.cai_networking import (
+    coerce_session_driver_ray_address,
+    format_ray_head,
+    master_engine_ip,
+)
 
 
 def _gcs_reachable(address: str | None, timeout: float = 1.5) -> bool:
@@ -145,10 +149,12 @@ def build_ray_cluster_topology(
     Structured cluster map: master, optional train controller, worker nodes, links.
     """
     master_ip = master_engine_ip()
-    gcs_ok = _gcs_reachable(ray_address)
+    driver_gcs = coerce_session_driver_ray_address(ray_address) or ray_address
+    gcs_ok = _gcs_reachable(driver_gcs)
     topology: dict[str, Any] = {
         "version": 1,
-        "gcs_address": ray_address,
+        "gcs_address": driver_gcs,
+        "worker_gcs_address": format_ray_head(master_ip) if master_ip else ray_address,
         "gcs_reachable": gcs_ok,
         "master_ip": master_ip,
         "job_status": job_status,
@@ -193,7 +199,7 @@ def build_ray_cluster_topology(
         }
     )
 
-    with _ray_session(ray_address) as connected:
+    with _ray_session(driver_gcs) as connected:
         if not connected:
             head_id = _add_component(
                 {
