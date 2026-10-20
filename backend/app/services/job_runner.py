@@ -150,7 +150,22 @@ def run_training_job(job_id: int) -> None:
         db.commit()
         db.refresh(worker_group)
 
-        if head and job.num_workers > 0:
+        low_memory_mode = bool(platform.non_distributed_low_memory_mode)
+        launch_cdsw_workers = head and job.num_workers > 0 and not low_memory_mode
+
+        if low_memory_mode:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    "Non-distributed low memory mode: skipping CDSW worker launch; "
+                    "Train runs 1 rank on the session with reduced batch size.",
+                ),
+            )
+
+        if launch_cdsw_workers:
             append_job_log(
                 db,
                 job_id,
@@ -223,20 +238,27 @@ def run_training_job(job_id: int) -> None:
         if platform.ray_local_mode and not pool.is_remote:
             ray_addr = None
 
-        mem_err = ray_train_session_memory_error()
+        cdsw_engines = job.num_workers if launch_cdsw_workers else 0
+
+        mem_err = ray_train_session_memory_error(
+            cdsw_worker_engines=cdsw_engines,
+            non_distributed_low_memory=low_memory_mode,
+        )
         if mem_err and ray_addr:
             append_job_log(db, job_id, "framework", framework_line("fail", mem_err))
             raise RuntimeError(mem_err)
 
-        cdsw_engines = job.num_workers if head and job.num_workers > 0 else 0
-        train_workers = effective_ray_train_workers(
-            max(1, job.num_workers),
-            platform.ray_train_num_workers,
-            cdsw_worker_engines=cdsw_engines,
-        )
+        if low_memory_mode:
+            train_workers = 1
+        else:
+            train_workers = effective_ray_train_workers(
+                max(1, job.num_workers),
+                platform.ray_train_num_workers,
+                cdsw_worker_engines=cdsw_engines,
+            )
         train_config["ray_train_workers_scheduled"] = train_workers
         train_config["cdsw_worker_engines"] = cdsw_engines
-        if train_workers < job.num_workers:
+        if train_workers < job.num_workers and not low_memory_mode:
             append_job_log(
                 db,
                 job_id,
@@ -280,9 +302,12 @@ def run_training_job(job_id: int) -> None:
                 f"epochs={job.epochs}",
             ),
         )
-        worker_mem = float(getattr(pool, "memory_gb", 8.0) if head else 0)
-        if should_apply_train_memory_savings(
-            worker_memory_gb=worker_mem if cdsw_engines > 0 else None,
+        worker_mem = float(getattr(pool, "memory_gb", 8.0) if launch_cdsw_workers else 0)
+        if (
+            low_memory_mode
+            or should_apply_train_memory_savings(
+                worker_memory_gb=worker_mem if cdsw_engines > 0 else None,
+            )
         ) and train_config.get("per_device_train_batch_size", 4) > 2:
             train_config = {
                 **train_config,

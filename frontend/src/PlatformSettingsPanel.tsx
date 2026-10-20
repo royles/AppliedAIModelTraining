@@ -98,6 +98,23 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
               }
             />
           </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={ray.non_distributed_low_memory_mode}
+              onChange={(e) =>
+                setRay({
+                  ...ray,
+                  non_distributed_low_memory_mode: e.target.checked,
+                })
+              }
+            />
+            Non-distributed low memory mode (1 Train rank on session, no CDSW engines)
+          </label>
+          <p className="hint settings-hint-inline">
+            Leave off for normal distributed jobs — worker engines supply the large memory pool;
+            the session only runs Ray control. Turn on only for small session-only training.
+          </p>
         </div>
 
         <div>

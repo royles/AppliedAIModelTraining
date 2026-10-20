@@ -137,16 +137,40 @@ def session_memory_too_small_for_ray_train() -> bool:
     return limit < effective_session_memory_floor_gb()
 
 
-def ray_train_session_memory_error() -> str | None:
+def ray_train_session_memory_error(
+    *,
+    cdsw_worker_engines: int = 0,
+    non_distributed_low_memory: bool = False,
+) -> str | None:
+    """
+    Block only when Train would run entirely on a tiny session with no worker pool.
+
+    Distributed jobs (CDSW engines > 0) use worker memory; the session holds Ray control only.
+    """
+    if cdsw_worker_engines > 0:
+        return None
+
     limit = container_memory_limit_gb()
-    if limit is None or not session_memory_too_small_for_ray_train():
+    if limit is None:
+        return None
+
+    if non_distributed_low_memory:
+        if limit >= ABSOLUTE_MIN_SESSION_FOR_RAY_TRAIN_GB:
+            return None
+        return (
+            f"Session cgroup memory is ~{limit:.2f} GiB — too small even for non-distributed "
+            f"low-memory mode (need ~>={ABSOLUTE_MIN_SESSION_FOR_RAY_TRAIN_GB:.1f} GiB). "
+            f"Use a larger session profile or enable distributed CDSW workers."
+        )
+
+    if not session_memory_too_small_for_ray_train():
         return None
     floor = effective_session_memory_floor_gb()
     return (
-        f"Session cgroup memory is ~{limit:.2f} GiB (need ~>={floor:.1f} GiB measured, "
-        f"nominal {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB profile). Upgrade the CAI session "
-        f"profile if below {MIN_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
-        f"Stale Ray Train jobs leak detached PlacementGroupCleaner actors on the head until Ray restarts."
+        f"Session cgroup memory is ~{limit:.2f} GiB (need ~>={floor:.1f} GiB measured for "
+        f"session-only Train, or enable CDSW workers for distributed memory). "
+        f"For session-only on a small pod, turn on **Non-distributed low memory mode** in "
+        f"Framework Configuration, or upgrade the session profile and run `ray stop` before retrying."
     )
 
 

@@ -148,6 +148,13 @@ class RaySettings(BaseModel):
         le=32,
         description="Cap Ray Train workers per job; 0 = automatic (low-memory aware).",
     )
+    non_distributed_low_memory_mode: bool = Field(
+        default=False,
+        description=(
+            "Session-only Train: 1 rank, no CDSW worker launch, small batch. "
+            "Use when the session is small but you are not using distributed engines."
+        ),
+    )
 
 
 class CdswWorkerSettings(BaseModel):

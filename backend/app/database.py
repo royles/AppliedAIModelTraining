@@ -37,6 +37,11 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _sqlite_add_column_if_missing("training_jobs", "config_json", "config_json TEXT")
     _sqlite_add_column_if_missing("training_jobs", "log_json", "log_json TEXT")
+    _sqlite_add_column_if_missing(
+        "platform_settings",
+        "non_distributed_low_memory_mode",
+        "non_distributed_low_memory_mode INTEGER DEFAULT 0",
+    )
     for col, ddl in (
         ("lifecycle_state", "lifecycle_state VARCHAR(32) DEFAULT 'trained'"),
         ("display_name", "display_name VARCHAR(255)"),

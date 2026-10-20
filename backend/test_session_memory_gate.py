@@ -6,6 +6,14 @@ from app.resource_hints import (
 )
 
 
+def test_distributed_jobs_skip_session_memory_gate(monkeypatch):
+    monkeypatch.setattr(
+        "app.resource_hints.container_memory_limit_gb",
+        lambda: 3.66,
+    )
+    assert ray_train_session_memory_error(cdsw_worker_engines=4) is None
+
+
 def test_tiny_session_blocks_ray_train(monkeypatch):
     monkeypatch.setenv("PLATFORM_CAI_LOW_MEMORY", "0")
     monkeypatch.setattr(
@@ -14,7 +22,7 @@ def test_tiny_session_blocks_ray_train(monkeypatch):
     )
     err = ray_train_session_memory_error()
     assert err is not None
-    assert "PlacementGroupCleaner" in err
+    assert "CDSW workers" in err
 
 
 def test_nominal_eight_gb_profile_allows_ray_train(monkeypatch):

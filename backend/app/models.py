@@ -76,6 +76,7 @@ class PlatformSettings(Base):
     ray_local_mode: Mapped[bool] = mapped_column(default=True)
     ray_head_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
     ray_train_num_workers: Mapped[int] = mapped_column(Integer, default=0)
+    non_distributed_low_memory_mode: Mapped[bool] = mapped_column(default=False)
     worker_cpu: Mapped[float] = mapped_column(Float, default=4.0)
     worker_memory_gb: Mapped[float] = mapped_column(Float, default=8.0)
     gpus_per_worker: Mapped[int] = mapped_column(Integer, default=0)

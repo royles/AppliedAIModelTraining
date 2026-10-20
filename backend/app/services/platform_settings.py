@@ -54,6 +54,9 @@ def _ray_settings(row: PlatformSettings) -> RaySettings:
         ray_local_mode=row.ray_local_mode,
         ray_head_address=row.ray_head_address,
         ray_train_num_workers=row.ray_train_num_workers,
+        non_distributed_low_memory_mode=bool(
+            getattr(row, "non_distributed_low_memory_mode", False)
+        ),
     )
 
 
@@ -99,6 +102,7 @@ def update_platform_settings(
         row.ray_local_mode = data["ray_local_mode"]
         row.ray_head_address = data["ray_head_address"]
         row.ray_train_num_workers = data["ray_train_num_workers"]
+        row.non_distributed_low_memory_mode = data["non_distributed_low_memory_mode"]
     if payload.cdsw_workers is not None:
         data = payload.cdsw_workers.model_dump()
         for key, value in data.items():

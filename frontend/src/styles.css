@@ -1728,6 +1728,12 @@ body {
   width: auto;
 }
 
+.settings-hint-inline {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .card {
   background: #121a2b;
   border: 1px solid #243049;

@@ -97,6 +97,7 @@ export type RaySettings = {
   ray_local_mode: boolean;
   ray_head_address: string | null;
   ray_train_num_workers: number;
+  non_distributed_low_memory_mode: boolean;
 };
 
 export type CdswWorkerSettings = {
