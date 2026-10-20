@@ -18,4 +18,4 @@ def test_worker_bootstrap_resolves_head_from_master_ip_not_worker_ip() -> None:
     assert "PLATFORM_RAY_HEAD_ADDRESS" in code
     resolve_body = code.split("def resolve_head")[1].split("def wait_for_gcs")[0]
     assert "CDSW_IP_ADDRESS" not in resolve_body
-    assert "return FALLBACK_HEAD" in resolve_body
+    assert "return pinned" in resolve_body
