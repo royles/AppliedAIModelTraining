@@ -168,10 +168,14 @@ def ui_bundle_has_sidebar_ux() -> bool:
             text = js_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        has_model_tasks_shell = (
+            "model-tasks-blueprint-layout" in text
+            or "model-tasks-recipe-layout" in text
+        )
         if (
             "app-shell" in text
             and "Framework Configuration" in text
-            and "model-tasks-recipe-layout" in text
+            and has_model_tasks_shell
         ):
             return True
     return False
