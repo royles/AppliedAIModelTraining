@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 
 LogFn = Callable[[str], None]
 
+# Bump when worker probe semantics change (visible in probe JSON + framework logs).
+WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20a"
+
+
+def worker_connectivity_probe_passed(probe: dict) -> bool:
+    """
+    True when a CDSW worker can reach the master Ray head the same way GPU workers do.
+
+    GPU engines use ``ray start --block`` (CLI client), not ``ray.init`` with
+    ``_node_ip_address``. ``ray status`` + TCP is the reliable join check.
+    """
+    if not probe.get("tcp"):
+        return False
+    if probe.get("ray_status_ok"):
+        return True
+    return bool(probe.get("ray_ok"))
+
 
 def live_master_gcs_address() -> str | None:
     ip = master_engine_ip()
@@ -236,6 +253,7 @@ def main():
     ensure_ray(py, root)
     head = resolve_head()
     out = {{
+        "probe_revision": {json.dumps(WORKER_CONNECTIVITY_PROBE_REVISION)},
         "head": head,
         "tcp": False,
         "ray_ok": False,
@@ -275,13 +293,8 @@ def main():
     try:
         import ray
         out["ray_version"] = getattr(ray, "__version__", "unknown")
-        init_kw = {{"address": head, "ignore_reinit_error": True}}
-        node_ip = os.environ.get("CDSW_IP_ADDRESS", "").strip() or os.environ.get(
-            "CML_IP_ADDRESS", ""
-        ).strip()
-        if node_ip:
-            init_kw["_node_ip_address"] = node_ip
-        ray.init(**init_kw)
+        # Client-only check (do not pass _node_ip_address — that is for ray start --block).
+        ray.init(address=head, ignore_reinit_error=True)
         out["ray_ok"] = ray.is_initialized()
         out["nodes"] = len(ray.nodes())
         ray.shutdown()

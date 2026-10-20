@@ -230,9 +230,22 @@ def run_training_job(job_id: int) -> None:
                     "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
                 ),
             )
+            from app.services.ray_cai_networking import WORKER_CONNECTIVITY_PROBE_REVISION
             from app.services.ray_driver_connect import ensure_ray_auth_token
 
             probe_token = ensure_ray_auth_token()
+            if probe_token:
+                os.environ["RAY_AUTH_TOKEN"] = probe_token
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
+                    f"GCS auth token {'present' if probe_token else 'MISSING — ray status/join will fail'}",
+                ),
+            )
             pool.launch(
                 1,
                 head,
@@ -244,9 +257,12 @@ def run_training_job(job_id: int) -> None:
                 gpus_per_worker=0,
             )
             probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
-            if not probe.get("tcp") or not probe.get("ray_ok"):
-                from app.services.ray_cai_networking import describe_worker_probe_failure
+            from app.services.ray_cai_networking import (
+                describe_worker_probe_failure,
+                worker_connectivity_probe_passed,
+            )
 
+            if not worker_connectivity_probe_passed(probe):
                 detail = describe_worker_probe_failure(probe, head)
                 append_job_log(db, job_id, "framework", framework_line("fail", detail))
                 raise RuntimeError(detail)

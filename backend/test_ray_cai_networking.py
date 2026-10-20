@@ -4,6 +4,7 @@ from unittest.mock import patch
 from app.services.ray_cai_networking import (
     build_worker_connectivity_probe_code,
     describe_worker_probe_failure,
+    worker_connectivity_probe_passed,
     worker_ray_join_address,
 )
 
@@ -41,7 +42,13 @@ def test_probe_code_embeds_auth_and_uses_venv():
     assert 'INLINE_RAY_AUTH_TOKEN = "secret-token"' in code
     assert ".venv" in code
     assert "ray.scripts.scripts" in code
-    assert "_node_ip_address" in code
+    assert "ray.init(address=head, ignore_reinit_error=True)" in code
+
+
+def test_probe_passes_on_ray_status_without_ray_init():
+    assert worker_connectivity_probe_passed(
+        {"tcp": True, "ray_ok": False, "ray_status_ok": True}
+    )
 
 
 def test_describe_probe_failure_tcp_without_ray_auth():
