@@ -171,6 +171,7 @@ def ui_bundle_has_sidebar_ux() -> bool:
         has_model_tasks_shell = (
             "model-tasks-blueprint-layout" in text
             or "model-tasks-recipe-layout" in text
+            or ("model-task-wizard" in text and "model-tasks-page" in text)
         )
         if (
             "app-shell" in text
