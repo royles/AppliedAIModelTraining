@@ -40,6 +40,25 @@ class ChatCompletionResponse(BaseModel):
     usage: UsageInfo
 
 
+class ChatCompletionDelta(BaseModel):
+    role: Literal["assistant"] | None = None
+    content: str | None = None
+
+
+class ChatCompletionStreamChoice(BaseModel):
+    index: int
+    delta: ChatCompletionDelta
+    finish_reason: Literal["stop", "length"] | None = None
+
+
+class ChatCompletionStreamChunk(BaseModel):
+    id: str
+    object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
+    created: int
+    model: str
+    choices: list[ChatCompletionStreamChoice]
+
+
 class ModelCard(BaseModel):
     id: str
     object: Literal["model"] = "model"

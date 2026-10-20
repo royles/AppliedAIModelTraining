@@ -1942,6 +1942,117 @@ td {
   background: #44403c;
 }
 
+.registry-chat {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border, #334155);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.registry-chat h4 {
+  margin: 0;
+}
+
+.registry-chat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.registry-chat-field textarea,
+.registry-chat-compose textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, #334155);
+  background: var(--surface-2, #0f172a);
+  color: inherit;
+}
+
+.registry-chat-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.85rem;
+}
+
+.registry-chat-options input[type="number"] {
+  width: 4.5rem;
+  margin-left: 0.35rem;
+}
+
+.registry-chat-log {
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--surface-2, #0f172a);
+  border: 1px solid var(--border, #334155);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.registry-chat-bubble {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  max-width: 95%;
+}
+
+.registry-chat-user {
+  align-self: flex-end;
+  background: #1e3a5f;
+}
+
+.registry-chat-assistant {
+  align-self: flex-start;
+  background: #1e293b;
+}
+
+.registry-chat-system {
+  align-self: center;
+  background: #292524;
+  font-size: 0.85rem;
+}
+
+.registry-chat-role {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 0.25rem;
+}
+
+.registry-chat-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.registry-chat-compose {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.registry-chat-compose .btn-primary {
+  flex-shrink: 0;
+}
+
+.registry-chat-error {
+  margin: 0;
+}
+
+.registry-chat-disabled {
+  margin-top: 1rem;
+}
+
 .jobs-section {
   flex: 1;
   display: flex;

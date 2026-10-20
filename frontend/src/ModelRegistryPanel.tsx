@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type RegistryLifecycleInfo, type RegistryModel } from "./api";
+import { ModelRegistryChat } from "./ModelRegistryChat";
 
 const STATE_CLASS: Record<string, string> = {
   trained: "trained",
@@ -137,6 +138,8 @@ export function ModelRegistryPanel() {
 
             <h4>Model card</h4>
             <pre className="model-card-md">{selected.model_card_markdown ?? "No card yet."}</pre>
+
+            <ModelRegistryChat model={selected} />
           </section>
         )}
       </div>
