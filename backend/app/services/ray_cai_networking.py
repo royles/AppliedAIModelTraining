@@ -88,48 +88,68 @@ def ensure_ray_head_for_workers(
     host, _ = parse_gcs_host_port(gcs)
     from app.services.ray_cluster_watch import wait_for_gcs_rpc_subprocess
     from app.services.ray_driver_connect import restart_co_located_ray_head
-    from app.services.ray_gcs_auth import require_ray_gcs_auth_token
+    from app.services.ray_gcs_auth import (
+        invalidate_stored_gcs_auth_tokens,
+        require_ray_gcs_auth_token,
+        sync_ray_gcs_auth_token,
+    )
 
     def _rpc_ready(timeout: float) -> bool:
-        try:
-            fresh_token = require_ray_gcs_auth_token(gcs)
-        except RuntimeError:
+        token = sync_ray_gcs_auth_token(gcs, required=False)
+        if not token or not gcs_tcp_reachable(host, timeout_sec=2.0):
             return False
-        return (
-            gcs_tcp_reachable(host, timeout_sec=2.0)
-            and wait_for_gcs_rpc_subprocess(gcs, auth_token=fresh_token, timeout_sec=timeout)
-        )
+        return wait_for_gcs_rpc_subprocess(gcs, auth_token=token, timeout_sec=timeout)
+
+    def _finalize_head() -> str:
+        os.environ["RAY_HEAD_ADDRESS"] = gcs
+        os.environ["RAY_ADDRESS"] = gcs
+        assert_master_gcs_worker_routable()
+        require_ray_gcs_auth_token(gcs)
+        return gcs
 
     if force_restart:
         _log("Ensuring fresh Ray head on master pod IP (ray stop --force)…")
         restart_co_located_ray_head(framework_log=framework_log)
-    elif _rpc_ready(25.0):
-        os.environ["RAY_HEAD_ADDRESS"] = gcs
-        os.environ["RAY_ADDRESS"] = gcs
-        assert_master_gcs_worker_routable()
-        from app.services.ray_gcs_auth import require_ray_gcs_auth_token
-
-        require_ray_gcs_auth_token(gcs)
-        _log(f"Ray head healthy at {gcs}")
+    elif _rpc_ready(60.0):
+        _finalize_head()
+        _log(f"Ray head already healthy at {gcs} (no restart)")
         return gcs
 
     if not force_restart:
-        _log(f"Ray GCS not healthy at {gcs}; restarting head…")
+        tcp_up = gcs_tcp_reachable(host, timeout_sec=2.0)
+        if tcp_up:
+            _log(
+                "Ray GCS port is open but RPC/auth check failed; "
+                "refreshing GCS token before ray stop (head may already be running)…",
+            )
+            invalidate_stored_gcs_auth_tokens()
+            sync_ray_gcs_auth_token(gcs, required=False)
+            if _rpc_ready(45.0):
+                _finalize_head()
+                _log(f"Ray head healthy at {gcs} after auth refresh (no restart)")
+                return gcs
+        _log(
+            f"Ray GCS not healthy at {gcs} (tcp={'up' if tcp_up else 'down'}); restarting head…",
+        )
         restart_co_located_ray_head(framework_log=framework_log)
 
-    if not _rpc_ready(90.0):
+    if not _rpc_ready(120.0):
+        from app.resource_hints import container_memory_limit_gb, is_low_memory_container
+
+        mem_hint = ""
+        if is_low_memory_container():
+            lim = container_memory_limit_gb()
+            mem_hint = (
+                f" Session memory is only ~{lim:.1f} GiB — Ray head restarts are slow and may OOM; "
+                "use a >=16 GiB session profile for the Ray head + API, or run workers on 16+ GiB engines."
+            )
         raise RuntimeError(
             f"Ray GCS is not reachable at {gcs} from the master session after restart. "
-            "CDSW workers cannot join. Run `ray stop --force` and `python3 scripts/start.py`, "
-            "then check start-user.log for `ray start --head` errors."
+            "CDSW workers cannot join. Run `ray stop --force`, remove data/.ray_gcs_auth_token, "
+            f"and `python3 scripts/start.py`.{mem_hint}"
         )
 
-    os.environ["RAY_HEAD_ADDRESS"] = gcs
-    os.environ["RAY_ADDRESS"] = gcs
-    assert_master_gcs_worker_routable()
-    from app.services.ray_gcs_auth import require_ray_gcs_auth_token
-
-    require_ray_gcs_auth_token(gcs)
+    _finalize_head()
     _log(f"Ray head ready at {gcs} (workers join via CDSW_MASTER_IP:{resolve_ray_gcs_port()})")
     return gcs
 

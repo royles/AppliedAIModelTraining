@@ -665,9 +665,23 @@ def start_ray_head() -> None:
                 file=sys.stderr,
             )
     except Exception as exc:
+        mem_note = ""
+        try:
+            from app.resource_hints import container_memory_limit_gb, is_low_memory_container
+
+            if is_low_memory_container():
+                lim = container_memory_limit_gb()
+                mem_note = (
+                    f" Session cgroup ~{lim:.1f} GiB is tight for Ray head + API; "
+                    "a >=16 GiB profile is recommended."
+                )
+        except Exception:
+            pass
         print(
             f"Warning: Ray head setup failed ({exc}). "
-            "Distributed training will fail until `ray stop --force` and restart.",
+            "This usually means GCS auth/RPC failed after a head restart — not because Ray was "
+            "left running unchanged. Try: `ray stop --force`, `rm -f data/.ray_gcs_auth_token`, "
+            f"`python3 scripts/start.py`.{mem_note}",
             file=sys.stderr,
         )
 

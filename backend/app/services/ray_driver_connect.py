@@ -21,7 +21,7 @@ from app.services.cai_networking import (
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20m"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20n"
 
 
 def _ray_cli(*args: str) -> list[str]:
