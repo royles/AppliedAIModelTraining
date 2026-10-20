@@ -9,6 +9,7 @@ import {
   type TokenizerBuildConfig,
   type TrainingJob,
 } from "./api";
+import { PlatformStatusBar } from "./PlatformStatusBar";
 import { ModelRegistryPanel } from "./ModelRegistryPanel";
 import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
@@ -417,7 +418,9 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-root">
+      <PlatformStatusBar jobs={jobs} onOpenTask={openTask} />
+      <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
           <h1>Applied AI</h1>
@@ -596,6 +599,7 @@ export default function App() {
           />
         )}
       </main>
+      </div>
     </div>
   );
 }

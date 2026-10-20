@@ -38,7 +38,7 @@ from common import (
     resolve_ux_port,
     run_ui_gateway_foreground,
     run_vite_dev_foreground,
-    start_ray_head,
+    start_ray_head_background,
     start_ui_gateway_background,
     ui_api_health_url,
     venv_python,
@@ -108,7 +108,6 @@ def main() -> int:
     if is_cai_session():
         os.environ["RAY_LOCAL_MODE"] = "false"
         print_cai_memory_hints()
-        start_ray_head()
 
     if args.dev_ui:
         print(f"=== Dev UI: {BIND_HOST}:{ux_port}, API {BIND_HOST}:{backend_port} ===")
@@ -160,7 +159,21 @@ def main() -> int:
         )
         return 1
 
+    start_ui_gateway_background(ux_port, backend_port)
+    ux_ready = wait_for_urls([ui_api_health_url(ux_port)], attempts=60)
+    if ux_ready:
+        print(
+            f"UX ready: http://{BIND_HOST}:{ux_port}/  "
+            f"(API via /api → {BIND_HOST}:{backend_port})"
+        )
+    else:
+        print(
+            f"UX not responding on :{ux_port}; see {log_file('ui')}",
+            file=sys.stderr,
+        )
+
     if is_cai_session():
+        start_ray_head_background()
         ip = cai_session_ip()
         print(f"CAI session IP: {ip}")
         print(f"Application route → UX on CDSW_APP_PORT={ux_port} ({BIND_HOST})")
@@ -168,18 +181,12 @@ def main() -> int:
               f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}")
         if ensure_runtime_ready() != 0:
             return 1
+        if not ux_ready:
+            return 1
         return run_ui_gateway_foreground(ux_port, backend_port)
 
-    start_ui_gateway_background(ux_port, backend_port)
-    if wait_for_urls(
-        [api_health_url(backend_port), ui_api_health_url(ux_port)],
-        attempts=60,
-    ):
-        print(
-            f"UX: http://{BIND_HOST}:{ux_port}/  "
-            f"(API via /api → {BIND_HOST}:{backend_port})  "
-            f"Direct API docs: http://{BIND_HOST}:{backend_port}/docs"
-        )
+    if ux_ready:
+        print(f"Direct API docs: http://{BIND_HOST}:{backend_port}/docs")
         return 0
     print(f"Timed out; see {log_file('api')} and {log_file('ui')}", file=sys.stderr)
     return 1

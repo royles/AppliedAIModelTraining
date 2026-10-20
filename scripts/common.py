@@ -634,6 +634,18 @@ def _ray_head_options():
     return ray_start_include_dashboard, state_api_reachable, ray_head_dashboard_cli_args
 
 
+def start_ray_head_background() -> None:
+    """Start Ray head without blocking API/UX startup (CAI)."""
+    import threading
+
+    threading.Thread(
+        target=start_ray_head,
+        name="ray-head-startup",
+        daemon=True,
+    ).start()
+    print("Ray head starting in background (UX and API are not waiting on Ray).", flush=True)
+
+
 def start_ray_head() -> None:
     ip = cai_session_ip()
     if not ip:

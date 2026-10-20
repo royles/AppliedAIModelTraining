@@ -1,0 +1,74 @@
+"""Lightweight platform status for the UX header (health poll)."""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import TrainingJob
+from app.services import cdsw_workers
+from app.services.cai_networking import ray_driver_gcs_address, ray_worker_head_address
+
+ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
+
+
+def active_jobs_summary(db: Session) -> dict[str, Any]:
+    jobs = list(
+        db.scalars(
+            select(TrainingJob)
+            .where(TrainingJob.status.in_(tuple(ACTIVE_JOB_STATUSES)))
+            .order_by(TrainingJob.updated_at.desc())
+        )
+    )
+    return {
+        "count": len(jobs),
+        "jobs": [
+            {"id": j.id, "name": j.name, "status": j.status}
+            for j in jobs[:8]
+        ],
+    }
+
+
+def platform_ray_status() -> dict[str, Any]:
+    """Ray GCS reachability without ray.init in the API process."""
+    head = ray_worker_head_address()
+    gcs = ray_driver_gcs_address(head) if head else None
+    if not gcs:
+        gcs = os.environ.get("RAY_HEAD_ADDRESS") or os.environ.get("RAY_ADDRESS")
+    out: dict[str, Any] = {
+        "gcs_address": gcs,
+        "cdsw_available": cdsw_workers.cdsw_available(),
+        "gcs_reachable": False,
+        "alive_nodes": None,
+        "gpu_capacity": None,
+        "state": "unknown",
+    }
+    if not gcs:
+        out["state"] = "not_configured"
+        return out
+
+    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
+    from app.services.ray_cluster_watch import ray_status_cluster_snapshot
+    from app.services.ray_driver_connect import gcs_client_ready
+
+    token = load_gcs_auth_token_from_disk()
+    reachable = gcs_client_ready(gcs, auth_token=token, rpc_timeout_sec=6.0)
+    out["gcs_reachable"] = reachable
+    if not reachable:
+        out["state"] = "starting" if cdsw_workers.cdsw_available() else "offline"
+        return out
+
+    snap = ray_status_cluster_snapshot(gcs, auth_token=token, timeout_sec=8.0)
+    if snap is None:
+        out["state"] = "reachable"
+        return out
+
+    alive = int(snap.get("alive", 0))
+    gpu = float(snap.get("gpu", 0.0))
+    out["alive_nodes"] = alive
+    out["gpu_capacity"] = gpu
+    out["state"] = "online" if alive >= 1 else "reachable"
+    return out
