@@ -1852,6 +1852,13 @@ td {
   gap: 1rem;
   min-height: 0;
   flex: 1;
+  align-items: stretch;
+}
+
+.registry-detail.card {
+  overflow-y: auto;
+  min-height: 0;
+  max-height: calc(100vh - 10rem);
 }
 
 .registry-list h3,
@@ -1914,8 +1921,18 @@ td {
   padding-left: 1.25rem;
 }
 
+.registry-model-card-details {
+  margin-top: 1rem;
+}
+
+.registry-model-card-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
 .model-card-md {
-  max-height: 420px;
+  max-height: 360px;
   overflow: auto;
   font-size: 0.8rem;
   line-height: 1.45;

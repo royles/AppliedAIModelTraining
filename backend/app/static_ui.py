@@ -57,6 +57,7 @@ def read_ui_build_info() -> dict[str, Any]:
         try:
             bundle = js_path.read_text(encoding="utf-8", errors="ignore")
             features["model_registry"] = "Model registry" in bundle and "/api/registry" in bundle
+            features["registry_chat"] = "Chat with this model" in bundle
         except OSError:
             features["model_registry"] = False
     info = {

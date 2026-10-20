@@ -218,7 +218,7 @@ export const api = {
       js?: string;
       css?: string;
       stamp?: string;
-      features?: { model_registry?: boolean };
+      features?: { model_registry?: boolean; registry_chat?: boolean };
     }>("/api/ui/build-info"),
   listPresets: () => request<TransformerPreset[]>("/api/transformer/presets"),
   listDatasetFiles: () =>

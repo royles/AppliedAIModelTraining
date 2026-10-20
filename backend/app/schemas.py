@@ -75,6 +75,7 @@ class TrainingJobRead(BaseModel):
 
 class UiBuildFeaturesRead(BaseModel):
     model_registry: bool = False
+    registry_chat: bool = False
 
 
 class UiBuildInfoRead(BaseModel):

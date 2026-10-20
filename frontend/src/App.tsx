@@ -64,6 +64,7 @@ export default function App() {
   const [uiBundleId, setUiBundleId] = useState<string | null>(null);
   const [registryModels, setRegistryModels] = useState<RegistryModel[]>([]);
   const [registryUiMissing, setRegistryUiMissing] = useState(false);
+  const [registryChatUiMissing, setRegistryChatUiMissing] = useState(false);
 
   const selectedPreset = presets.find((p) => p.name === preset);
   const selectedJob = useMemo(
@@ -102,8 +103,14 @@ export default function App() {
         if (info.js) {
           setUiBundleId(info.js.replace(/^index-/, "").replace(/\.js$/, ""));
         }
-        const features = info.features as { model_registry?: boolean } | undefined;
+        const features = info.features as {
+          model_registry?: boolean;
+          registry_chat?: boolean;
+        } | undefined;
         setRegistryUiMissing(features?.model_registry === false);
+        setRegistryChatUiMissing(
+          features?.model_registry === true && features?.registry_chat === false,
+        );
       }
     }).catch(() => {
       setPlatformVersion(null);
@@ -340,6 +347,12 @@ export default function App() {
             This UI bundle is missing the Model registry panel. Run{" "}
             <code>git pull origin main</code> and restart <code>scripts/start.py</code>, then hard-refresh
             the browser.
+          </div>
+        )}
+        {registryChatUiMissing && (
+          <div className="banner warn">
+            This UI bundle is outdated (registry chat missing). Run <code>git pull origin main</code>,
+            restart <code>python3 scripts/start.py</code>, and hard-refresh (Ctrl+Shift+R).
           </div>
         )}
 
