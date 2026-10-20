@@ -145,6 +145,7 @@ export function ModelTasksPanel(props: Props) {
 
   const [confirmedSteps, setConfirmedSteps] = useState<Set<string>>(() => new Set());
   const [blueprintSteps, setBlueprintSteps] = useState<BlueprintStep[]>([]);
+  const [selectedBlueprintStepId, setSelectedBlueprintStepId] = useState<string>("mode");
 
   const invalidateFrom = useCallback((stepId: string) => {
     setConfirmedSteps((prev) => {
@@ -162,6 +163,7 @@ export function ModelTasksPanel(props: Props) {
   }, []);
 
   const scrollToStep = useCallback((stepId: string) => {
+    setSelectedBlueprintStepId(stepId);
     document.getElementById(`blueprint-step-${stepId}`)?.scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -261,6 +263,7 @@ export function ModelTasksPanel(props: Props) {
             openaiModelId={openaiModelId}
             paramEstimate={paramEstimate}
             confirmedStepIds={confirmedSteps}
+            selectedStepId={selectedBlueprintStepId}
             onStepSelect={scrollToStep}
             onStepsChange={setBlueprintSteps}
             canStart={ready}

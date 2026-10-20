@@ -103,6 +103,16 @@ body {
 .sidebar-nav button.active {
   background: #1e3a8a;
   color: #fff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+.sidebar-nav button:not(.active) {
+  border: 1px solid transparent;
+}
+
+.sidebar-nav button.active {
+  border-color: #2563eb;
 }
 
 .sidebar-ui-build {
@@ -481,6 +491,12 @@ body {
 
 .blueprint-step-button:hover {
   border-color: #3b82f6;
+}
+
+.blueprint-step.active {
+  border-color: #60a5fa;
+  background: #121d33;
+  box-shadow: inset 3px 0 0 #60a5fa;
 }
 
 .blueprint-step.confirmed-pending {

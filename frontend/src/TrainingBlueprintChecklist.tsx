@@ -24,6 +24,7 @@ type Props = {
   openaiModelId: string;
   paramEstimate: number | null;
   confirmedStepIds: ReadonlySet<string>;
+  selectedStepId?: string | null;
   onStepSelect?: (stepId: string) => void;
   onStepsChange?: (steps: ReturnType<typeof buildTrainingBlueprint>) => void;
   canStart: boolean;
@@ -48,6 +49,7 @@ export function TrainingBlueprintChecklist(props: Props) {
     openaiModelId,
     paramEstimate,
     confirmedStepIds,
+    selectedStepId,
     onStepSelect,
     onStepsChange,
     canStart,
@@ -174,13 +176,17 @@ export function TrainingBlueprintChecklist(props: Props) {
         {steps.map((step) => {
           const confirmed = confirmedStepIds.has(step.id);
           const complete = step.done && confirmed;
+          const selected = selectedStepId === step.id;
           return (
             <li key={step.id}>
               <button
                 type="button"
                 className={`blueprint-step blueprint-step-button ${complete ? "done" : ""} ${
                   step.waitingOn.length ? "blocked" : ""
-                } ${confirmed && !complete ? "confirmed-pending" : ""}`}
+                } ${confirmed && !complete ? "confirmed-pending" : ""} ${
+                  selected ? "active" : ""
+                }`}
+                aria-current={selected ? "step" : undefined}
                 onClick={() => onStepSelect?.(step.id)}
               >
                 <span className="blueprint-tick" aria-hidden>

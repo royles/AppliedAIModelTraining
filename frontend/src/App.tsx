@@ -380,35 +380,36 @@ export default function App() {
           <p className="subtitle">Model Training</p>
         </div>
         <nav className="sidebar-nav" aria-label="Main">
-          <button
-            type="button"
-            className={nav === "tasks" && selectedJobId === null ? "active" : ""}
-            onClick={() => goNav("tasks")}
-          >
-            Tasks
-          </button>
-          <button
-            type="button"
-            className={nav === "registry" ? "active" : ""}
-            onClick={() => goNav("registry")}
-          >
-            Model registry
-            {registryModels.length > 0 ? ` (${registryModels.length})` : ""}
-          </button>
-          <button
-            type="button"
-            className={nav === "framework" ? "active" : ""}
-            onClick={() => goNav("framework")}
-          >
-            Framework Configuration
-          </button>
-          <button
-            type="button"
-            className={nav === "model-tasks" ? "active" : ""}
-            onClick={() => goNav("model-tasks")}
-          >
-            Model Tasks
-          </button>
+          {(
+            [
+              {
+                id: "tasks" as NavView,
+                label: `Tasks${jobs.length > 0 ? ` (${jobs.length})` : ""}`,
+              },
+              {
+                id: "registry" as NavView,
+                label: `Model registry${registryModels.length > 0 ? ` (${registryModels.length})` : ""}`,
+              },
+              { id: "framework" as NavView, label: "Framework Configuration" },
+              { id: "model-tasks" as NavView, label: "Model Tasks" },
+            ] as const
+          ).map((item) => {
+            const active =
+              item.id === "tasks"
+                ? nav === "tasks" || selectedJobId !== null
+                : nav === item.id && selectedJobId === null;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={active ? "active" : undefined}
+                aria-current={active ? "page" : undefined}
+                onClick={() => goNav(item.id)}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
         {platformVersion && (
           <p
