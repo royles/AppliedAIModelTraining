@@ -143,6 +143,7 @@ def health() -> HealthResponse:
             "cloudera_docs": {
                 "workers_api": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html",
                 "worker_network": "https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html",
+                "cdsw_worker_network_example": "https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html",
                 "engine_env": "https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html",
             },
             "memory": memory_guidance_for_health(),
