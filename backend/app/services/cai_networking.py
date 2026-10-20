@@ -2,6 +2,7 @@
 Cloudera AI Ray address resolution.
 
 Based on:
+- https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html
 - https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html
 - https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html
 """

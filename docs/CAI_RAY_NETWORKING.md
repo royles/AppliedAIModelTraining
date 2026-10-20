@@ -2,7 +2,8 @@
 
 This platform follows Cloudera’s distributed-computing and engine networking model. Official references:
 
-- [Worker network communication](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html) — workers receive **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`** (master engine IP).
+- [CDSW 1.10.5 — Worker network communications (example)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) — each worker gets **`CDSW_MASTER_IP`** (fully routable master engine IP); workers open TCP **to the master** (doc uses port 6000; Ray GCS uses **6379** the same way).
+- [Worker network communication (CML cloud)](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html) — same idea on CAI: **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`**.
 - [Engine environment variables](https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html) — **`CDSW_IP_ADDRESS`** is how *other engines* reach *this* engine; HTTP on **`CDSW_APP_PORT`** / **`CDSW_READONLY_PORT`** should bind **`127.0.0.1`** inside the pod.
 - [Workers API](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-workers-api.html) — `launch_workers(..., code=...)` runs `ray start --block` on worker engines.
 
@@ -12,7 +13,23 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 |------|----------------|------------------------------|-----|
 | **Ray head** | Session (master) pod | `ray start --head` on port **6379** | Started by `scripts/start.py` (`start_ray_head`). |
 | **Training driver** | Same session pod as head | **`CDSW_IP_ADDRESS:6379`** + **`_node_ip_address`** | Ray 2.x on Linux rewrites `127.0.0.1` to the pod IP in `ray.init` anyway (`resolve_ip_for_localhost`). The driver must match the head node IP in GCS (see `ray_driver_connect.py`). |
-| **Ray workers** | Worker engines from `launch_workers` | **`CDSW_MASTER_IP:6379`** (injected at launch + fallback head from session) | Do **not** use the worker’s own `CDSW_IP_ADDRESS` as the head — that causes GCS RPC timeouts. |
+| **Ray workers** | Worker engines from `launch_workers` | **`CDSW_MASTER_IP:6379`** (CAI-set on workers; session also pins **`PLATFORM_RAY_HEAD_ADDRESS`**) | Same pattern as Cloudera’s socket example: connect to **master IP**, not the worker’s **`CDSW_IP_ADDRESS`**. |
+
+### Cloudera worker → master pattern (Ray)
+
+Cloudera’s [worker network example](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) connects workers with:
+
+```python
+s.connect((os.environ["CDSW_MASTER_IP"], <master_port>))
+```
+
+On this platform the **master** runs `ray start --head` with **`--node-ip-address=<CDSW_IP_ADDRESS>`** so GCS listens on the pod IP workers reach via **`CDSW_MASTER_IP`**. Worker bootstrap runs:
+
+```text
+ray start --block --address=<CDSW_MASTER_IP>:6379 --node-ip-address=<worker CDSW_IP_ADDRESS>
+```
+
+If a connectivity probe shows **`tcp: true`** to `CDSW_MASTER_IP:6379`, CAI **worker→master routing matches the doc**; remaining failures are usually Ray head bind/auth/version (not missing firewall between engines).
 
 ## Environment variables
 

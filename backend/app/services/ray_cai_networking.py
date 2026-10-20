@@ -149,8 +149,9 @@ def describe_worker_probe_failure(probe: dict, head: str) -> str:
             f"Worker used non-project Python ({py}); expected project .venv Ray matching the head."
         )
     hint_text = " ".join(hints) if hints else (
-        "TCP to GCS succeeds but Ray client cannot join — restart the head on the pod IP "
-        "(`ray stop --force`, `python3 scripts/start.py`)."
+        "Per Cloudera worker networking, TCP to CDSW_MASTER_IP:6379 means engine routing is OK; "
+        "restart the Ray head on the master pod IP (`ray stop --force`, `python3 scripts/start.py`) "
+        "and ensure worker Ray matches the session (.venv + RAY_AUTH_TOKEN)."
     )
     return (
         f"CDSW worker cannot join Ray on the master from the worker network (head={head}). "
