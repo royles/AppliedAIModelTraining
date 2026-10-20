@@ -521,7 +521,9 @@ def resolve_ray_address(explicit: str | None) -> str | None:
         return ray_driver_init_address(explicit) or explicit
     env = os.environ.get("RAY_ADDRESS")
     if env:
-        return env
+        from app.services.cdsw_workers import ray_driver_init_address
+
+        return ray_driver_init_address(env) or env
     head = os.environ.get("RAY_HEAD_ADDRESS")
     if head:
         from app.services.cdsw_workers import ray_client_address
