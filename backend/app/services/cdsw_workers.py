@@ -225,13 +225,31 @@ def worker_node_ip() -> str:
     return ""
 
 def resolve_head() -> str:
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP", "CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
+    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
         ip = os.environ.get(key)
         if ip:
             return ip.strip() + ":6379"
     return FALLBACK_HEAD
 
+def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
+    import socket
+    import time
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=3.0):
+                return True
+        except OSError:
+            time.sleep(2.0)
+    return False
+
 HEAD = resolve_head()
+host, _, port_s = HEAD.partition(":")
+port = int(port_s or "6379")
+print(f"[platform] Waiting for Ray GCS at {{HEAD}} (up to 600s)…", flush=True)
+if not wait_for_gcs(host, port):
+    print(f"[platform] ERROR: GCS not reachable at {{HEAD}}", flush=True)
+    raise SystemExit(1)
 NODE_IP = worker_node_ip()
 print(
     f"[platform] CDSW worker python={{py}} head={{HEAD}} node_ip={{NODE_IP or 'auto'}} "
@@ -285,12 +303,20 @@ def worker_launch_env(
         mem_gb = float(os.environ.get("PLATFORM_WORKER_MEMORY_GB", "8") or 8)
     env["PLATFORM_WORKER_MEMORY_GB"] = str(mem_gb)
     env.update(worker_ray_memory_env(mem_gb))
+    from app.services.cai_networking import master_engine_ip
+
+    master = master_engine_ip()
+    if master:
+        env["CDSW_MASTER_IP"] = master
+        env["CML_MASTER_IP"] = master
     for key in (
         "CDSW_WORKING_DIRECTORY",
         "HOME",
         "PATH",
         "PYTHONPATH",
         "CML_RESOURCE_PROFILE_ID",
+        "RAY_AUTH_TOKEN",
+        "RAY_AUTH_TOKEN_PATH",
     ):
         if os.environ.get(key):
             env[key] = os.environ[key]

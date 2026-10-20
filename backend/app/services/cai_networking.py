@@ -129,10 +129,11 @@ def worker_ray_head_from_env(fallback_head: str) -> str:
     """
     Resolve Ray head on a worker engine.
 
-    Workers should prefer CDSW_MASTER_IP / CML_MASTER_IP set by CAI (see worker
-    network communication docs), then fall back to the address embedded at launch.
+    Workers must use the **master** engine IP (``CDSW_MASTER_IP``), not this
+    worker's ``CDSW_IP_ADDRESS`` — otherwise ``ray start --block`` targets the
+    wrong host and GCS RPC times out.
     """
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP", "CDSW_IP_ADDRESS", "CML_IP_ADDRESS"):
+    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
         ip = os.environ.get(key)
         if ip:
             return format_ray_head(ip.strip())

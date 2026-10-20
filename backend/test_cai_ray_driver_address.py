@@ -5,6 +5,7 @@ from unittest.mock import patch
 from app.services.cai_networking import (
     coerce_session_driver_ray_address,
     is_cai_master_session,
+    worker_ray_head_from_env,
 )
 from app.services.ray_driver_connect import (
     _init_attempts,
@@ -49,3 +50,19 @@ def test_coerce_pod_ip_on_cdsw_home():
         clear=False,
     ):
         assert coerce_session_driver_ray_address(head) == head
+
+
+def test_worker_head_ignores_worker_cdsw_ip_address():
+    fallback = "100.100.59.179:6379"
+    with patch.dict(
+        "os.environ",
+        {"CDSW_IP_ADDRESS": "100.100.59.200", "CDSW_MASTER_IP": "100.100.59.179"},
+        clear=True,
+    ):
+        assert worker_ray_head_from_env(fallback) == fallback
+    with patch.dict(
+        "os.environ",
+        {"CDSW_IP_ADDRESS": "100.100.59.200"},
+        clear=True,
+    ):
+        assert worker_ray_head_from_env(fallback) == fallback

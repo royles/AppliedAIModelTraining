@@ -12,7 +12,7 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 |------|----------------|------------------------------|-----|
 | **Ray head** | Session (master) pod | `ray start --head` on port **6379** | Started by `scripts/start.py` (`start_ray_head`). |
 | **Training driver** | Same session pod as head | **`CDSW_IP_ADDRESS:6379`** + **`_node_ip_address`** | Ray 2.x on Linux rewrites `127.0.0.1` to the pod IP in `ray.init` anyway (`resolve_ip_for_localhost`). The driver must match the head node IP in GCS (see `ray_driver_connect.py`). |
-| **Ray workers** | Worker engines from `launch_workers` | **`CDSW_MASTER_IP:6379`** (or master’s `CDSW_IP_ADDRESS:6379` passed at launch) | Workers are separate engines; they must use the master’s cluster-routable IP. |
+| **Ray workers** | Worker engines from `launch_workers` | **`CDSW_MASTER_IP:6379`** (injected at launch + fallback head from session) | Do **not** use the worker’s own `CDSW_IP_ADDRESS` as the head — that causes GCS RPC timeouts. |
 
 ## Environment variables
 

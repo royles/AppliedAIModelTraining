@@ -104,6 +104,18 @@ def resolve_head() -> str:
             return ip.strip() + ":6379"
     return FALLBACK_HEAD
 
+def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
+    import socket
+    import time
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=3.0):
+                return True
+        except OSError:
+            time.sleep(2.0)
+    return False
+
 root = project_root()
 os.chdir(root)
 sys.path.insert(0, str(root / "backend"))
@@ -122,6 +134,11 @@ try:
         raise FileNotFoundError(f"Missing {{payload_path}}")
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
     head = resolve_head()
+    gcs_host, _, port_s = head.partition(":")
+    gcs_port = int(port_s or "6379")
+    print(f"[platform] Waiting for Ray GCS at {{head}} (up to 600s)…", flush=True)
+    if not wait_for_gcs(gcs_host, gcs_port):
+        raise RuntimeError(f"GCS not reachable at {{head}}")
     node_ip = os.environ.get("CDSW_IP_ADDRESS") or os.environ.get("CML_IP_ADDRESS") or head.split(":")[0]
     os.environ["RAY_ADDRESS"] = head
     print(f"[platform] Remote Ray Train driver job={{JOB_ID}} head={{head}} node_ip={{node_ip}}", flush=True)
