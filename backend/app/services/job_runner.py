@@ -189,7 +189,6 @@ def run_training_job(job_id: int) -> None:
             train_config["expected_cdsw_worker_nodes"] = job.num_workers
             train_config["ray_head_address"] = head
 
-            from app.services.cdsw_workers import ray_driver_init_address
             from app.services.ray_cluster_watch import wait_for_cluster_nodes_subprocess
             from app.services.ray_driver_connect import ensure_ray_auth_token
 
