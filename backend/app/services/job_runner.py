@@ -207,7 +207,9 @@ def run_training_job(job_id: int) -> None:
             from app.services.ray_gcs_auth import bind_gcs_auth_for_address
 
             head = ensure_ray_head_for_workers(
-                framework_log=lambda m: _fw(framework_line("ray", m)),
+                framework_log=lambda m: _fw(
+                    m if m.startswith("[") else framework_line("ray", m)
+                ),
                 force_restart=False,
             )
             bind_gcs_auth_for_address(head, required=True)

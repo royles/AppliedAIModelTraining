@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -22,6 +23,84 @@ from app.services.log_flair import (
 logger = logging.getLogger(__name__)
 
 LogFn = Callable[[str], None]
+
+_CLUSTER_SNAPSHOT_TIMEOUT_SEC = 18.0
+_CLUSTER_WAIT_HEARTBEAT_SEC = 15.0
+_CLUSTER_WAIT_POLL_SEC = 5.0
+
+
+def _ray_status_subprocess(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 20.0,
+) -> tuple[int, str, str]:
+    """Run ``ray status``; return (exit_code, stdout, stderr)."""
+    from app.services.ray_driver_connect import _ray_cli
+
+    env = os.environ.copy()
+    env["RAY_ADDRESS"] = gcs_address
+    if auth_token:
+        env["RAY_AUTH_TOKEN"] = auth_token
+    else:
+        env.pop("RAY_AUTH_TOKEN", None)
+    try:
+        proc = subprocess.run(
+            _ray_cli("status"),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return -1, "", str(exc)
+    return proc.returncode, proc.stdout or "", proc.stderr or ""
+
+
+def parse_ray_status_active_nodes(stdout: str) -> int | None:
+    """Count node entries under the ``Active:`` section of ``ray status`` output."""
+    lines = stdout.splitlines()
+    in_active = False
+    count = 0
+    for raw in lines:
+        line = raw.strip()
+        lower = line.lower()
+        if "active:" in lower and "pending" not in lower:
+            in_active = True
+            continue
+        if in_active:
+            if lower.startswith("pending:") or lower.startswith("recent failures:"):
+                break
+            if not line:
+                continue
+            if "node_" in line or line[0].isdigit():
+                count += 1
+    return count if in_active else None
+
+
+def ray_status_cluster_hint(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 20.0,
+) -> tuple[int | None, str]:
+    """
+    Lightweight cluster view without ``ray.init`` (for UX heartbeats while workers join).
+    """
+    code, out, err = _ray_status_subprocess(
+        gcs_address, auth_token=auth_token, timeout_sec=timeout_sec
+    )
+    combined = f"{out}\n{err}".lower()
+    if "invalidauthtoken" in combined:
+        return None, "ray status: InvalidAuthToken — re-run scripts/start.py on the session"
+    if code != 0:
+        tail = (err or out).strip()[-200:]
+        return None, f"ray status failed (exit={code}){': ' + tail if tail else ''}"
+    alive = parse_ray_status_active_nodes(out)
+    if alive is None:
+        return None, "could not parse ray status output"
+    return alive, f"ray status: {alive} active node(s)"
 
 
 def framework_log(db: Session, job_id: int, message: str) -> None:
@@ -216,34 +295,56 @@ def wait_for_cluster_nodes_subprocess(
     min_alive: int,
     min_gpu: float = 0.0,
     timeout_sec: float = 600.0,
-    poll_sec: float = 8.0,
+    poll_sec: float = _CLUSTER_WAIT_POLL_SEC,
     auth_token: str | None = None,
 ) -> int:
     """Poll Ray GCS until ``min_alive`` nodes (and optional GPUs) are available."""
     seen_counts: set[int] = set()
-    deadline = time.monotonic() + timeout_sec
-    last_heartbeat = time.monotonic()
+    started = time.monotonic()
+    deadline = started + timeout_sec
+    last_heartbeat = started
     need_gpu = min_gpu > 0
     log(
         framework_line(
             "ray",
-            f"Waiting for Ray cluster (need >={min_alive} node(s)"
+            f"Waiting for Ray cluster at {gcs_address} (need >={min_alive} node(s)"
             + (f", >={min_gpu:g} GPU" if need_gpu else "")
             + f", timeout {int(timeout_sec)}s)…",
         )
     )
+    if need_gpu:
+        log(
+            framework_line(
+                "info",
+                "Session Ray head is usually CPU-only; GPU ranks need a CDSW worker "
+                "that finished `ray start --block` on the master address.",
+            )
+        )
     while time.monotonic() < deadline:
         now = time.monotonic()
-        if now - last_heartbeat >= 30.0:
+        if now - last_heartbeat >= _CLUSTER_WAIT_HEARTBEAT_SEC:
             last_heartbeat = now
+            elapsed = int(now - started)
+            status_alive, status_hint = ray_status_cluster_hint(
+                gcs_address, auth_token=auth_token, timeout_sec=20.0
+            )
+            extra = status_hint
+            if status_alive is not None and status_alive < min_alive:
+                extra += (
+                    f"; waiting for CDSW worker(s) to join (have {status_alive}, need >={min_alive})"
+                )
+            elif need_gpu and status_alive is not None and status_alive >= min_alive:
+                extra += f"; need >={min_gpu:g} GPU in cluster (check worker profile / gpus=1)"
             log(
                 framework_line(
                     "ray",
-                    "Still waiting for Ray cluster (GCS RPC + worker join)…",
+                    f"Still waiting ({elapsed}s): {extra}",
                 )
             )
         snap = ray_cluster_snapshot_subprocess(
-            gcs_address, auth_token=auth_token, timeout_sec=40.0
+            gcs_address,
+            auth_token=auth_token,
+            timeout_sec=_CLUSTER_SNAPSHOT_TIMEOUT_SEC,
         )
         if snap is not None:
             count = int(snap["alive"])
@@ -261,6 +362,13 @@ def wait_for_cluster_nodes_subprocess(
             if nodes_ok and gpu_ok:
                 log(ray_cluster_ready_line(count))
                 return count
+        else:
+            status_alive, status_hint = ray_status_cluster_hint(
+                gcs_address, auth_token=auth_token, timeout_sec=20.0
+            )
+            if status_alive is not None and status_alive not in seen_counts:
+                seen_counts.add(status_alive)
+                log(framework_line("info", status_hint))
         time.sleep(poll_sec)
     final = ray_cluster_snapshot_subprocess(
         gcs_address, auth_token=auth_token, timeout_sec=40.0

@@ -64,9 +64,11 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
 
   useEffect(() => {
     loadLogs();
-    const id = window.setInterval(loadLogs, 5000);
+    const pollMs =
+      job.status === "running" || job.status === "provisioning" ? 2000 : 5000;
+    const id = window.setInterval(loadLogs, pollMs);
     return () => window.clearInterval(id);
-  }, [loadLogs]);
+  }, [loadLogs, job.status]);
 
   const rayStatusKey = logs ? rayStatusFingerprint(logs.ray_status) : "";
 
