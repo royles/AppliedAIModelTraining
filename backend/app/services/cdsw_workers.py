@@ -145,6 +145,9 @@ def wait_for_gcs_port(
 
 
 def build_worker_start_code(head_address: str, *, cpus: float = 4.0, gpus: int = 1) -> str:
+    from app.services.cdsw_worker_codegen import embedded_worker_resolve_head_source
+
+    resolve_head_src = embedded_worker_resolve_head_source()
     """
     Python code for launch_workers `code=`.
 
@@ -224,20 +227,7 @@ def worker_node_ip() -> str:
             return ip.strip()
     return ""
 
-def resolve_head() -> str:
-    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip() or FALLBACK_HEAD
-    pin_host = pinned.split(":")[0].strip()
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
-        ip = os.environ.get(key, "").strip()
-        if ip and ip == pin_host:
-            return ip + ":6379"
-    if os.environ.get("CDSW_MASTER_IP") and os.environ.get("CDSW_MASTER_IP").strip() != pin_host:
-        print(
-            f"[platform] WARN: CDSW_MASTER_IP={{os.environ.get('CDSW_MASTER_IP')}} "
-            f"!= launch head {{pinned}}; using launch head",
-            flush=True,
-        )
-    return pinned
+{resolve_head_src}
 
 def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
     import socket
@@ -312,8 +302,9 @@ def worker_launch_env(
         mem_gb = float(os.environ.get("PLATFORM_WORKER_MEMORY_GB", "8") or 8)
     env["PLATFORM_WORKER_MEMORY_GB"] = str(mem_gb)
     env.update(worker_ray_memory_env(mem_gb))
-    from app.services.cai_networking import master_engine_ip, parse_gcs_host_port
+    from app.services.cai_networking import master_engine_ip, parse_gcs_host_port, resolve_ray_gcs_port
 
+    env["PLATFORM_RAY_GCS_PORT"] = str(resolve_ray_gcs_port(ray_head_address))
     head = (ray_head_address or "").strip()
     if head:
         env["PLATFORM_RAY_HEAD_ADDRESS"] = head

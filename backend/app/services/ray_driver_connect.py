@@ -16,11 +16,12 @@ from app.services.cai_networking import (
     is_cai_master_session,
     master_engine_ip,
     parse_gcs_host_port,
+    resolve_ray_gcs_port,
 )
 
 logger = logging.getLogger(__name__)
 
-RAY_DRIVER_CONNECT_REVISION = "2026-10-20g"
+RAY_DRIVER_CONNECT_REVISION = "2026-10-20h"
 
 
 def _ray_cli(*args: str) -> list[str]:
@@ -81,11 +82,7 @@ def resolve_driver_gcs_address(
     master = master_ip_from_context(worker_head)
     on_master = is_cai_master_session() or master is not None
     if on_master and master:
-        port = 6379
-        if explicit:
-            _, port = parse_gcs_host_port(explicit)
-        elif worker_head:
-            _, port = parse_gcs_host_port(worker_head)
+        port = resolve_ray_gcs_port(explicit or worker_head)
         return format_ray_head(master, port)
     return explicit
 
@@ -170,10 +167,11 @@ def restart_co_located_ray_head(
     from app.resource_hints import ray_head_start_memory_args
     from app.services.ray_head_options import ray_head_dashboard_cli_args
 
+    gcs_port = resolve_ray_gcs_port()
     args = [
         "start",
         "--head",
-        "--port=6379",
+        f"--port={gcs_port}",
         f"--node-ip-address={ip}",
         "--disable-usage-stats",
     ]

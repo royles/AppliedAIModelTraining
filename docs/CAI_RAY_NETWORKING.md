@@ -17,19 +17,21 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 
 ### Cloudera worker → master pattern (Ray)
 
-Cloudera’s [worker network example](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) connects workers with:
+Cloudera’s [worker network example](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html):
 
-```python
-s.connect((os.environ["CDSW_MASTER_IP"], <master_port>))
-```
+| Side | Doc pattern | This platform (Ray GCS) |
+|------|-------------|-------------------------|
+| **Master** | `socket.bind(("0.0.0.0", port))` — listen on all interfaces | `ray start --head --port=<GCS> --node-ip-address=<CDSW_IP_ADDRESS>` (GCS accepts worker TCP to pod IP) |
+| **Worker** | `connect((os.environ["CDSW_MASTER_IP"], port))` | `ray start --block --address=<resolved head>` where `resolve_head()` prefers **`CDSW_MASTER_IP`** when it matches the session launch pin |
+| **HTTP / UX** | N/A in worker doc | FastAPI + CDSW app port stay on **`127.0.0.1`** only (`scripts/common.BIND_HOST`) |
 
-On this platform the **master** runs `ray start --head` with **`--node-ip-address=<CDSW_IP_ADDRESS>`** so GCS listens on the pod IP workers reach via **`CDSW_MASTER_IP`**. Worker bootstrap runs:
+GCS port defaults to **6379**; override with **`PLATFORM_RAY_GCS_PORT`** (1024–65535) on session and workers (passed in `worker_launch_env`).
 
-```text
-ray start --block --address=<CDSW_MASTER_IP>:6379 --node-ip-address=<worker CDSW_IP_ADDRESS>
-```
+Canonical Python: `cai_networking.resolve_worker_ray_head_address()` and the same logic embedded in CDSW worker code via `cdsw_worker_codegen.embedded_worker_resolve_head_source()`.
 
-If a connectivity probe shows **`tcp: true`** to `CDSW_MASTER_IP:6379`, CAI **worker→master routing matches the doc**; remaining failures are usually Ray head bind/auth/version (not missing firewall between engines).
+After head start, `assert_master_gcs_worker_routable()` verifies TCP to **`CDSW_IP_ADDRESS:<GCS>`**, not only `127.0.0.1`.
+
+If a connectivity probe shows **`tcp: true`** to `CDSW_MASTER_IP:<GCS>`, CAI **worker→master routing matches the doc**; remaining failures are usually Ray auth/version (not engine isolation).
 
 ## Environment variables
 

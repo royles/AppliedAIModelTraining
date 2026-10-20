@@ -555,13 +555,19 @@ def ensure_runtime_ready() -> int:
     return 0
 
 
-def _ray_port_open(port: int = 6379) -> bool:
+def _ray_port_open(port: int | None = None) -> bool:
     backend = REPO_ROOT / "backend"
     if str(backend) not in sys.path:
         sys.path.insert(0, str(backend))
-    from app.services.cai_networking import gcs_tcp_reachable
+    from app.services.cai_networking import gcs_tcp_reachable, resolve_ray_gcs_port
 
-    return gcs_tcp_reachable("127.0.0.1", port, timeout_sec=1.0)
+    gcs_port = port if port is not None else resolve_ray_gcs_port()
+    if gcs_tcp_reachable("127.0.0.1", gcs_port, timeout_sec=1.0):
+        return True
+    master_ip = cai_session_ip()
+    if master_ip:
+        return gcs_tcp_reachable(master_ip, gcs_port, timeout_sec=1.0)
+    return False
 
 
 def _gcs_rpc_ready(gcs_address: str, timeout_sec: float = 30.0) -> bool:

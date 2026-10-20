@@ -87,6 +87,9 @@ def build_remote_train_driver_code(job_id: int, head_address: str) -> str:
 
     Does not run ``ray start --block`` (GPU workers already joined the cluster).
     """
+    from app.services.cdsw_worker_codegen import embedded_worker_resolve_head_source
+
+    resolve_head_src = embedded_worker_resolve_head_source()
     return f'''import json
 import os
 import sys
@@ -105,12 +108,7 @@ def project_root() -> Path:
                 return p.resolve()
     return Path.cwd().resolve()
 
-def resolve_head() -> str:
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
-        ip = os.environ.get(key)
-        if ip:
-            return ip.strip() + ":6379"
-    return FALLBACK_HEAD
+{resolve_head_src}
 
 def wait_for_gcs(host: str, port: int, timeout_sec: float = 600.0) -> bool:
     import socket
@@ -141,7 +139,7 @@ try:
     if not payload_path.is_file():
         raise FileNotFoundError(f"Missing {{payload_path}}")
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
-    head = resolve_head()
+    head = (payload.get("ray_head_address") or "").strip() or resolve_head()
     gcs_host, _, port_s = head.partition(":")
     gcs_port = int(port_s or "6379")
     print(f"[platform] Waiting for Ray GCS at {{head}} (up to 600s)…", flush=True)

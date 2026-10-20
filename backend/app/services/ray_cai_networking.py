@@ -15,10 +15,13 @@ from pathlib import Path
 from typing import Callable
 
 from app.services.cai_networking import (
+    assert_master_gcs_worker_routable,
     format_ray_head,
     gcs_tcp_reachable,
     master_engine_ip,
     parse_gcs_host_port,
+    resolve_ray_gcs_port,
+    resolve_worker_ray_head_address,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,21 +35,8 @@ def live_master_gcs_address() -> str | None:
 
 
 def worker_ray_join_address(fallback_head: str) -> str:
-    """
-    Address for ``ray start --block --address=...`` on a CDSW worker.
-
-    Prefer CAI ``CDSW_MASTER_IP`` when it matches the launch-time head; otherwise
-    use the launch pin (``PLATFORM_RAY_HEAD_ADDRESS`` / fallback).
-    """
-    pinned = os.environ.get("PLATFORM_RAY_HEAD_ADDRESS", "").strip() or fallback_head.strip()
-    pin_host, _ = parse_gcs_host_port(pinned)
-    for key in ("CDSW_MASTER_IP", "CML_MASTER_IP"):
-        ip = os.environ.get(key, "").strip()
-        if not ip:
-            continue
-        if ip == pin_host:
-            return format_ray_head(ip)
-    return pinned
+    """Address for ``ray start --block --address=...`` on a CDSW worker."""
+    return resolve_worker_ray_head_address(fallback_head)
 
 
 def ensure_ray_head_for_workers(
@@ -96,6 +86,7 @@ def ensure_ray_head_for_workers(
     elif _rpc_ready(25.0):
         os.environ["RAY_HEAD_ADDRESS"] = gcs
         os.environ["RAY_ADDRESS"] = gcs
+        assert_master_gcs_worker_routable()
         _log(f"Ray head healthy at {gcs}")
         return gcs
 
@@ -112,7 +103,8 @@ def ensure_ray_head_for_workers(
 
     os.environ["RAY_HEAD_ADDRESS"] = gcs
     os.environ["RAY_ADDRESS"] = gcs
-    _log(f"Ray head ready at {gcs} (worker join address)")
+    assert_master_gcs_worker_routable()
+    _log(f"Ray head ready at {gcs} (workers join via CDSW_MASTER_IP:{resolve_ray_gcs_port()})")
     return gcs
 
 
@@ -166,7 +158,11 @@ def build_worker_connectivity_probe_code(
     ray_auth_token: str | None = None,
 ) -> str:
     """CDSW worker bootstrap: verify TCP + ``ray status`` + ray.init from worker network."""
+    from app.services.cdsw_worker_codegen import embedded_worker_resolve_head_source
+
     token_json = json.dumps((ray_auth_token or "").strip())
+    resolve_head_src = embedded_worker_resolve_head_source()
+    default_port = resolve_ray_gcs_port(head_address)
     return f'''import json
 import os
 import socket
@@ -174,9 +170,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-HEAD = "{head_address}"
+FALLBACK_HEAD = "{head_address}"
 RESULT_PATH = "{result_path}"
 INLINE_RAY_AUTH_TOKEN = {token_json}
+
+{resolve_head_src}
 
 def project_root() -> Path:
     for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT", "CDSW_WORKING_DIRECTORY"):
@@ -236,8 +234,9 @@ def main():
     os.chdir(root)
     py = pick_python(root)
     ensure_ray(py, root)
+    head = resolve_head()
     out = {{
-        "head": HEAD,
+        "head": head,
         "tcp": False,
         "ray_ok": False,
         "python": py,
@@ -246,8 +245,8 @@ def main():
         ) if os.environ.get(k)}},
     }}
     apply_auth(out)
-    host, _, ps = HEAD.partition(":")
-    port = int(ps or "6379")
+    host, _, ps = head.partition(":")
+    port = int(ps or "{default_port}")
     try:
         socket.create_connection((host, port), timeout=15).close()
         out["tcp"] = True
@@ -255,7 +254,7 @@ def main():
         out["tcp_error"] = str(exc)
         _write(out)
         sys.exit(1)
-    ray_env = {{**os.environ, "RAY_ADDRESS": HEAD}}
+    ray_env = {{**os.environ, "RAY_ADDRESS": head}}
     if os.environ.get("RAY_AUTH_TOKEN"):
         ray_env["RAY_AUTH_TOKEN"] = os.environ["RAY_AUTH_TOKEN"]
     try:
@@ -276,7 +275,7 @@ def main():
     try:
         import ray
         out["ray_version"] = getattr(ray, "__version__", "unknown")
-        init_kw = {{"address": HEAD, "ignore_reinit_error": True}}
+        init_kw = {{"address": head, "ignore_reinit_error": True}}
         node_ip = os.environ.get("CDSW_IP_ADDRESS", "").strip() or os.environ.get(
             "CML_IP_ADDRESS", ""
         ).strip()
