@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type Project,
@@ -129,9 +129,15 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  const appliedPresetRef = useRef<string | null>(null);
+
   useEffect(() => {
     const p = presets.find((x) => x.name === preset);
     if (!p) return;
+    // Presets list refreshes on a timer; only re-apply when the user picks a different preset.
+    if (appliedPresetRef.current === preset) return;
+    appliedPresetRef.current = preset;
+
     const arch = p.config.architecture;
     const c = p.config;
     setHiddenSize(arch.hidden_size);

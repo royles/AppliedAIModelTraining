@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type TrainingDatasetConfig } from "./api";
+import { ValidatedNumberField } from "./ValidatedNumberField";
 
 type Props = {
   value: TrainingDatasetConfig;
@@ -137,25 +138,31 @@ export function DatasetConfigFields({ value, onChange }: Props) {
       <div className="arch-grid arch-grid-compact">
         <label>
           Repeat corpus
-          <input
-            type="number"
-            min={1}
-            max={10000}
+          <ValidatedNumberField
             value={value.repeat ?? 1}
-            onChange={(e) => patch({ repeat: Number(e.target.value) })}
+            min={1}
+            max={10_000}
+            onChange={(n) => patch({ repeat: n })}
           />
         </label>
         <label>
           Max samples (optional)
           <input
-            type="number"
-            min={1}
+            type="text"
+            inputMode="numeric"
             value={value.max_samples ?? ""}
-            onChange={(e) =>
-              patch({
-                max_samples: e.target.value ? Number(e.target.value) : null,
-              })
-            }
+            placeholder="All examples"
+            onChange={(e) => {
+              const t = e.target.value.trim();
+              if (!t) {
+                patch({ max_samples: null });
+                return;
+              }
+              const n = Number.parseInt(t, 10);
+              if (Number.isFinite(n) && n >= 1) {
+                patch({ max_samples: n });
+              }
+            }}
           />
         </label>
       </div>
