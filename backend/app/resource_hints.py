@@ -18,6 +18,9 @@ RECOMMENDED_WORKER_MEMORY_GB_GPU = 32.0
 # Containers below this use low-memory Train caps (batch size, session-only worker count).
 LOW_MEMORY_CONTAINER_GB = MIN_SESSION_MEMORY_GB
 MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB = MIN_SESSION_MEMORY_GB
+# 8 GiB CML profiles often report ~7.3–7.9 GiB in cgroup; allow nominal minimum tier.
+SESSION_MEMORY_CGROUP_SLACK_GB = 0.85
+ABSOLUTE_MIN_SESSION_FOR_RAY_TRAIN_GB = 6.5
 
 
 def _read_cgroup_limit_bytes() -> int | None:
@@ -120,19 +123,29 @@ def log_worker_launch_memory(memory_gb: float, gpus: int) -> None:
         )
 
 
+def effective_session_memory_floor_gb() -> float:
+    from app.services.ray_memory_config import minimum_instance_memory_gb
+
+    nominal = minimum_instance_memory_gb() - SESSION_MEMORY_CGROUP_SLACK_GB
+    return max(ABSOLUTE_MIN_SESSION_FOR_RAY_TRAIN_GB, nominal)
+
+
 def session_memory_too_small_for_ray_train() -> bool:
     limit = container_memory_limit_gb()
-    return limit is not None and limit < MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB
+    if limit is None:
+        return False
+    return limit < effective_session_memory_floor_gb()
 
 
 def ray_train_session_memory_error() -> str | None:
     limit = container_memory_limit_gb()
-    if limit is None or limit >= MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:
+    if limit is None or not session_memory_too_small_for_ray_train():
         return None
+    floor = effective_session_memory_floor_gb()
     return (
-        f"Session container memory is ~{limit:.2f} GiB (minimum {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB "
-        f"required for Ray head + Train). Upgrade the CAI session profile to >= "
-        f"{MIN_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
+        f"Session cgroup memory is ~{limit:.2f} GiB (need ~>={floor:.1f} GiB measured, "
+        f"nominal {MIN_SESSION_MEMORY_FOR_RAY_TRAIN_GB:.0f} GiB profile). Upgrade the CAI session "
+        f"profile if below {MIN_SESSION_MEMORY_GB:.0f} GiB, then run `ray stop` and restart the app. "
         f"Stale Ray Train jobs leak detached PlacementGroupCleaner actors on the head until Ray restarts."
     )
 

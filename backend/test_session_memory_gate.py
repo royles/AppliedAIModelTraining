@@ -17,6 +17,14 @@ def test_tiny_session_blocks_ray_train(monkeypatch):
     assert "PlacementGroupCleaner" in err
 
 
+def test_nominal_eight_gb_profile_allows_ray_train(monkeypatch):
+    monkeypatch.setattr(
+        "app.resource_hints.container_memory_limit_gb",
+        lambda: 7.39,
+    )
+    assert ray_train_session_memory_error() is None
+
+
 def test_large_session_allows_ray_train(monkeypatch):
     monkeypatch.setattr(
         "app.resource_hints.container_memory_limit_gb",
