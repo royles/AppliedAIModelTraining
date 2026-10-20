@@ -79,7 +79,7 @@ export function PlatformStatusBar({ jobs, onOpenTask }: Props) {
     }
 
     poll();
-    const id = window.setInterval(poll, 4000);
+    const id = window.setInterval(poll, 8000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

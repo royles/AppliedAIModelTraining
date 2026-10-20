@@ -12,8 +12,15 @@ class Base(DeclarativeBase):
 
 def _make_engine():
     settings = get_settings()
-    connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-    return create_engine(settings.database_url, connect_args=connect_args)
+    url = settings.database_url
+    connect_args = {"check_same_thread": False, "timeout": 30} if url.startswith("sqlite") else {}
+    kwargs: dict = {"connect_args": connect_args, "pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        # Health polls + job threads must not exhaust the pool on slow Ray checks.
+        kwargs["pool_size"] = 10
+        kwargs["max_overflow"] = 20
+        kwargs["pool_timeout"] = 60
+    return create_engine(settings.database_url, **kwargs)
 
 
 engine = _make_engine()

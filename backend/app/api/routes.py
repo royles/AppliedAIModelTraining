@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models import Experiment, TrainingJob
 from app.schemas import (
     ArchitectureSummary,
@@ -27,7 +27,7 @@ from app.schemas import (
     PlatformSettingsUpdate,
 )
 from app.resource_hints import memory_guidance_for_health
-from app.services.platform_status import active_jobs_summary, platform_ray_status
+from app.services.platform_status import active_jobs_summary, cached_platform_ray_status
 from app.services.ray_driver_connect import health_ray_driver_info
 from app.services import cdsw_workers
 from app.services.cai_networking import (
@@ -141,8 +141,14 @@ def ui_build_info() -> UiBuildInfoRead:
 
 
 @router.get("/health", response_model=HealthResponse)
-def health(db: Session = Depends(get_db)) -> HealthResponse:
+def health() -> HealthResponse:
     import ray
+
+    db = SessionLocal()
+    try:
+        jobs_summary = active_jobs_summary(db)
+    finally:
+        db.close()
 
     runtime = "initialized" if ray.is_initialized() else "not_initialized"
     starter = (REPO_ROOT / "data" / "datasets" / "starter_corpus.txt").resolve()
@@ -155,8 +161,8 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
             "ray_head_driver": ray_driver_gcs_address(ray_worker_head_address())
             if cdsw_workers.cdsw_available()
             else None,
-            "platform_ray": platform_ray_status(),
-            "active_jobs": active_jobs_summary(db),
+            "platform_ray": cached_platform_ray_status(),
+            "active_jobs": jobs_summary,
             "master_engine_ip": master_engine_ip(),
             "networking_doc": "docs/CAI_RAY_NETWORKING.md",
             "cloudera_docs": {
