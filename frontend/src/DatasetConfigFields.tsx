@@ -22,7 +22,8 @@ export function DatasetConfigFields({ value, onChange }: Props) {
     <article className="card">
       <h3>Training dataset</h3>
       <p className="hint">
-        Corpus used during Ray Train. Files live under <code>data/datasets/</code> in the project.
+        Corpus for Ray Train: project files, Hugging Face, Iceberg tables, or Parquet on S3
+        (<code>s3://bucket/prefix/</code>). Session needs S3/Iceberg credentials via env or CAI mounts.
       </p>
       <label>
         Source
@@ -37,6 +38,8 @@ export function DatasetConfigFields({ value, onChange }: Props) {
           <option value="text_file">Text file (.txt)</option>
           <option value="jsonl_file">JSONL file</option>
           <option value="huggingface">Hugging Face dataset</option>
+          <option value="iceberg">Iceberg table</option>
+          <option value="parquet_s3">Parquet on S3</option>
         </select>
       </label>
 
@@ -108,6 +111,96 @@ export function DatasetConfigFields({ value, onChange }: Props) {
         </>
       )}
 
+      {value.source === "iceberg" && (
+        <>
+          <label>
+            Catalog URI (REST)
+            <input
+              value={value.iceberg_catalog_uri ?? ""}
+              onChange={(e) => patch({ iceberg_catalog_uri: e.target.value.trim() || null })}
+              placeholder="https://iceberg-catalog.example.com"
+            />
+          </label>
+          <p className="hint">
+            Or set <code>PLATFORM_ICEBERG_CATALOG_URI</code> on the session. Warehouse path optional
+            for Hive-style catalogs.
+          </p>
+          <label>
+            Table (namespace.table)
+            <input
+              value={value.iceberg_table ?? ""}
+              onChange={(e) => patch({ iceberg_table: e.target.value.trim() || null })}
+              placeholder="ml.training_corpus"
+            />
+          </label>
+          <label>
+            Text column
+            <input
+              value={value.iceberg_text_column ?? "text"}
+              onChange={(e) => patch({ iceberg_text_column: e.target.value })}
+            />
+          </label>
+          <label>
+            Label column (optional)
+            <input
+              value={value.iceberg_label_column ?? ""}
+              onChange={(e) =>
+                patch({ iceberg_label_column: e.target.value.trim() || null })
+              }
+            />
+          </label>
+          <label>
+            Warehouse (optional)
+            <input
+              value={value.iceberg_warehouse ?? ""}
+              onChange={(e) => patch({ iceberg_warehouse: e.target.value.trim() || null })}
+              placeholder="s3://warehouse-bucket/iceberg/"
+            />
+          </label>
+        </>
+      )}
+
+      {value.source === "parquet_s3" && (
+        <>
+          <label>
+            Parquet location
+            <input
+              value={value.parquet_uri ?? ""}
+              onChange={(e) => patch({ parquet_uri: e.target.value.trim() || null })}
+              placeholder="s3://my-bucket/datasets/train/"
+            />
+          </label>
+          <p className="hint">
+            Single <code>.parquet</code> file or directory of Parquet parts. Uses{" "}
+            <code>AWS_REGION</code> / instance credentials unless you set region below.
+          </p>
+          <label>
+            Text column
+            <input
+              value={value.parquet_text_column ?? "text"}
+              onChange={(e) => patch({ parquet_text_column: e.target.value })}
+            />
+          </label>
+          <label>
+            Label column (optional)
+            <input
+              value={value.parquet_label_column ?? ""}
+              onChange={(e) =>
+                patch({ parquet_label_column: e.target.value.trim() || null })
+              }
+            />
+          </label>
+          <label>
+            S3 region (optional)
+            <input
+              value={value.s3_region ?? ""}
+              onChange={(e) => patch({ s3_region: e.target.value.trim() || null })}
+              placeholder="us-east-1"
+            />
+          </label>
+        </>
+      )}
+
       {value.source === "huggingface" && (
         <>
           <label>
@@ -115,9 +208,22 @@ export function DatasetConfigFields({ value, onChange }: Props) {
             <input
               value={value.hf_dataset ?? ""}
               onChange={(e) => patch({ hf_dataset: e.target.value.trim() || null })}
-              placeholder="wikitext"
+              placeholder="Salesforce/wikitext"
             />
           </label>
+          <label>
+            Config / subset (if required)
+            <input
+              value={value.hf_config ?? ""}
+              onChange={(e) => patch({ hf_config: e.target.value.trim() || null })}
+              placeholder="wikitext-103-raw-v1"
+            />
+          </label>
+          <p className="hint">
+            Some hubs need a config (WikiText: <code>wikitext-103-raw-v1</code>). You can also
+            use <code>Salesforce/wikitext:wikitext-103-raw-v1</code> in the dataset id field.
+            Set <strong>Max samples</strong> for large sets — the full train split loads into memory.
+          </p>
           <label>
             Split
             <input

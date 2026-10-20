@@ -110,11 +110,41 @@ def _load_jsonl(path: Path, text_field: str, label_field: str | None) -> tuple[l
     return texts, labels if label_field else None
 
 
+def _parse_hf_dataset_id(raw: str) -> tuple[str, str | None]:
+    """
+    Allow ``org/name:config`` or ``org/name@config`` in the dataset id field.
+    """
+    text = raw.strip()
+    for sep in (":", "@"):
+        if sep in text:
+            repo, config = text.split(sep, 1)
+            repo = repo.strip()
+            config = config.strip() or None
+            if repo and config:
+                return repo, config
+    return text, None
+
+
 def _load_huggingface(cfg: TrainingDatasetConfig) -> tuple[list[str], list[int] | None]:
     from datasets import load_dataset
 
     assert cfg.hf_dataset
-    ds = load_dataset(cfg.hf_dataset, split=cfg.hf_split)
+    repo, inline_config = _parse_hf_dataset_id(cfg.hf_dataset)
+    config_name = (cfg.hf_config or "").strip() or inline_config
+    if config_name:
+        ds = load_dataset(repo, config_name, split=cfg.hf_split)
+    else:
+        try:
+            ds = load_dataset(repo, split=cfg.hf_split)
+        except ValueError as exc:
+            msg = str(exc)
+            if "Config name is missing" in msg or "pick one among the available configs" in msg:
+                raise ValueError(
+                    f"Hugging Face dataset '{repo}' requires a config name "
+                    f"(e.g. wikitext-103-raw-v1). Set dataset.hf_config or use "
+                    f"'{repo}:wikitext-103-raw-v1'. Original error: {msg}"
+                ) from exc
+            raise
     limit = cfg.max_samples or len(ds)
     texts: list[str] = []
     labels: list[int] = []
@@ -155,6 +185,14 @@ def load_training_samples(
         texts, labels = _load_jsonl(path, cfg.text_field, cfg.label_field)
     elif cfg.source == "huggingface":
         texts, labels = _load_huggingface(cfg)
+    elif cfg.source == "iceberg":
+        from app.training.iceberg_loader import load_iceberg_samples
+
+        texts, labels = load_iceberg_samples(cfg)
+    elif cfg.source == "parquet_s3":
+        from app.training.parquet_loader import load_parquet_samples
+
+        texts, labels = load_parquet_samples(cfg)
     else:
         raise ValueError(f"Unsupported dataset source: {cfg.source}")
 

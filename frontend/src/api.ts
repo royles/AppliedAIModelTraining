@@ -28,7 +28,14 @@ export type TokenizerBuildConfig = {
 };
 
 export type TrainingDatasetConfig = {
-  source: "builtin" | "inline" | "text_file" | "jsonl_file" | "huggingface";
+  source:
+    | "builtin"
+    | "inline"
+    | "text_file"
+    | "jsonl_file"
+    | "huggingface"
+    | "iceberg"
+    | "parquet_s3";
   builtin_name?: string;
   texts?: string[];
   labels?: number[] | null;
@@ -36,9 +43,21 @@ export type TrainingDatasetConfig = {
   text_field?: string;
   label_field?: string | null;
   hf_dataset?: string | null;
+  hf_config?: string | null;
   hf_split?: string;
   hf_text_column?: string;
   hf_label_column?: string | null;
+  iceberg_catalog_name?: string;
+  iceberg_catalog_type?: string;
+  iceberg_catalog_uri?: string | null;
+  iceberg_warehouse?: string | null;
+  iceberg_table?: string | null;
+  iceberg_text_column?: string;
+  iceberg_label_column?: string | null;
+  parquet_uri?: string | null;
+  parquet_text_column?: string;
+  parquet_label_column?: string | null;
+  s3_region?: string | null;
   max_samples?: number | null;
   repeat?: number;
 };
