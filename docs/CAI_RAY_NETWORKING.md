@@ -21,7 +21,8 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 | `CDSW_IP_ADDRESS` / `CML_IP_ADDRESS` | Every engine | Master’s IP as seen by other engines; worker Ray head address `host:6379`. |
 | `CDSW_MASTER_IP` / `CML_MASTER_IP` | Worker engines only | Master IP for outbound connections (preferred in worker bootstrap code). |
 | `RAY_HEAD_ADDRESS` | Session after `start_ray_head` | Cached `CDSW_IP_ADDRESS:6379` for workers and UI. |
-| `RAY_ADDRESS` | Session driver | Set to **`127.0.0.1:6379`** after head is up. |
+| `RAY_ADDRESS` | Session driver | Set to **`CDSW_IP_ADDRESS:6379`** after head is up (same GCS as workers). |
+| `RAY_AUTH_TOKEN` | Session driver | Ray 2.59+ GCS token from `~/.ray/auth_token` (synced at startup). |
 | `PLATFORM_NCCL_DEFAULTS` | Session + workers | Default **`1`**: apply NCCL / `TORCH_NCCL` env (`NCCL_ASYNC_ERROR_HANDLING`, socket interface `^docker0,lo`, etc.). Set **`0`** to skip. |
 
 ## NCCL (multi-GPU Ray Train)
@@ -38,7 +39,8 @@ Set `NCCL_DEBUG=INFO` in the project/session if you need NCCL logs (not set by d
 
 ## Code map
 
-- `app/services/cai_networking.py` — resolve master IP, worker head, driver loopback.
+- `app/services/cai_networking.py` — resolve master IP, worker head.
+- `app/services/ray_driver_connect.py` — `ray.init` with `_node_ip_address` + auth.
 - `app/services/nccl_env.py` — default NCCL env for GPU Train (`PLATFORM_NCCL_DEFAULTS`).
 - `app/services/cdsw_workers.py` — `build_worker_start_code`, `launch_workers`.
 - `scripts/common.py` — `start_ray_head()`, `cai_session_ip()`.
@@ -51,22 +53,23 @@ These are **different connection roles** on CAI:
 |------|---------|-----------|---------|----------------|
 | 1 | Session | `ray start --head` | GCS on `:6379` | Head registers with **pod IP** (`CDSW_IP_ADDRESS`) |
 | 2 | CDSW worker engine | `ray start --block --address=…` | **`CDSW_MASTER_IP:6379`** (master pod IP) | **Succeeds** — remote engine → routable master IP |
-| 3 | Training driver | `ray.init(address=…)` in **same pod as head** | Must be **`127.0.0.1:6379`** | **Fails** if set to pod IP (`No node info found` / `Failed to connect … at <pod-ip>:6379`) |
+| 3 | Training driver | `ray.init(address=…)` in **same pod as head** | **`CDSW_IP:6379`** and **`_node_ip_address=CDSW_IP`** | **Fails** if only logs say `127.0.0.1` but Ray canonicalizes to pod IP without matching the head node (60s timeout → `No node info found` / `Failed to connect … at <pod-ip>:6379`) |
 
 The cluster map can look healthy while Train still fails:
 
 - **TCP checks** to `100.100.x.x:6379` succeed (GCS listens on all interfaces).
 - **Worker nodes** appear in `ray.nodes()` because they used the correct **worker** address.
-- **Ray Train** alone runs `ray.init` on the master pod; that code path must use **loopback**, not the address workers use.
+- **Ray Train** runs a separate `ray.init` in the API process; it must register against the **same head node IP** Ray stored at `ray start --head`.
 
-Framework log should show **`Driver connecting via 127.0.0.1:6379`** and **`workers join 100.100.x.x:6379`**. If the traceback still cites the pod IP, the session is not running the loopback coercion (pull latest `main`, restart the API).
+Framework log should show **`Ray driver GCS connect 100.100.x.x:6379; node_ip=100.100.x.x`**. If you only see `127.0.0.1` in UX logs but the error cites the pod IP, that is Ray rewriting localhost — upgrade to a build with `ray_driver_connect.py`.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|--------|
-| Workers OK, Train fails with `No node info found` / connect to `<pod-ip>:6379` | Driver used worker head address; confirm framework log shows `127.0.0.1:6379` for the driver. |
-| `Failed to connect to the observability pubsub at address <pod-ip>:6379` | Driver is using pod IP; upgrade and confirm logs show `driver=127.0.0.1:6379`. |
+| `No node info found matching attributes: '<ip>, /tmp/ray'` | Do not pass `_temp_dir` to `ray.init` (fixed in `ray_driver_connect`). Session-only jobs restart the head via `ray stop` + `ray start --head`. |
+| Workers OK, Train fails with `No node info found` / connect to `<pod-ip>:6379` after ~60s | Stale raylet vs GCS; `ray stop --force` and restart head; confirm `ray.init OK` in framework log. |
+| `InvalidAuthToken` on `ray.init` | Backend missing `RAY_AUTH_TOKEN`; rerun `scripts/start.py` or copy `~/.ray/auth_token` into the API env. |
 | `Ray GCS not reachable at 127.0.0.1:6379` | Head not running — `ss -ltn \| grep 6379`, rerun `python3 scripts/start.py`, inspect `start-user.log`. |
 | Workers `scheduling` forever | Resource profile / GPU labels; worker code never reaches `ray start --block`. |
 | Head in Framework UI ≠ session IP | Stale SQLite `ray_head_address`; live env wins after sync on API start. |

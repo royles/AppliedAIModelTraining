@@ -7,9 +7,17 @@ from app.services.cai_networking import (
     is_cai_master_session,
 )
 from app.services.ray_driver_connect import (
+    _init_attempts,
     master_ip_from_context,
     resolve_driver_gcs_address,
 )
+
+
+def test_init_attempts_never_set_temp_dir():
+    attempts = _init_attempts("100.0.0.1:6379", "100.0.0.1")
+    assert attempts
+    for kw in attempts:
+        assert "_temp_dir" not in kw
 
 
 def test_coerce_uses_master_ip_not_loopback():

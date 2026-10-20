@@ -437,9 +437,14 @@ def run_transformer_training(
             def _ray_log(msg: str) -> None:
                 _framework(framework_line("ray", msg))
 
+            session_only = int(train_config.get("cdsw_worker_engines") or 0) == 0
+            from app.services.ray_driver_connect import ensure_session_ray_head
+
+            ensure_session_ray_head(session_only=session_only, framework_log=_ray_log)
             ray_address = init_ray_train_driver(
                 ray_address,
                 worker_head=worker_head,
+                session_only=session_only,
                 framework_log=_ray_log,
             )
     else:
