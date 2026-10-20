@@ -395,7 +395,7 @@ def run_training_job(job_id: int) -> None:
 
         if launch_cdsw_workers and head:
             from app.services.ray_cluster_watch import (
-                ray_cluster_snapshot_subprocess,
+                cluster_snapshot_for_wait,
                 wait_for_cluster_nodes_subprocess,
             )
             from app.services.ray_driver_connect import ensure_ray_auth_token
@@ -413,7 +413,7 @@ def run_training_job(job_id: int) -> None:
                     timeout_sec=900.0 if use_gpu else 600.0,
                     auth_token=auth_token,
                 )
-                snap = ray_cluster_snapshot_subprocess(gcs_wait, auth_token=auth_token)
+                snap = cluster_snapshot_for_wait(gcs_wait, auth_token=auth_token)
                 if use_gpu and (snap is None or snap["gpu"] < min_gpu):
                     detail = (
                         f"Ray cluster reports {snap['gpu'] if snap else 0:g} GPU but "

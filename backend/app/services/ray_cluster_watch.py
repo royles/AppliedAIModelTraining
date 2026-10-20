@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -79,6 +80,72 @@ def parse_ray_status_active_nodes(stdout: str) -> int | None:
     return count if in_active else None
 
 
+def parse_ray_status_resource_capacities(stdout: str) -> dict[str, float]:
+    """Parse ``Total Usage`` capacity lines (e.g. ``0.0/1.0 GPU`` → 1 GPU)."""
+    caps = {"cpu": 0.0, "gpu": 0.0}
+    in_totals = False
+    for raw in stdout.splitlines():
+        line = raw.strip()
+        lower = line.lower()
+        if "total usage:" in lower:
+            in_totals = True
+            continue
+        if in_totals:
+            if lower.startswith("from request_resources:") or lower.startswith("pending demands:"):
+                break
+            match = re.match(r"[\d.]+/([\d.]+)\s+(CPU|GPU)\b", line, re.IGNORECASE)
+            if match:
+                caps[match.group(2).lower()] = float(match.group(1))
+    return caps
+
+
+def ray_status_cluster_snapshot(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 20.0,
+) -> dict[str, float] | None:
+    """Node/GPU counts from ``ray status`` (no ``ray.init`` in the API process)."""
+    code, out, err = _ray_status_subprocess(
+        gcs_address, auth_token=auth_token, timeout_sec=timeout_sec
+    )
+    combined = f"{out}\n{err}".lower()
+    if "invalidauthtoken" in combined or code != 0:
+        return None
+    alive = parse_ray_status_active_nodes(out)
+    if alive is None:
+        return None
+    caps = parse_ray_status_resource_capacities(out)
+    return {
+        "alive": float(alive),
+        "gpu": float(caps.get("gpu", 0.0)),
+        "cpu": float(caps.get("cpu", 0.0)),
+    }
+
+
+def cluster_snapshot_for_wait(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    init_timeout_sec: float = _CLUSTER_SNAPSHOT_TIMEOUT_SEC,
+) -> dict[str, float] | None:
+    """
+    Cluster resource view for provisioning waits.
+
+    Prefer a subprocess ``ray.init`` snapshot when it works; fall back to ``ray status``
+    (matches ``ray status`` CLI on the session when co-located ``ray.init`` is flaky).
+    """
+    snap = ray_cluster_snapshot_subprocess(
+        gcs_address, auth_token=auth_token, timeout_sec=init_timeout_sec
+    )
+    if snap is not None:
+        return {**snap, "via": "ray_init"}
+    status = ray_status_cluster_snapshot(gcs_address, auth_token=auth_token)
+    if status is not None:
+        return {**status, "via": "ray_status"}
+    return None
+
+
 def ray_status_cluster_hint(
     gcs_address: str,
     *,
@@ -100,7 +167,9 @@ def ray_status_cluster_hint(
     alive = parse_ray_status_active_nodes(out)
     if alive is None:
         return None, "could not parse ray status output"
-    return alive, f"ray status: {alive} active node(s)"
+    caps = parse_ray_status_resource_capacities(out)
+    gpu = caps.get("gpu", 0.0)
+    return alive, f"ray status: {alive} active node(s), {gpu:g} GPU capacity"
 
 
 def framework_log(db: Session, job_id: int, message: str) -> None:
@@ -341,19 +410,20 @@ def wait_for_cluster_nodes_subprocess(
                     f"Still waiting ({elapsed}s): {extra}",
                 )
             )
-        snap = ray_cluster_snapshot_subprocess(
+        snap = cluster_snapshot_for_wait(
             gcs_address,
             auth_token=auth_token,
-            timeout_sec=_CLUSTER_SNAPSHOT_TIMEOUT_SEC,
+            init_timeout_sec=_CLUSTER_SNAPSHOT_TIMEOUT_SEC,
         )
         if snap is not None:
             count = int(snap["alive"])
             if count not in seen_counts:
                 seen_counts.add(count)
+                via = str(snap.get("via") or "GCS")
                 log(
                     framework_line(
                         "ray",
-                        f"Cluster reports {count} alive node(s), "
+                        f"Cluster ({via}) reports {count} alive node(s), "
                         f"GPU={snap['gpu']:g} CPU={snap['cpu']:g}",
                     )
                 )
@@ -370,9 +440,7 @@ def wait_for_cluster_nodes_subprocess(
                 seen_counts.add(status_alive)
                 log(framework_line("info", status_hint))
         time.sleep(poll_sec)
-    final = ray_cluster_snapshot_subprocess(
-        gcs_address, auth_token=auth_token, timeout_sec=40.0
-    )
+    final = cluster_snapshot_for_wait(gcs_address, auth_token=auth_token)
     final_n = int(final["alive"]) if final else 0
     final_gpu = final["gpu"] if final else 0.0
     log(
