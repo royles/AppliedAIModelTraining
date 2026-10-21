@@ -1,0 +1,232 @@
+/**
+ * Global CDL component styles — overrides legacy dark-theme rules in styles.css.
+ */
+
+body {
+  font-size: var(--cdl-text-base);
+  font-weight: var(--cdl-font-weight-regular);
+  color: var(--cdl-text-primary);
+  background: var(--cdl-bg-app);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--cdl-font-weight-semibold);
+  line-height: var(--cdl-line-tight);
+  color: var(--cdl-text-primary);
+}
+
+.main-panel {
+  background: var(--cdl-bg-app);
+  padding: var(--cdl-grid-margin);
+}
+
+.main-panel-header h2 {
+  font-size: var(--cdl-text-2xl);
+  font-weight: var(--cdl-font-weight-semibold);
+}
+
+.subtitle,
+.hint {
+  color: var(--cdl-text-muted);
+  font-size: var(--cdl-text-sm);
+}
+
+/* Sidebar — dark rail (CDP navigation pattern) */
+.sidebar {
+  background: var(--cdl-bg-sidebar);
+  border-right: 1px solid #1a1a1a;
+}
+
+.sidebar-brand h1 {
+  color: var(--cdl-text-on-dark);
+  font-size: var(--cdl-text-lg);
+}
+
+.sidebar-brand .subtitle {
+  color: var(--cdl-text-on-dark-muted);
+}
+
+.sidebar-nav button {
+  background: transparent;
+  color: var(--cdl-text-on-dark-muted);
+  font-weight: var(--cdl-font-weight-medium);
+  border-radius: var(--cdl-radius-md);
+  border: 1px solid transparent;
+  min-height: var(--cdl-btn-height);
+}
+
+.sidebar-nav button:hover {
+  background: var(--cdl-bg-sidebar-hover);
+  color: var(--cdl-text-on-dark);
+}
+
+.sidebar-nav button.active {
+  background: var(--cdl-bg-sidebar-active);
+  color: var(--cdl-text-on-dark);
+  font-weight: var(--cdl-font-weight-semibold);
+  box-shadow: inset 3px 0 0 var(--cdl-primary);
+  border-color: transparent;
+}
+
+.platform-status-bar {
+  background: var(--cdl-bg-surface);
+  border-bottom: 1px solid var(--cdl-border-subtle);
+}
+
+.platform-status-pill {
+  background: var(--cdl-bg-app);
+  border-color: var(--cdl-border-subtle);
+  color: var(--cdl-text-secondary);
+}
+
+/* Buttons */
+button:not(.sidebar-nav button):not(.link-button):not(.registry-item):not(.hierarchy-project-select):not(.platform-status-pill):not(.cdl-icon-btn):not(.cdl-field-help-btn) {
+  background: var(--cdl-primary);
+  color: var(--cdl-primary-on);
+  border: 1px solid var(--cdl-primary);
+  border-radius: var(--cdl-radius-md);
+  min-height: var(--cdl-btn-height);
+  padding: 0 var(--cdl-space-4);
+  font-weight: var(--cdl-font-weight-semibold);
+  font-size: var(--cdl-text-sm);
+}
+
+button:not(.sidebar-nav button):not(.link-button):hover:not(:disabled):not(.platform-status-pill) {
+  background: var(--cdl-primary-hover);
+  border-color: var(--cdl-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--cdl-bg-surface) !important;
+  color: var(--cdl-text-primary) !important;
+  border: 1px solid var(--cdl-border-strong) !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--cdl-bg-app) !important;
+  border-color: var(--cdl-text-muted) !important;
+}
+
+.btn-danger {
+  background: var(--cdl-error) !important;
+  border-color: var(--cdl-error) !important;
+  color: #fff !important;
+}
+
+.link-button {
+  color: var(--cdl-text-link);
+}
+
+input,
+select,
+textarea {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-strong);
+  border-radius: var(--cdl-radius-md);
+  color: var(--cdl-text-primary);
+  min-height: var(--cdl-input-height);
+  font-size: var(--cdl-text-sm);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: var(--cdl-focus-ring);
+  outline-offset: var(--cdl-focus-offset);
+  border-color: var(--cdl-text-link);
+}
+
+.card,
+.task-card {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-subtle);
+  border-radius: var(--cdl-radius-lg);
+  box-shadow: var(--cdl-shadow-sm);
+}
+
+.task-card {
+  background: var(--cdl-bg-surface);
+}
+
+.banner.error {
+  background: var(--cdl-error-bg);
+  border: 1px solid var(--cdl-error);
+  color: var(--cdl-error);
+}
+
+.banner.warn {
+  background: var(--cdl-warning-bg);
+  border: 1px solid var(--cdl-warning);
+  color: var(--cdl-text-primary);
+}
+
+.pill {
+  background: var(--cdl-bg-app);
+  color: var(--cdl-text-secondary);
+  border: 1px solid var(--cdl-border-subtle);
+  text-transform: none;
+  font-weight: var(--cdl-font-weight-medium);
+}
+
+.pill.succeeded {
+  background: var(--cdl-success-bg);
+  color: var(--cdl-success);
+  border-color: var(--cdl-success);
+}
+
+.pill.failed {
+  background: var(--cdl-error-bg);
+  color: var(--cdl-error);
+  border-color: var(--cdl-error);
+}
+
+.pill.running,
+.pill.provisioning {
+  background: var(--cdl-info-bg);
+  color: var(--cdl-info);
+  border-color: var(--cdl-info);
+}
+
+.cdl-icon-btn {
+  background: var(--cdl-bg-surface);
+  border-color: var(--cdl-border-subtle);
+  color: var(--cdl-text-secondary);
+}
+
+.cdl-icon-btn:hover {
+  border-color: var(--cdl-primary);
+  color: var(--cdl-primary);
+}
+
+/* 12-column content grid helper */
+.cdl-page-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--cdl-grid-gutter);
+  width: 100%;
+  max-width: 1440px;
+}
+
+.cdl-page-grid > .cdl-span-12 {
+  grid-column: span 12;
+}
+
+.cdl-page-grid > .cdl-span-8 {
+  grid-column: span 8;
+}
+
+.cdl-page-grid > .cdl-span-4 {
+  grid-column: span 4;
+}
+
+@media (max-width: 960px) {
+  .cdl-page-grid > .cdl-span-8,
+  .cdl-page-grid > .cdl-span-4 {
+    grid-column: span 12;
+  }
+}

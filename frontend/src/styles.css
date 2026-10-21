@@ -1,7 +1,7 @@
 :root {
   font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
-  color: var(--cdl-text-primary, #e8eef7);
-  background: var(--cdl-bg-app, #0b1220);
+  color: var(--cdl-text-primary);
+  background: var(--cdl-bg-app);
   line-height: var(--cdl-line-normal, 1.5);
 }
 

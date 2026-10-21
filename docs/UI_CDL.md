@@ -2,9 +2,15 @@
 
 Reference: [Welcome to CDL 4.0](https://design.cloudera.com/9f23dd142/p/62bbf8-welcome-to-cdl-40)
 
+## What “aligned” means here
+
+The shipped UI uses a **CDP-style light console shell** (gray page background, white cards, dark sidebar rail, **Cloudera orange** primary actions) plus CDL **24px grid gutters** via `--cdl-grid-gutter` / `--cdl-grid-margin`. Legacy dark-theme hex values may still appear in specialized views (Ray diagram, cluster map); new work should use tokens only.
+
+Official **CUIX** React components are not bundled (CAI bundle size); we mirror CDL patterns in CSS. For pixel-perfect parity with the design site, paste token values from CDL 4.0 into `cdl-tokens.css` when your team exports them from Figma.
+
 ## Tokens
 
-CSS variables live in [`frontend/src/theme/cdl-tokens.css`](../frontend/src/theme/cdl-tokens.css):
+CSS variables live in [`frontend/src/theme/cdl-tokens.css`](../frontend/src/theme/cdl-tokens.css). Global overrides: [`cdl-base.css`](../frontend/src/theme/cdl-base.css).
 
 - Typography: `--cdl-font-sans`, `--cdl-text-*`
 - Color: `--cdl-bg-*`, `--cdl-text-*`, `--cdl-primary`, semantic success/warn/error

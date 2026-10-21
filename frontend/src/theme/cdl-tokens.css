@@ -1,71 +1,81 @@
 /**
- * CDL 4.0–aligned design tokens (dark shell).
+ * Cloudera Design Language (CDL 4.0) — console-oriented tokens.
  * Reference: https://design.cloudera.com/9f23dd142/p/62bbf8-welcome-to-cdl-40
+ * Grid: 12 columns, 24px gutters/margins (Engineering@Cloudera).
  */
 :root {
-  /* Typography */
-  --cdl-font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  /* Typography — single sans family, clear hierarchy */
+  --cdl-font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --cdl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --cdl-text-xs: 0.72rem;
+  --cdl-text-xs: 0.75rem;
   --cdl-text-sm: 0.8125rem;
-  --cdl-text-base: 0.9375rem;
-  --cdl-text-lg: 1.125rem;
+  --cdl-text-base: 0.875rem;
+  --cdl-text-lg: 1rem;
   --cdl-text-xl: 1.25rem;
+  --cdl-text-2xl: 1.5rem;
+  --cdl-font-weight-regular: 400;
+  --cdl-font-weight-medium: 500;
+  --cdl-font-weight-semibold: 600;
   --cdl-line-tight: 1.25;
   --cdl-line-normal: 1.5;
 
-  /* Spacing (4px grid) */
+  /* Spacing — 4px base; CDL grid margin/gutter 24px */
   --cdl-space-1: 0.25rem;
   --cdl-space-2: 0.5rem;
   --cdl-space-3: 0.75rem;
   --cdl-space-4: 1rem;
   --cdl-space-5: 1.25rem;
   --cdl-space-6: 1.5rem;
-  --cdl-space-8: 2rem;
+  --cdl-grid-gutter: 24px;
+  --cdl-grid-margin: 24px;
 
-  /* Radii */
   --cdl-radius-sm: 4px;
-  --cdl-radius-md: 8px;
-  --cdl-radius-lg: 12px;
+  --cdl-radius-md: 6px;
+  --cdl-radius-lg: 8px;
   --cdl-radius-pill: 999px;
 
-  /* Dark shell neutrals */
-  --cdl-bg-app: #0b1220;
-  --cdl-bg-surface: #0f1729;
-  --cdl-bg-elevated: #141f33;
-  --cdl-bg-sidebar: #070d18;
-  --cdl-border-subtle: #243049;
-  --cdl-border-strong: #3d4f6f;
+  /* CDP-style light shell (CDL console default) */
+  --cdl-bg-app: #f4f4f4;
+  --cdl-bg-surface: #ffffff;
+  --cdl-bg-elevated: #ffffff;
+  --cdl-bg-sidebar: #2c2c2c;
+  --cdl-bg-sidebar-hover: #3d3d3d;
+  --cdl-bg-sidebar-active: #424242;
+  --cdl-border-subtle: #d8d8d8;
+  --cdl-border-strong: #b0b0b0;
 
-  /* Text (AA on dark surfaces) */
-  --cdl-text-primary: #e8eef7;
-  --cdl-text-secondary: #cbd5e1;
-  --cdl-text-muted: #94a3b8;
-  --cdl-text-link: #93c5fd;
+  --cdl-text-primary: #1a1a1a;
+  --cdl-text-secondary: #4a4a4a;
+  --cdl-text-muted: #6b6b6b;
+  --cdl-text-on-dark: #f5f5f5;
+  --cdl-text-on-dark-muted: #c8c8c8;
+  --cdl-text-link: #0066cc;
 
-  /* Brand / primary */
-  --cdl-primary: #3b82f6;
-  --cdl-primary-hover: #2563eb;
-  --cdl-primary-muted: #1e3a5f;
+  /* Cloudera brand accent (primary actions) */
+  --cdl-primary: #e06323;
+  --cdl-primary-hover: #c8551c;
+  --cdl-primary-active: #a84618;
+  --cdl-primary-muted: #fde8dc;
+  --cdl-primary-on: #ffffff;
 
-  /* Semantic */
-  --cdl-success: #22c55e;
-  --cdl-success-bg: #14532d;
-  --cdl-warning: #f59e0b;
-  --cdl-warning-bg: #422006;
-  --cdl-error: #ef4444;
-  --cdl-error-bg: #450a0a;
-  --cdl-info: #38bdf8;
+  --cdl-success: #2e7d32;
+  --cdl-success-bg: #e8f5e9;
+  --cdl-warning: #ed6c02;
+  --cdl-warning-bg: #fff4e5;
+  --cdl-error: #c62828;
+  --cdl-error-bg: #ffebee;
+  --cdl-info: #0277bd;
+  --cdl-info-bg: #e1f5fe;
 
-  /* Focus (WCAG visible) */
-  --cdl-focus-ring: 2px solid #60a5fa;
+  --cdl-focus-ring: 2px solid #0066cc;
   --cdl-focus-offset: 2px;
 
-  /* Elevation */
-  --cdl-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
-  --cdl-shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+  --cdl-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+  --cdl-shadow-md: 0 2px 8px rgb(0 0 0 / 0.1);
 
-  /* Layout */
+  --cdl-btn-height: 36px;
+  --cdl-input-height: 36px;
+
   --sidebar-width: 240px;
   --sidebar-width-collapsed: 52px;
 }
