@@ -135,7 +135,7 @@ h6 {
 }
 
 /* Buttons */
-button:not(.sidebar-nav-item):not(.task-card-main):not(.link-button):not(.registry-item):not(.hierarchy-project-select):not(.platform-status-pill):not(.cdl-icon-btn):not(.cdl-field-help-btn) {
+button:not(.sidebar-nav-item):not(.task-card-main):not(.model-task-wizard-step):not(.link-button):not(.registry-item):not(.hierarchy-project-select):not(.platform-status-pill):not(.cdl-icon-btn):not(.cdl-field-help-btn) {
   background: var(--cdl-primary);
   color: var(--cdl-primary-on);
   border: 1px solid var(--cdl-primary);
@@ -146,7 +146,7 @@ button:not(.sidebar-nav-item):not(.task-card-main):not(.link-button):not(.regist
   font-size: var(--cdl-text-sm);
 }
 
-button:not(.sidebar-nav-item):not(.task-card-main):not(.link-button):hover:not(:disabled):not(.platform-status-pill) {
+button:not(.sidebar-nav-item):not(.task-card-main):not(.model-task-wizard-step):not(.link-button):hover:not(:disabled):not(.platform-status-pill) {
   background: var(--cdl-primary-hover);
   border-color: var(--cdl-primary-hover);
 }
@@ -469,4 +469,104 @@ textarea:focus {
 .worker-size-preset-active {
   border-color: var(--cdl-primary) !important;
   color: var(--cdl-primary) !important;
+}
+
+/* Model task wizard stepper — outline steps, not primary-filled tabs */
+.model-task-wizard-step {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-subtle);
+  color: var(--cdl-text-secondary);
+  font-weight: var(--cdl-font-weight-medium);
+  min-height: unset;
+  padding: var(--cdl-space-2) var(--cdl-space-2);
+  box-shadow: none;
+}
+
+.model-task-wizard-step:hover:not(:disabled) {
+  background: var(--cdl-bg-app);
+  border-color: var(--cdl-border-strong);
+  color: var(--cdl-text-primary);
+}
+
+.model-task-wizard-step.active {
+  background: var(--cdl-primary-muted);
+  border-color: var(--cdl-primary);
+  color: var(--cdl-text-primary);
+  font-weight: var(--cdl-font-weight-semibold);
+  box-shadow: none;
+}
+
+.model-task-wizard-step.done:not(.active) {
+  background: var(--cdl-success-bg);
+  border-color: color-mix(in srgb, var(--cdl-success) 45%, var(--cdl-border-subtle));
+  color: var(--cdl-success);
+}
+
+.model-task-wizard-step-connector {
+  background: var(--cdl-border-subtle);
+}
+
+.model-task-wizard-toolbar {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-subtle);
+}
+
+/* Project / task / job hierarchy columns */
+.hierarchy-create-form {
+  border-bottom-color: var(--cdl-border-subtle);
+}
+
+.hierarchy-project-row {
+  border: 1px solid var(--cdl-border-subtle);
+  border-radius: var(--cdl-radius-md);
+  background: var(--cdl-bg-surface);
+}
+
+.hierarchy-project-row.active {
+  border-color: color-mix(in srgb, var(--cdl-primary) 55%, var(--cdl-border-subtle));
+  box-shadow: inset 3px 0 0 var(--cdl-primary);
+}
+
+.hierarchy-project-select {
+  background: transparent;
+  color: var(--cdl-text-primary);
+  border: none;
+  min-height: unset;
+  padding: var(--cdl-space-2) var(--cdl-space-3);
+  font-weight: var(--cdl-font-weight-regular);
+  box-shadow: none;
+}
+
+.hierarchy-project-select:hover {
+  background: var(--cdl-bg-app);
+}
+
+.hierarchy-project-select.active {
+  background: var(--cdl-primary-muted);
+}
+
+.hierarchy-project-name {
+  color: var(--cdl-text-primary);
+  font-weight: var(--cdl-font-weight-semibold);
+}
+
+.hierarchy-project-select .hint {
+  color: var(--cdl-text-muted);
+}
+
+.hierarchy-job-card {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-subtle);
+  border-radius: var(--cdl-radius-md);
+}
+
+.hierarchy-row-actions .btn-danger.btn-compact {
+  background: var(--cdl-bg-surface) !important;
+  color: var(--cdl-error) !important;
+  border: 1px solid color-mix(in srgb, var(--cdl-error) 50%, var(--cdl-border-strong)) !important;
+}
+
+.hierarchy-row-actions .btn-danger.btn-compact:hover:not(:disabled) {
+  background: var(--cdl-error-bg) !important;
+  border-color: var(--cdl-error) !important;
 }

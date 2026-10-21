@@ -647,30 +647,14 @@ button.platform-status-pill:hover {
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.5rem 0.35rem;
-  border-radius: 8px;
-  border: 1px solid #243049;
-  background: #0b1220;
-  color: #9fb0c9;
-  font-size: 0.75rem;
+  border-radius: var(--cdl-radius-md, 8px);
+  font-size: var(--cdl-text-xs, 0.75rem);
   cursor: pointer;
 }
 
 .model-task-wizard-step:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.model-task-wizard-step.active {
-  border-color: #60a5fa;
-  background: #1e3a8a;
-  color: #fff;
-  font-weight: 600;
-}
-
-.model-task-wizard-step.done:not(.active) {
-  border-color: #14532d;
-  color: #bbf7d0;
 }
 
 .model-task-wizard-step-num {
@@ -681,7 +665,6 @@ button.platform-status-pill:hover {
 .model-task-wizard-step-connector {
   width: 0.75rem;
   height: 2px;
-  background: #243049;
   margin: 0 0.15rem;
   flex-shrink: 0;
 }
@@ -880,7 +863,7 @@ button.platform-status-pill:hover {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #243049;
+  border-bottom: 1px solid var(--cdl-border-subtle);
 }
 
 .hierarchy-project-list,
@@ -897,36 +880,17 @@ button.platform-status-pill:hover {
   display: flex;
   align-items: stretch;
   gap: 0.35rem;
-  border: 1px solid #243049;
-  border-radius: 8px;
   overflow: hidden;
-}
-
-.hierarchy-project-row.active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px #1e3a8a;
 }
 
 .hierarchy-project-select {
   flex: 1;
   text-align: left;
-  background: #0b1220;
-  border: none;
-  padding: 0.5rem 0.65rem;
   cursor: pointer;
-  color: inherit;
   font: inherit;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-}
-
-.hierarchy-project-select:hover {
-  background: #111a2e;
-}
-
-.hierarchy-project-name {
-  font-weight: 600;
 }
 
 .hierarchy-row-actions {
@@ -947,9 +911,6 @@ button.platform-status-pill:hover {
 
 .hierarchy-job-card {
   padding: 0.65rem 0.75rem;
-  border: 1px solid #243049;
-  border-radius: 8px;
-  background: #0b1220;
 }
 
 .hierarchy-job-head {
