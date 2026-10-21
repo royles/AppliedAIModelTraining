@@ -17,8 +17,10 @@ export function SidebarIconRegistry({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M4 7h16v3H4V7zm0 5h16v3H4v-3zm0 5h10v3H4v-3z"
-        fill="currentColor"
+        d="M5 6h14v4H5V6zm0 6h14v4H5v-4zm0 6h9v4H5v-4z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
       />
     </svg>
   );

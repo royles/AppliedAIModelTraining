@@ -378,61 +378,13 @@ button.platform-status-pill:hover {
   flex-direction: column;
 }
 
-.task-card {
-  background: #121a2b;
-  border: 1px solid #243049;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .task-card-detail {
   width: min(22rem, 100%);
   flex-shrink: 0;
 }
 
-.task-card-selected {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
-}
-
-.task-card-main-static {
-  cursor: default;
-}
-
-.task-card-main-static:hover {
-  background: transparent;
-}
-
-.task-card-error {
-  margin: 0;
-  font-size: 0.72rem;
-  color: #fca5a5;
-  line-height: 1.35;
-}
-
-.task-card:hover {
-  border-color: #3b82f6;
-}
-
 .task-card-main {
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 1rem;
-  color: inherit;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-weight: 400;
   flex: 1;
-}
-
-.task-card-main:hover {
-  background: #0f1729;
 }
 
 .task-card-delete {
@@ -483,10 +435,6 @@ button.platform-status-pill:hover {
 .inference-links.compact {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
-}
-
-.inference-links.compact a {
-  color: #60a5fa;
 }
 
 .inference-curl {
@@ -1149,48 +1097,9 @@ button.btn-danger:hover:not(:disabled) {
   font-size: 0.72rem;
 }
 
-.task-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.task-card-id {
-  color: #9fb0c9;
-  font-size: 0.85rem;
-}
-
-.task-card-title {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.task-card-kv {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.8rem;
-  color: #b8c5da;
-}
-
-.task-card-kv li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.2rem 0;
-  border-bottom: 1px solid #1a2438;
-}
-
-.task-card-cta {
-  margin-top: 0.35rem;
-  font-size: 0.8rem;
-  color: #60a5fa;
-}
-
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: #9fb0c9;
 }
 
 .task-detail {
@@ -2464,28 +2373,6 @@ td {
   display: flex;
   justify-content: space-between;
   padding: 0.25rem 0;
-}
-
-.pill {
-  display: inline-block;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  background: #243049;
-}
-
-.pill.succeeded {
-  background: #14532d;
-}
-
-.pill.failed {
-  background: #7f1d1d;
-}
-
-.pill.running,
-.pill.provisioning {
-  background: #1e3a8a;
 }
 
 .registry-layout {
