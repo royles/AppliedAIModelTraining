@@ -37,6 +37,7 @@
   --cdl-radius-pill: 999px;
   --cdl-pill-padding-y: 0.2rem;
   --cdl-pill-padding-x: 0.7rem;
+  --cdl-pill-min-height: 1.625rem;
 
   /* Light theme (default) */
   --cdl-bg-app: #f4f4f4;

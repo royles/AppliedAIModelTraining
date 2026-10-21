@@ -129,9 +129,89 @@ h6 {
 }
 
 .platform-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cdl-space-2);
+  min-height: var(--cdl-pill-min-height);
+  padding: 0 var(--cdl-pill-padding-x);
+  font-family: var(--cdl-font-sans);
+  font-size: var(--cdl-text-xs);
+  font-weight: var(--cdl-font-weight-medium);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  box-sizing: border-box;
   background: var(--cdl-bg-app);
-  border-color: var(--cdl-border-subtle);
+  border: 1px solid var(--cdl-border-subtle);
   color: var(--cdl-text-secondary);
+}
+
+button.platform-status-pill {
+  cursor: pointer;
+  margin: 0;
+  appearance: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  min-height: var(--cdl-pill-min-height);
+}
+
+button.platform-status-pill:hover {
+  border-color: var(--cdl-text-link);
+  color: var(--cdl-text-primary);
+}
+
+.platform-status-dot {
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--cdl-text-muted);
+}
+
+.platform-status-pill.tone-loading .platform-status-dot {
+  background: var(--cdl-text-muted);
+  animation: platform-status-pulse 1.2s ease-in-out infinite;
+}
+
+.platform-status-pill.tone-ok .platform-status-dot {
+  background: var(--cdl-success);
+}
+
+.platform-status-pill.tone-warn .platform-status-dot {
+  background: var(--cdl-warning);
+}
+
+.platform-status-pill.tone-error .platform-status-dot {
+  background: var(--cdl-error);
+}
+
+.platform-status-pill.tone-idle .platform-status-dot {
+  background: var(--cdl-text-muted);
+}
+
+.platform-status-pill.tone-ok {
+  border-color: color-mix(in srgb, var(--cdl-success) 45%, var(--cdl-border-subtle));
+}
+
+.platform-status-pill.tone-warn {
+  border-color: color-mix(in srgb, var(--cdl-warning) 45%, var(--cdl-border-subtle));
+}
+
+.platform-status-pill.tone-error {
+  border-color: color-mix(in srgb, var(--cdl-error) 45%, var(--cdl-border-subtle));
+}
+
+@keyframes platform-status-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Buttons */
@@ -329,8 +409,10 @@ textarea:focus {
 
 .pill {
   display: inline-block;
+  min-height: var(--cdl-pill-min-height);
   padding: var(--cdl-pill-padding-y) var(--cdl-pill-padding-x);
   border-radius: var(--cdl-radius-pill);
+  font-family: var(--cdl-font-sans);
   font-size: var(--cdl-text-xs);
   line-height: 1.35;
   background: var(--cdl-bg-app);

@@ -13,7 +13,7 @@ type Props = {
 };
 
 function toneClass(tone: IndicatorTone): string {
-  return `platform-status-pill tone-${tone}`;
+  return `pill platform-status-pill tone-${tone}`;
 }
 
 function StatusPill({
