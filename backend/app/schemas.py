@@ -260,6 +260,18 @@ class PlatformSettingsUpdate(BaseModel):
     cdsw_workers: CdswWorkerSettings | None = None
 
 
+class ProjectRaySettingsRead(BaseModel):
+    project_id: int
+    ray: RaySettings
+    cdsw_workers: CdswWorkerSettings
+    runtime: PlatformRuntimeInfo
+
+
+class ProjectRaySettingsUpdate(BaseModel):
+    ray: RaySettings | None = None
+    cdsw_workers: CdswWorkerSettings | None = None
+
+
 class RegistryLifecycleInfo(BaseModel):
     state: str
     guidance: str

@@ -69,6 +69,14 @@ def init_db() -> None:
             "WHERE lifecycle_state IS NULL OR lifecycle_state = ''"
         )
         conn.commit()
+    from app.database import SessionLocal
+    from app.services.project_ray_settings import seed_missing_project_ray_settings
+
+    db = SessionLocal()
+    try:
+        seed_missing_project_ray_settings(db)
+    finally:
+        db.close()
 
 
 def get_db() -> Generator[Session, None, None]:

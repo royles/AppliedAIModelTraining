@@ -110,13 +110,23 @@ export default function App() {
     }
   }, [selectedExp]);
 
-  useEffect(() => {
-    api.getPlatformSettings().then((s) => {
+  const applyProjectRayDefaults = useCallback((projectId: number) => {
+    api.getProjectRaySettings(projectId).then((s) => {
       setJobWorkers(s.cdsw_workers.default_job_num_workers);
-      setJobGpus(Math.max(1, s.cdsw_workers.gpus_per_worker || 1));
+      const gpus = s.cdsw_workers.gpus_per_worker;
+      setJobGpus(gpus > 0 ? gpus : 1);
       setJobWorkerCpu(s.cdsw_workers.worker_cpu);
       setJobWorkerMemoryGb(s.cdsw_workers.worker_memory_gb);
     });
+  }, []);
+
+  useEffect(() => {
+    if (selectedExp != null) {
+      applyProjectRayDefaults(selectedExp);
+    }
+  }, [selectedExp, applyProjectRayDefaults]);
+
+  useEffect(() => {
     api.uiBuildInfo().then((info) => {
       if (info.status === "ready") {
         setPlatformVersion(info.platform_version ?? null);
@@ -549,17 +559,12 @@ export default function App() {
           <div className="settings-page">
             <header className="main-panel-header">
               <h2>Framework Configuration</h2>
-              <p className="hint">Ray runtime and CDSW worker defaults for the platform.</p>
+              <p className="hint">
+                Platform defaults for <strong>new projects</strong>. Each project keeps its own Ray
+                configuration (Model Tasks → Project step).
+              </p>
             </header>
-            <PlatformSettingsPanel
-              title="Ray &amp; CDSW workers"
-              onSaved={() => {
-                api.getPlatformSettings().then((s) => {
-                  setJobWorkers(s.cdsw_workers.default_job_num_workers);
-                  setJobGpus(s.cdsw_workers.gpus_per_worker);
-                });
-              }}
-            />
+            <PlatformSettingsPanel title="Platform defaults (new projects)" />
           </div>
         ) : (
           <ModelTasksPanel
@@ -608,6 +613,9 @@ export default function App() {
             onJobWorkerMemoryGbChange={setJobWorkerMemoryGb}
             onCreateJob={onCreateJob}
             onApplyBlueprint={applyModelTaskBlueprint}
+            onProjectRaySettingsSaved={() => {
+              if (selectedExp != null) applyProjectRayDefaults(selectedExp);
+            }}
             dataset={dataset}
             onDatasetChange={setDataset}
             initMode={initMode}

@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from app.models import PlatformSettings, TrainingJob
+from app.models import PlatformSettings, ProjectRaySettings, TrainingJob
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +53,16 @@ def merge_worker_resources_into_config_json(
     return json.dumps(data)
 
 
-def resolve_worker_launch_spec(job: TrainingJob, platform: PlatformSettings) -> dict[str, float | int]:
+def resolve_worker_launch_spec(
+    job: TrainingJob, ray_row: PlatformSettings | ProjectRaySettings
+) -> dict[str, float | int]:
     """Effective launch_workers cpu/memory/gpus for Ray GPU engines on this job."""
     overrides = _worker_resources_from_config(job.config_json)
-    cpu = overrides.get("cpu", float(platform.worker_cpu))
-    memory_gb = overrides.get("memory_gb", float(platform.worker_memory_gb))
+    cpu = overrides.get("cpu", float(ray_row.worker_cpu))
+    memory_gb = overrides.get("memory_gb", float(ray_row.worker_memory_gb))
     gpus = job.gpus_per_worker
-    if gpus <= 0 and platform.gpus_per_worker > 0:
-        gpus = platform.gpus_per_worker
+    if gpus <= 0 and ray_row.gpus_per_worker > 0:
+        gpus = ray_row.gpus_per_worker
     return {
         "cpu": cpu,
         "memory_gb": memory_gb,

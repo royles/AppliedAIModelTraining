@@ -48,6 +48,11 @@ export function ModelRegistryPanel() {
   const selected = models.find((m) => m.id === selectedId) ?? null;
   const projectGroups = useMemo(() => groupModelsByProject(models), [models]);
   const lineage = (selected?.metadata?.lineage_snapshot ?? null) as Record<string, unknown> | null;
+  const rayConfig = (lineage?.ray_config ?? null) as Record<string, unknown> | null;
+  const jobRun = (lineage?.job_run ?? null) as Record<string, unknown> | null;
+  const raySnap = (rayConfig?.ray ?? null) as Record<string, unknown> | null;
+  const cdswSnap = (rayConfig?.cdsw_workers ?? null) as Record<string, unknown> | null;
+  const launchSpec = (jobRun?.effective_worker_launch_spec ?? null) as Record<string, unknown> | null;
 
   const load = useCallback(async () => {
     try {
@@ -172,6 +177,63 @@ export function ModelRegistryPanel() {
                       <code>{String(lineage.content_hash ?? "—").slice(0, 16)}…</code>
                     </span>
                   </li>
+                </ul>
+              </div>
+            )}
+
+            {rayConfig && (
+              <div className="registry-lineage-block" aria-label="Ray configuration snapshot">
+                <h4>Ray configuration (frozen)</h4>
+                <ul className="kv registry-meta">
+                  <li>
+                    <span>Ray head</span>
+                    <span>
+                      <code>{String(raySnap?.ray_head_address ?? "auto / env")}</code>
+                    </span>
+                  </li>
+                  <li>
+                    <span>Train worker cap</span>
+                    <span>{String(raySnap?.ray_train_num_workers ?? "—")}</span>
+                  </li>
+                  <li>
+                    <span>Worker sizing</span>
+                    <span>
+                      {String(cdswSnap?.worker_cpu ?? "—")} CPU · {String(cdswSnap?.worker_memory_gb ?? "—")}{" "}
+                      GiB · {String(cdswSnap?.gpus_per_worker ?? "—")} GPU/worker
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {jobRun && (
+              <div className="registry-lineage-block" aria-label="Job run snapshot">
+                <h4>Job run (frozen)</h4>
+                <ul className="kv registry-meta">
+                  <li>
+                    <span>Status</span>
+                    <span>{String(jobRun.status ?? "—")}</span>
+                  </li>
+                  <li>
+                    <span>Ray address</span>
+                    <span>
+                      <code>{String(jobRun.ray_address ?? "—")}</code>
+                    </span>
+                  </li>
+                  <li>
+                    <span>Workers</span>
+                    <span>
+                      {String(jobRun.num_workers ?? "—")} × {String(jobRun.gpus_per_worker ?? "—")} GPU
+                    </span>
+                  </li>
+                  {launchSpec && (
+                    <li>
+                      <span>CDSW launch</span>
+                      <span>
+                        {String(launchSpec.cpu ?? "—")} CPU · {String(launchSpec.memory_gb ?? "—")} GiB
+                      </span>
+                    </li>
+                  )}
                 </ul>
               </div>
             )}

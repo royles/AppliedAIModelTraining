@@ -61,6 +61,9 @@ def register_trained_model(
     if existing:
         raise ValueError(f"openai_model_id already registered: {openai_model_id}")
 
+    job = db.get(TrainingJob, job.id)
+    if not job:
+        raise ValueError("Training job not found")
     metadata = build_training_metadata(
         job=job,
         config_json=job.config_json,

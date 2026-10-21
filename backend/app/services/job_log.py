@@ -13,7 +13,7 @@ from app.config import REPO_ROOT
 from app.models import TrainingJob
 from app.resource_hints import effective_ray_train_workers
 from app.services.distributed_training_status import build_distributed_training_status
-from app.services.platform_settings import ensure_platform_settings
+from app.services.project_ray_settings import ensure_project_ray_settings
 from app.services.ray_cluster_topology import (
     build_ray_cluster_topology,
     merge_topology_into_ray_status,
@@ -125,10 +125,10 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
     )
     ray_status = merge_topology_into_ray_status(ray_status, topology)
 
-    platform = ensure_platform_settings(db)
+    ray_config = ensure_project_ray_settings(db, job.experiment_id)
     effective_train_workers = effective_ray_train_workers(
         max(1, job.num_workers),
-        platform.ray_train_num_workers,
+        ray_config.ray_train_num_workers,
         cdsw_worker_engines=expected_workers,
     )
     ray_status["distributed"] = build_distributed_training_status(

@@ -29,6 +29,8 @@ from app.schemas import (
     WorkerGroupRead,
     PlatformSettingsRead,
     PlatformSettingsUpdate,
+    ProjectRaySettingsRead,
+    ProjectRaySettingsUpdate,
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services.platform_status import active_jobs_summary, cached_platform_ray_status
@@ -55,6 +57,11 @@ from app.services.platform_settings import (
     ensure_platform_settings,
     get_platform_settings,
     update_platform_settings,
+)
+from app.services.project_ray_settings import (
+    get_project_ray_settings,
+    seed_project_ray_settings,
+    update_project_ray_settings,
 )
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.dataset_config import TrainingDatasetConfig
@@ -349,7 +356,30 @@ def create_project(payload: ExperimentCreate, db: Session = Depends(get_db)) -> 
     db.add(exp)
     db.commit()
     db.refresh(exp)
+    seed_project_ray_settings(db, exp.id)
     return exp
+
+
+@router.get("/projects/{project_id}/ray-settings", response_model=ProjectRaySettingsRead)
+def read_project_ray_settings(
+    project_id: int, db: Session = Depends(get_db)
+) -> ProjectRaySettingsRead:
+    try:
+        return get_project_ray_settings(db, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.put("/projects/{project_id}/ray-settings", response_model=ProjectRaySettingsRead)
+def write_project_ray_settings(
+    project_id: int,
+    payload: ProjectRaySettingsUpdate,
+    db: Session = Depends(get_db),
+) -> ProjectRaySettingsRead:
+    try:
+        return update_project_ray_settings(db, project_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.patch("/experiments/{project_id}", response_model=ExperimentRead, include_in_schema=False)
@@ -457,10 +487,12 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
         raise HTTPException(status_code=404, detail="Project not found")
 
     cfg = _build_config(payload)
-    platform = ensure_platform_settings(db)
+    from app.services.project_ray_settings import ensure_project_ray_settings
+
+    project_ray = ensure_project_ray_settings(db, payload.experiment_id)
     gpus_per_worker = payload.gpus_per_worker
-    if gpus_per_worker <= 0 and platform.gpus_per_worker > 0:
-        gpus_per_worker = platform.gpus_per_worker
+    if gpus_per_worker <= 0 and project_ray.gpus_per_worker > 0:
+        gpus_per_worker = project_ray.gpus_per_worker
 
     task_version_id = payload.task_version_id
     if task_version_id is not None and not get_version(db, task_version_id):

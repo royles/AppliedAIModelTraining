@@ -20,6 +20,9 @@ class Experiment(Base):
 
     jobs: Mapped[list["TrainingJob"]] = relationship(back_populates="experiment")
     tasks: Mapped[list["TaskDefinition"]] = relationship(back_populates="project")
+    ray_settings: Mapped["ProjectRaySettings | None"] = relationship(
+        back_populates="project", uselist=False
+    )
 
 
 class TaskDefinition(Base):
@@ -102,8 +105,34 @@ class WorkerGroup(Base):
     job: Mapped["TrainingJob"] = relationship(back_populates="worker_group")
 
 
+class ProjectRaySettings(Base):
+    """Ray cluster + CDSW worker targets for one project (tasks/jobs inherit this)."""
+
+    __tablename__ = "project_ray_settings"
+
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("experiments.id", ondelete="CASCADE"), primary_key=True
+    )
+    ray_local_mode: Mapped[bool] = mapped_column(default=True)
+    ray_head_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    ray_train_num_workers: Mapped[int] = mapped_column(Integer, default=0)
+    non_distributed_low_memory_mode: Mapped[bool] = mapped_column(default=False)
+    worker_cpu: Mapped[float] = mapped_column(Float, default=4.0)
+    worker_memory_gb: Mapped[float] = mapped_column(Float, default=8.0)
+    gpus_per_worker: Mapped[int] = mapped_column(Integer, default=0)
+    default_job_num_workers: Mapped[int] = mapped_column(Integer, default=1)
+    accelerator_label_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_profile_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    project: Mapped["Experiment"] = relationship(back_populates="ray_settings")
+
+
 class PlatformSettings(Base):
-    """Singleton (id=1) Ray + CDSW worker defaults for the platform."""
+    """Singleton (id=1) Ray + CDSW worker defaults for new projects."""
 
     __tablename__ = "platform_settings"
 

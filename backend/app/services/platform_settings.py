@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import PlatformSettings
+from app.models import PlatformSettings, ProjectRaySettings
 from app.schemas import (
     CdswWorkerSettings,
     PlatformRuntimeInfo,
@@ -49,7 +49,7 @@ def ensure_platform_settings(db: Session) -> PlatformSettings:
     return row
 
 
-def _ray_settings(row: PlatformSettings) -> RaySettings:
+def _ray_settings(row: PlatformSettings | ProjectRaySettings) -> RaySettings:
     return RaySettings(
         ray_local_mode=row.ray_local_mode,
         ray_head_address=row.ray_head_address,
@@ -60,7 +60,7 @@ def _ray_settings(row: PlatformSettings) -> RaySettings:
     )
 
 
-def _cdsw_settings(row: PlatformSettings) -> CdswWorkerSettings:
+def _cdsw_settings(row: PlatformSettings | ProjectRaySettings) -> CdswWorkerSettings:
     return CdswWorkerSettings(
         worker_cpu=row.worker_cpu,
         worker_memory_gb=row.worker_memory_gb,
@@ -112,7 +112,7 @@ def update_platform_settings(
     return get_platform_settings(db)
 
 
-def resolved_ray_head(row: PlatformSettings | None) -> str | None:
+def resolved_ray_head(row: PlatformSettings | ProjectRaySettings | None) -> str | None:
     """Prefer live CAI session IP over stale SQLite defaults (see docs/CAI_RAY_NETWORKING.md)."""
     from app.services.cai_networking import format_ray_head, master_engine_ip, parse_gcs_host_port
 
@@ -149,7 +149,7 @@ def sync_platform_ray_head_from_session(db: Session) -> None:
         db.commit()
 
 
-def worker_pool_kwargs(row: PlatformSettings) -> dict[str, Any]:
+def worker_pool_kwargs(row: PlatformSettings | ProjectRaySettings) -> dict[str, Any]:
     return {
         "cpu": row.worker_cpu,
         "memory_gb": row.worker_memory_gb,

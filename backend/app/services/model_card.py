@@ -100,7 +100,51 @@ def generate_model_card(
         f"- **Task version id:** {lineage.get('task_version_id', '—')}",
         f"- **Config hash:** `{lineage.get('content_hash') or '—'}`",
         "",
-        "## Training procedure",
+        "## Ray configuration (project snapshot)",
+        "",
+    ]
+    ray_cfg = lineage.get("ray_config") if isinstance(lineage.get("ray_config"), dict) else {}
+    ray = ray_cfg.get("ray") if isinstance(ray_cfg.get("ray"), dict) else {}
+    cdsw = ray_cfg.get("cdsw_workers") if isinstance(ray_cfg.get("cdsw_workers"), dict) else {}
+    lines.extend(
+        [
+            f"- **Project Ray id:** {ray_cfg.get('project_id', '—')}",
+            f"- **Ray local mode:** {ray.get('ray_local_mode', '—')}",
+            f"- **Ray head override:** `{ray.get('ray_head_address') or '—'}`",
+            f"- **Ray Train worker cap:** {ray.get('ray_train_num_workers', '—')}",
+            f"- **Low-memory session mode:** {ray.get('non_distributed_low_memory_mode', '—')}",
+            f"- **Worker CPU / memory (project default):** {cdsw.get('worker_cpu', '—')} CPU, "
+            f"{cdsw.get('worker_memory_gb', '—')} GiB",
+            f"- **GPUs per worker (project default):** {cdsw.get('gpus_per_worker', '—')}",
+            "",
+            "## Job run (execution snapshot)",
+            "",
+        ]
+    )
+    job_run = lineage.get("job_run") if isinstance(lineage.get("job_run"), dict) else {}
+    wg = job_run.get("worker_group") if isinstance(job_run.get("worker_group"), dict) else {}
+    launch = (
+        job_run.get("effective_worker_launch_spec")
+        if isinstance(job_run.get("effective_worker_launch_spec"), dict)
+        else {}
+    )
+    lines.extend(
+        [
+            f"- **Final status:** `{job_run.get('status', '—')}`",
+            f"- **Ray address:** `{job_run.get('ray_address') or '—'}`",
+            f"- **Workers requested:** {job_run.get('num_workers', '—')} "
+            f"(GPU/worker: {job_run.get('gpus_per_worker', '—')})",
+            f"- **Effective CDSW launch spec:** {launch.get('cpu', '—')} CPU, "
+            f"{launch.get('memory_gb', '—')} GiB, {launch.get('gpus_per_worker', '—')} GPU/engine",
+            f"- **Worker group head:** `{wg.get('head_address') or '—'}`",
+            f"- **CDSW worker ids:** {wg.get('cdsw_worker_ids') or '—'}",
+            f"- **Completed at:** {job_run.get('completed_at') or '—'}",
+            "",
+            "## Training procedure",
+        ]
+    )
+    lines.extend(
+        [
         "",
         f"- **Base / builder:** `{record.base_model}`",
         f"- **Task:** `{record.task_type}`",
@@ -120,7 +164,8 @@ def generate_model_card(
         json.dumps(metrics, indent=2) if metrics else "{}",
         "```",
         "",
-    ]
+        ]
+    )
     if bench:
         lines.extend(
             [

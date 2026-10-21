@@ -23,7 +23,6 @@ from app.services.cdsw_workers import (
     worker_ids_to_json,
 )
 from app.services.platform_settings import (
-    ensure_platform_settings,
     resolved_ray_head,
     worker_pool_kwargs,
 )
@@ -191,7 +190,9 @@ def run_training_job(job_id: int) -> None:
         def framework_log(msg: str) -> None:
             append_job_log(db, job_id, "framework", msg)
 
-        platform = ensure_platform_settings(db)
+        from app.services.project_ray_settings import ensure_project_ray_settings
+
+        platform = ensure_project_ray_settings(db, job.experiment_id)
         from app.services.cai_networking import (
             format_ray_head,
             master_engine_ip,
@@ -866,12 +867,14 @@ def scale_job_workers(job_id: int, target: int, db: Session) -> WorkerGroup:
         raise ValueError("Job not found")
     if not job.worker_group:
         raise ValueError("Job has no worker group")
-    platform = ensure_platform_settings(db)
-    head = job.worker_group.head_address or resolved_ray_head(platform)
+    from app.services.project_ray_settings import ensure_project_ray_settings
+
+    ray_config = ensure_project_ray_settings(db, job.experiment_id)
+    head = job.worker_group.head_address or resolved_ray_head(ray_config)
     if not head:
         raise ValueError("No Ray head address; run inside CML/CDSW or set RAY_HEAD_ADDRESS")
 
-    pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": job.gpus_per_worker}
+    pool_kwargs = {**worker_pool_kwargs(ray_config), "gpus_per_worker": job.gpus_per_worker}
     pool = CdswRayWorkerPool(**pool_kwargs)
     launched = pool.scale(target, head)
     job.worker_group.target_workers = target

@@ -164,6 +164,12 @@ export type PlatformSettingsUpdate = {
   cdsw_workers?: CdswWorkerSettings;
 };
 
+export type ProjectRaySettings = PlatformSettings & {
+  project_id: number;
+};
+
+export type ProjectRaySettingsUpdate = PlatformSettingsUpdate;
+
 export type LogLine = {
   ts: string;
   message: string;
@@ -247,6 +253,13 @@ export const api = {
   getPlatformSettings: () => request<PlatformSettings>("/api/platform/settings"),
   updatePlatformSettings: (body: PlatformSettingsUpdate) =>
     request<PlatformSettings>("/api/platform/settings", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getProjectRaySettings: (projectId: number) =>
+    request<ProjectRaySettings>(`/api/projects/${projectId}/ray-settings`),
+  updateProjectRaySettings: (projectId: number, body: ProjectRaySettingsUpdate) =>
+    request<ProjectRaySettings>(`/api/projects/${projectId}/ray-settings`, {
       method: "PUT",
       body: JSON.stringify(body),
     }),

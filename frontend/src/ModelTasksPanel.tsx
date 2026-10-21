@@ -11,6 +11,7 @@ import { api } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
 import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
+import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { ProjectJobsHierarchy } from "./ProjectJobsHierarchy";
 import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 import { ValidatedNumberField } from "./ValidatedNumberField";
@@ -89,6 +90,7 @@ type Props = {
   baseModel?: string | null;
   useLora?: boolean;
   onApplyBlueprint: (file: ModelTaskBlueprintFile) => void;
+  onProjectRaySettingsSaved?: () => void;
 };
 
 function WizardStepCard({
@@ -174,6 +176,7 @@ export function ModelTasksPanel(props: Props) {
     baseModel,
     useLora,
     onApplyBlueprint,
+    onProjectRaySettingsSaved,
   } = props;
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -409,34 +412,43 @@ export function ModelTasksPanel(props: Props) {
     switch (stepId) {
       case "project":
         return (
-          <ProjectJobsHierarchy
-            projects={projects}
-            jobs={jobs}
-            selectedProjectId={selectedProjectId}
-            onSelectedProjectIdChange={onSelectedProjectIdChange}
-            newProjectName={newProjectName}
-            onNewProjectNameChange={onNewProjectNameChange}
-            newProjectDescription={newProjectDescription}
-            onNewProjectDescriptionChange={onNewProjectDescriptionChange}
-            onCreateProject={onCreateProject}
-            onUpdateProject={onUpdateProject}
-            onDeleteProject={onDeleteProject}
-            onUpdateJobName={onUpdateJobName}
-            onRequestDeleteJob={onRequestDeleteJob}
-            onRunJob={onRunJob}
-            onStopJob={onStopJob}
-            projectBusy={projectBusy}
-            jobBusy={jobBusy}
-            onInvalidateBlueprint={() => {}}
-            taskDefinitions={projectTasks}
-            taskVersions={taskVersions}
-            selectedTaskId={selectedTaskId}
-            onSelectedTaskIdChange={setSelectedTaskId}
-            onApplyTaskVersion={(spec) => {
-              onApplyBlueprint(parseModelTaskBlueprintFile(spec));
-              setBlueprintMessage("Loaded task version into wizard");
-            }}
-          />
+          <>
+            <ProjectJobsHierarchy
+              projects={projects}
+              jobs={jobs}
+              selectedProjectId={selectedProjectId}
+              onSelectedProjectIdChange={onSelectedProjectIdChange}
+              newProjectName={newProjectName}
+              onNewProjectNameChange={onNewProjectNameChange}
+              newProjectDescription={newProjectDescription}
+              onNewProjectDescriptionChange={onNewProjectDescriptionChange}
+              onCreateProject={onCreateProject}
+              onUpdateProject={onUpdateProject}
+              onDeleteProject={onDeleteProject}
+              onUpdateJobName={onUpdateJobName}
+              onRequestDeleteJob={onRequestDeleteJob}
+              onRunJob={onRunJob}
+              onStopJob={onStopJob}
+              projectBusy={projectBusy}
+              jobBusy={jobBusy}
+              onInvalidateBlueprint={() => {}}
+              taskDefinitions={projectTasks}
+              taskVersions={taskVersions}
+              selectedTaskId={selectedTaskId}
+              onSelectedTaskIdChange={setSelectedTaskId}
+              onApplyTaskVersion={(spec) => {
+                onApplyBlueprint(parseModelTaskBlueprintFile(spec));
+                setBlueprintMessage("Loaded task version into wizard");
+              }}
+            />
+            {selectedProjectId != null && (
+              <PlatformSettingsPanel
+                projectId={selectedProjectId}
+                title="Project Ray configuration"
+                onSaved={onProjectRaySettingsSaved}
+              />
+            )}
+          </>
         );
       case "mode":
         return (

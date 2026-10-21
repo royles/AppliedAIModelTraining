@@ -9,17 +9,28 @@ import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
 import type { WorkerSizePreset } from "./workerSizePresets";
 
 type Props = {
+  /** When set, load/save Ray config for this project (1:1 with the project). */
+  projectId?: number;
   onSaved?: () => void;
   title?: string;
+  saveLabel?: string;
+  introHint?: string;
 };
 
-export function PlatformSettingsPanel({ onSaved, title = "Framework Configuration" }: Props) {
+export function PlatformSettingsPanel({
+  projectId,
+  onSaved,
+  title = "Framework Configuration",
+  saveLabel,
+  introHint,
+}: Props) {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [ray, setRay] = useState<RaySettings | null>(null);
   const [cdsw, setCdsw] = useState<CdswWorkerSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [workerPresetId, setWorkerPresetId] = useState<string | null>(null);
+  const isProjectScope = projectId != null;
 
   function applyWorkerPreset(p: WorkerSizePreset) {
     if (!cdsw) return;
@@ -33,19 +44,33 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
   }
 
   useEffect(() => {
-    api.getPlatformSettings().then((s) => {
+    let cancelled = false;
+    setSettings(null);
+    setRay(null);
+    setCdsw(null);
+    setMessage(null);
+    const load = isProjectScope
+      ? api.getProjectRaySettings(projectId)
+      : api.getPlatformSettings();
+    load.then((s) => {
+      if (cancelled) return;
       setSettings(s);
       setRay(s.ray);
       setCdsw(s.cdsw_workers);
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [isProjectScope, projectId]);
 
   async function save() {
     if (!ray || !cdsw) return;
     setSaving(true);
     setMessage(null);
     try {
-      const updated = await api.updatePlatformSettings({ ray, cdsw_workers: cdsw });
+      const updated = isProjectScope
+        ? await api.updateProjectRaySettings(projectId, { ray, cdsw_workers: cdsw })
+        : await api.updatePlatformSettings({ ray, cdsw_workers: cdsw });
       setSettings(updated);
       setRay(updated.ray);
       setCdsw(updated.cdsw_workers);
@@ -62,7 +87,7 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
     return (
       <article className="card wide">
         <h2>{title}</h2>
-        <p>Loading platform settings…</p>
+        <p>{isProjectScope ? "Loading project Ray settings…" : "Loading platform settings…"}</p>
       </article>
     );
   }
@@ -71,6 +96,10 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
     <article className="card wide">
       <h2>{title}</h2>
       <p className="hint">
+        {introHint ??
+          (isProjectScope
+            ? "This project’s Ray cluster and CDSW worker targets apply to every task and job run under it."
+            : "Defaults copied into new projects. Each project keeps its own Ray configuration for runs.")}{" "}
         Runtime: Ray <strong>{settings.runtime.ray_runtime}</strong>
         · CDSW API <strong>{settings.runtime.cdsw_available ? "available" : "local sim"}</strong>
         · detected head <code>{settings.runtime.detected_ray_head ?? "—"}</code>
@@ -228,7 +257,9 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
       </div>
 
       <button type="button" onClick={save} disabled={saving}>
-        {saving ? "Saving…" : "Save platform settings"}
+        {saving
+          ? "Saving…"
+          : saveLabel ?? (isProjectScope ? "Save project Ray settings" : "Save platform defaults")}
       </button>
       {message && <p className="hint">{message}</p>}
     </article>
