@@ -281,11 +281,10 @@ button.platform-status-pill:hover {
   flex-shrink: 0;
 }
 
-.sidebar-collapsed .sidebar-nav button {
+.sidebar-collapsed .sidebar-nav-item {
   justify-content: center;
   padding-left: var(--cdl-space-2);
   padding-right: var(--cdl-space-2);
-  font-size: var(--cdl-text-sm);
 }
 
 .link-button {
@@ -325,34 +324,7 @@ button.platform-status-pill:hover {
   gap: 0.25rem;
 }
 
-.sidebar-nav button {
-  text-align: left;
-  background: transparent;
-  color: #b8c5da;
-  font-weight: 500;
-  padding: 0.65rem 0.75rem;
-  border-radius: 8px;
-}
-
-.sidebar-nav button:hover {
-  background: #121a2b;
-  color: #e8eef7;
-}
-
-.sidebar-nav button.active {
-  background: #1e3a8a;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: inset 3px 0 0 #60a5fa;
-}
-
-.sidebar-nav button:not(.active) {
-  border: 1px solid transparent;
-}
-
-.sidebar-nav button.active {
-  border-color: #2563eb;
-}
+/* Sidebar nav item layout — colors from cdl-base.css */
 
 .sidebar-ui-build {
   margin: auto 0.5rem 0;

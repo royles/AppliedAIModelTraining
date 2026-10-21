@@ -51,26 +51,75 @@ h6 {
   color: var(--cdl-text-on-dark-muted);
 }
 
-.sidebar-nav button {
+.sidebar-nav {
+  gap: var(--cdl-space-1);
+}
+
+.sidebar-nav-row,
+.sidebar-nav .cdl-tooltip-wrap {
+  display: block;
+  width: 100%;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--cdl-space-3);
+  width: 100%;
   background: transparent;
   color: var(--cdl-text-on-dark-muted);
   font-weight: var(--cdl-font-weight-medium);
   border-radius: var(--cdl-radius-md);
   border: 1px solid transparent;
   min-height: var(--cdl-btn-height);
+  padding: var(--cdl-space-2) var(--cdl-space-3);
+  text-align: left;
+  cursor: pointer;
+  font-size: var(--cdl-text-sm);
 }
 
-.sidebar-nav button:hover {
+.sidebar-nav-item:hover {
   background: var(--cdl-bg-sidebar-hover);
   color: var(--cdl-text-on-dark);
 }
 
-.sidebar-nav button.active {
+.sidebar-nav-item.active {
   background: var(--cdl-bg-sidebar-active);
   color: var(--cdl-text-on-dark);
   font-weight: var(--cdl-font-weight-semibold);
   box-shadow: inset 3px 0 0 var(--cdl-primary);
   border-color: transparent;
+}
+
+.sidebar-nav-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sidebar-nav-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sidebar-nav-label {
+  flex: 1;
+  min-width: 0;
+  line-height: var(--cdl-line-tight);
+}
+
+.sidebar-collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding-left: var(--cdl-space-2);
+  padding-right: var(--cdl-space-2);
+}
+
+.sidebar-collapsed .sidebar-nav .cdl-tooltip-wrap {
+  display: flex;
+  justify-content: center;
 }
 
 .platform-status-bar {
@@ -85,7 +134,7 @@ h6 {
 }
 
 /* Buttons */
-button:not(.sidebar-nav button):not(.link-button):not(.registry-item):not(.hierarchy-project-select):not(.platform-status-pill):not(.cdl-icon-btn):not(.cdl-field-help-btn) {
+button:not(.sidebar-nav-item):not(.link-button):not(.registry-item):not(.hierarchy-project-select):not(.platform-status-pill):not(.cdl-icon-btn):not(.cdl-field-help-btn) {
   background: var(--cdl-primary);
   color: var(--cdl-primary-on);
   border: 1px solid var(--cdl-primary);
@@ -96,7 +145,7 @@ button:not(.sidebar-nav button):not(.link-button):not(.registry-item):not(.hiera
   font-size: var(--cdl-text-sm);
 }
 
-button:not(.sidebar-nav button):not(.link-button):hover:not(:disabled):not(.platform-status-pill) {
+button:not(.sidebar-nav-item):not(.link-button):hover:not(:disabled):not(.platform-status-pill) {
   background: var(--cdl-primary-hover);
   border-color: var(--cdl-primary-hover);
 }

@@ -1,12 +1,19 @@
+import type { ComponentType } from "react";
 import { IconButton } from "./IconButton";
 import { Tooltip } from "./Tooltip";
+import {
+  SidebarIconFramework,
+  SidebarIconRegistry,
+  SidebarIconRuns,
+  SidebarIconTasks,
+} from "./SidebarNavIcons";
 
 export type NavView = "tasks" | "registry" | "framework" | "model-tasks";
 
 type NavItem = {
   id: NavView;
   label: string;
-  shortLabel: string;
+  Icon: ComponentType<{ className?: string }>;
 };
 
 type Props = {
@@ -22,10 +29,10 @@ type Props = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "tasks", label: "Runs", shortLabel: "Runs" },
-  { id: "registry", label: "Model registry", shortLabel: "Registry" },
-  { id: "framework", label: "Framework Configuration", shortLabel: "Framework" },
-  { id: "model-tasks", label: "Task configurations", shortLabel: "Tasks" },
+  { id: "tasks", label: "Runs", Icon: SidebarIconRuns },
+  { id: "registry", label: "Model registry", Icon: SidebarIconRegistry },
+  { id: "framework", label: "Framework Configuration", Icon: SidebarIconFramework },
+  { id: "model-tasks", label: "Task configurations", Icon: SidebarIconTasks },
 ];
 
 export function AppSidebar({
@@ -81,15 +88,19 @@ export function AppSidebar({
               ? nav === "tasks" || selectedJobId !== null
               : nav === item.id && selectedJobId === null;
           const label = itemLabel(item);
+          const { Icon } = item;
           const btn = (
             <button
-              key={item.id}
               type="button"
-              className={active ? "active" : undefined}
+              className={`sidebar-nav-item${active ? " active" : ""}`}
               aria-current={active ? "page" : undefined}
+              aria-label={collapsed ? label : undefined}
               onClick={() => onNavigate(item.id)}
             >
-              {collapsed ? item.shortLabel.slice(0, 1) : label}
+              <span className="sidebar-nav-icon">
+                <Icon />
+              </span>
+              {!collapsed && <span className="sidebar-nav-label">{label}</span>}
             </button>
           );
           return collapsed ? (
@@ -97,7 +108,9 @@ export function AppSidebar({
               {btn}
             </Tooltip>
           ) : (
-            btn
+            <span key={item.id} className="sidebar-nav-row">
+              {btn}
+            </span>
           );
         })}
       </nav>
