@@ -192,6 +192,13 @@ textarea:focus {
   border-color: var(--cdl-info);
 }
 
+.pill.stopped,
+.pill.queued {
+  background: var(--cdl-bg-app);
+  color: var(--cdl-text-muted);
+  border-color: var(--cdl-border-strong);
+}
+
 .cdl-icon-btn {
   background: var(--cdl-bg-surface);
   border-color: var(--cdl-border-subtle);
@@ -229,4 +236,56 @@ textarea:focus {
   .cdl-page-grid > .cdl-span-4 {
     grid-column: span 12;
   }
+}
+
+/* Modal dialogs (native <dialog>, not system alert/confirm) */
+.cdl-dialog {
+  border: none;
+  padding: 0;
+  max-width: min(28rem, calc(100vw - 2rem));
+  background: transparent;
+  color: var(--cdl-text-primary);
+}
+
+.cdl-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.cdl-dialog-panel {
+  background: var(--cdl-bg-surface);
+  border: 1px solid var(--cdl-border-subtle);
+  border-radius: var(--cdl-radius-lg);
+  box-shadow: var(--cdl-shadow-md);
+  padding: var(--cdl-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-4);
+}
+
+.cdl-dialog-title {
+  margin: 0;
+  font-size: var(--cdl-text-lg);
+  font-weight: var(--cdl-font-weight-semibold);
+}
+
+.cdl-dialog-body p {
+  margin: 0 0 var(--cdl-space-2);
+}
+
+.cdl-dialog-body p:last-child {
+  margin-bottom: 0;
+}
+
+.cdl-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--cdl-space-2);
+}
+
+.task-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cdl-space-2);
+  padding: 0 var(--cdl-space-4) var(--cdl-space-4);
 }

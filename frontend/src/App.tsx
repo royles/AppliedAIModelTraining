@@ -17,6 +17,9 @@ import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { TaskCardGrid } from "./TaskCardGrid";
 import { TaskDetailView } from "./TaskDetailView";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { JobRestartDialog } from "./components/JobRestartDialog";
+import { defaultResumeForRun, isJobActive } from "./jobActions";
 import { trainingJobListFieldsEqual } from "./jobUtils";
 import {
   DEFAULT_DATASET,
@@ -53,6 +56,8 @@ export default function App() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [projectBusy, setProjectBusy] = useState(false);
   const [jobBusy, setJobBusy] = useState(false);
+  const [deleteJobTarget, setDeleteJobTarget] = useState<TrainingJob | null>(null);
+  const [restartJobTarget, setRestartJobTarget] = useState<TrainingJob | null>(null);
   const [startBusy, setStartBusy] = useState(false);
   const [jobName, setJobName] = useState(DEFAULT_JOB_NAME);
   const [openaiModelId, setOpenaiModelId] = useState(DEFAULT_OPENAI_MODEL_ID);
@@ -316,11 +321,23 @@ export default function App() {
     }
   }
 
-  async function onDeleteJobFromBlueprint(jobId: number) {
-    if (!window.confirm("Delete this task and its artifacts?")) return;
+  function requestDeleteJob(jobId: number) {
+    const job = jobs.find((j) => j.id === jobId) ?? null;
+    if (job) {
+      setDeleteJobTarget(job);
+    }
+  }
+
+  async function confirmDeleteJob() {
+    if (!deleteJobTarget) return;
     setJobBusy(true);
     try {
-      await api.deleteJob(jobId);
+      await api.deleteJob(deleteJobTarget.id);
+      if (selectedJobId === deleteJobTarget.id) {
+        closeTask();
+        setNav("tasks");
+      }
+      setDeleteJobTarget(null);
       await refresh();
       setError(null);
     } catch (e) {
@@ -396,27 +413,41 @@ export default function App() {
   }
 
   async function restartTask(jobId: number, resume: boolean) {
+    setJobBusy(true);
     try {
       const updated = await api.restartJob(jobId, { resume });
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+      setRestartJobTarget(null);
+      setError(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setJobBusy(false);
+    }
+  }
+
+  function handleRunJob(jobId: number) {
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    if (job.status === "failed" || job.status === "stopped") {
+      setRestartJobTarget(job);
+      return;
+    }
+    void restartTask(jobId, defaultResumeForRun(job.status));
+  }
+
+  async function stopJob(jobId: number) {
+    setJobBusy(true);
+    try {
+      const updated = await api.stopJob(jobId);
       setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
       setError(null);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function deleteTask(jobId: number) {
-    try {
-      await api.deleteJob(jobId);
-      if (selectedJobId === jobId) {
-        closeTask();
-        setNav("tasks");
-      }
-      await refresh();
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setJobBusy(false);
     }
   }
 
@@ -468,8 +499,10 @@ export default function App() {
               closeTask();
               setNav("tasks");
             }}
-            onDelete={deleteTask}
-            onRestart={restartTask}
+            onRequestDelete={() => setDeleteJobTarget(selectedJob)}
+            onRun={() => handleRunJob(selectedJob.id)}
+            onStop={() => stopJob(selectedJob.id)}
+            actionBusy={jobBusy}
             onJobUpdated={handleJobUpdated}
             onOpenRegistry={openRegistry}
           />
@@ -485,7 +518,14 @@ export default function App() {
                 .
               </p>
             </header>
-            <TaskCardGrid jobs={jobs} onSelect={openTask} onDelete={deleteTask} />
+            <TaskCardGrid
+              jobs={jobs}
+              onSelect={openTask}
+              onRequestDelete={requestDeleteJob}
+              onRun={handleRunJob}
+              onStop={stopJob}
+              jobBusy={jobBusy}
+            />
           </>
         ) : nav === "registry" ? (
           <ModelRegistryPanel />
@@ -532,8 +572,9 @@ export default function App() {
             onUpdateProject={onUpdateProject}
             onDeleteProject={onDeleteProject}
             onUpdateJobName={onUpdateJobName}
-            onDeleteJob={onDeleteJobFromBlueprint}
-            onRerunJob={(jobId) => restartTask(jobId, true)}
+            onRequestDeleteJob={requestDeleteJob}
+            onRunJob={handleRunJob}
+            onStopJob={stopJob}
             projectBusy={projectBusy}
             jobBusy={jobBusy}
             startBusy={startBusy}
@@ -567,6 +608,37 @@ export default function App() {
         )}
       </main>
       </div>
+
+      <ConfirmDialog
+        open={deleteJobTarget !== null}
+        title="Delete job?"
+        confirmLabel="Delete"
+        danger
+        busy={jobBusy}
+        onCancel={() => setDeleteJobTarget(null)}
+        onConfirm={() => void confirmDeleteJob()}
+      >
+        {deleteJobTarget ? (
+          <>
+            <p>
+              Delete run <strong>#{deleteJobTarget.id}</strong> &ldquo;{deleteJobTarget.name}&rdquo;?
+            </p>
+            <p className="hint">
+              This removes the job record, logs, and any registered <code>/v1</code> model entry tied to this
+              run. Artifacts on disk are removed when possible. Active workers may take a moment to shut down.
+            </p>
+          </>
+        ) : null}
+      </ConfirmDialog>
+
+      <JobRestartDialog
+        open={restartJobTarget !== null}
+        jobName={restartJobTarget?.name ?? ""}
+        busy={jobBusy}
+        onCancel={() => setRestartJobTarget(null)}
+        onResume={() => restartJobTarget && void restartTask(restartJobTarget.id, true)}
+        onStartOver={() => restartJobTarget && void restartTask(restartJobTarget.id, false)}
+      />
     </div>
   );
 }

@@ -51,8 +51,9 @@ type Props = {
   onUpdateProject: (projectId: number, name: string) => void;
   onDeleteProject: (projectId: number) => void;
   onUpdateJobName: (jobId: number, name: string) => void;
-  onDeleteJob: (jobId: number) => void;
-  onRerunJob: (jobId: number) => void;
+  onRequestDeleteJob: (jobId: number) => void;
+  onRunJob: (jobId: number) => void;
+  onStopJob: (jobId: number) => void;
   projectBusy: boolean;
   jobBusy: boolean;
   jobName: string;
@@ -131,8 +132,9 @@ export function ModelTasksPanel(props: Props) {
     onUpdateProject,
     onDeleteProject,
     onUpdateJobName,
-    onDeleteJob,
-    onRerunJob,
+    onRequestDeleteJob,
+    onRunJob,
+    onStopJob,
     projectBusy,
     jobBusy,
     jobName,
@@ -397,8 +399,9 @@ export function ModelTasksPanel(props: Props) {
             onUpdateProject={onUpdateProject}
             onDeleteProject={onDeleteProject}
             onUpdateJobName={onUpdateJobName}
-            onDeleteJob={onDeleteJob}
-            onRerunJob={onRerunJob}
+            onRequestDeleteJob={onRequestDeleteJob}
+            onRunJob={onRunJob}
+            onStopJob={onStopJob}
             projectBusy={projectBusy}
             jobBusy={jobBusy}
             onInvalidateBlueprint={() => {}}

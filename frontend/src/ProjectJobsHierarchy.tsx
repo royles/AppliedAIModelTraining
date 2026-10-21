@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Project, TaskDefinition, TaskVersion, TrainingJob } from "./api";
+import { canRunJob, canStopJob } from "./jobActions";
 
 type Props = {
   projects: Project[];
@@ -14,8 +15,9 @@ type Props = {
   onUpdateProject: (projectId: number, name: string) => void;
   onDeleteProject: (projectId: number) => void;
   onUpdateJobName: (jobId: number, name: string) => void;
-  onDeleteJob: (jobId: number) => void;
-  onRerunJob: (jobId: number) => void;
+  onRequestDeleteJob: (jobId: number) => void;
+  onRunJob: (jobId: number) => void;
+  onStopJob: (jobId: number) => void;
   projectBusy: boolean;
   jobBusy: boolean;
   onInvalidateBlueprint: () => void;
@@ -40,8 +42,9 @@ export function ProjectJobsHierarchy(props: Props) {
     onUpdateProject,
     onDeleteProject,
     onUpdateJobName,
-    onDeleteJob,
-    onRerunJob,
+    onRequestDeleteJob,
+    onRunJob,
+    onStopJob,
     projectBusy,
     jobBusy,
     onInvalidateBlueprint,
@@ -315,11 +318,25 @@ export function ProjectJobsHierarchy(props: Props) {
                       <div className="hierarchy-row-actions">
                         <button
                           type="button"
-                          disabled={jobBusy}
-                          onClick={() => onRerunJob(job.id)}
-                          title="Queue another training run for this job"
+                          className="btn-compact"
+                          disabled={jobBusy || !canRunJob(job.status)}
+                          onClick={() => onRunJob(job.id)}
+                          title={
+                            canRunJob(job.status)
+                              ? "Queue this job to run again"
+                              : "Stop the job or wait until it finishes"
+                          }
                         >
-                          Re-run job
+                          Run
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-compact"
+                          disabled={jobBusy || !canStopJob(job.status)}
+                          onClick={() => onStopJob(job.id)}
+                          title={canStopJob(job.status) ? "Stop provisioning or training" : "Job is not running"}
+                        >
+                          Stop
                         </button>
                         <button
                           type="button"
@@ -335,7 +352,7 @@ export function ProjectJobsHierarchy(props: Props) {
                           type="button"
                           className="btn-danger btn-compact"
                           disabled={jobBusy}
-                          onClick={() => onDeleteJob(job.id)}
+                          onClick={() => onRequestDeleteJob(job.id)}
                         >
                           Delete
                         </button>

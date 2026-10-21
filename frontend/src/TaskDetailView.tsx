@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type JobLogs, type TrainingJob } from "./api";
 import { trainingJobListFieldsEqual } from "./jobUtils";
 import { TaskCard } from "./TaskCard";
-import { confirmDeleteTask } from "./taskDelete";
+import { canRunJob, canStopJob } from "./jobActions";
 import { formatLogLines, mergeSerialJobLogs } from "./logFormat";
 import { RayClusterMap } from "./RayClusterMap";
 import { rayStatusFingerprint } from "./rayStatusFields";
@@ -10,8 +10,10 @@ import { rayStatusFingerprint } from "./rayStatusFields";
 type Props = {
   job: TrainingJob;
   onBack: () => void;
-  onDelete: (jobId: number) => void | Promise<void>;
-  onRestart: (jobId: number, resume: boolean) => void | Promise<void>;
+  onRequestDelete: () => void;
+  onRun: () => void;
+  onStop: () => void | Promise<void>;
+  actionBusy?: boolean;
   onJobUpdated?: (job: TrainingJob) => void;
   onOpenRegistry?: () => void;
 };
@@ -28,10 +30,19 @@ function scrollLogToBottom(el: HTMLDivElement | null) {
   }
 }
 
-export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated, onOpenRegistry }: Props) {
+export function TaskDetailView({
+  job,
+  onBack,
+  onRequestDelete,
+  onRun,
+  onStop,
+  actionBusy,
+  onJobUpdated,
+  onOpenRegistry,
+}: Props) {
   const [logs, setLogs] = useState<JobLogs | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [restarting, setRestarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const serialLogRef = useRef<HTMLDivElement>(null);
   const lastSerialTextRef = useRef("");
   const scrollStickRef = useRef(true);
@@ -96,32 +107,29 @@ export function TaskDetailView({ job, onBack, onDelete, onRestart, onJobUpdated,
           ← Tasks
         </button>
         <div className="task-detail-actions">
-          {job.status === "failed" && (
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={restarting}
-              onClick={() => {
-                const resume = window.confirm(
-                  "Restart this task with the same parameters?\n\n" +
-                    "OK = resume from the last saved epoch/step if available.\n" +
-                    "Cancel = start training over (keeps prior artifacts on disk).",
-                );
-                setRestarting(true);
-                void onRestart(job.id, resume).finally(() => setRestarting(false));
-              }}
-            >
-              {restarting ? "Restarting…" : "Restart"}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={actionBusy || !canRunJob(job.status)}
+            onClick={onRun}
+          >
+            Run
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={actionBusy || stopping || !canStopJob(job.status)}
+            onClick={() => {
+              setStopping(true);
+              void Promise.resolve(onStop()).finally(() => setStopping(false));
+            }}
+          >
+            {stopping ? "Stopping…" : "Stop"}
+          </button>
           <button
             type="button"
             className="btn-danger task-detail-delete"
-            onClick={() => {
-              if (confirmDeleteTask(job)) {
-                void onDelete(job.id);
-              }
-            }}
+            disabled={actionBusy}
+            onClick={onRequestDelete}
           >
             Delete
           </button>

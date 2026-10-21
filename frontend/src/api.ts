@@ -334,6 +334,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body ?? { resume: true }),
     }),
+  stopJob: (jobId: number) =>
+    request<TrainingJob>(`/api/jobs/${jobId}/stop`, {
+      method: "POST",
+    }),
   getTaskBlueprintDraft: () =>
     request<{ blueprint: Record<string, unknown> | null }>("/api/training/task-blueprints/draft"),
   putTaskBlueprintDraft: (blueprint: Record<string, unknown>) =>

@@ -43,6 +43,52 @@ _job_threads: dict[int, threading.Thread] = {}
 _job_thread_lock = threading.Lock()
 _pending_resume: dict[int, bool] = {}
 _pending_ray_force_head: dict[int, bool] = {}
+_job_cancel_requested: set[int] = set()
+_job_pools: dict[int, CdswRayWorkerPool] = {}
+
+
+class JobCancelledError(Exception):
+    """Raised when the user stops a job while it is running."""
+
+
+def request_training_job_cancel(job_id: int) -> None:
+    with _job_thread_lock:
+        _job_cancel_requested.add(job_id)
+
+
+def clear_training_job_cancel(job_id: int) -> None:
+    with _job_thread_lock:
+        _job_cancel_requested.discard(job_id)
+
+
+def is_training_job_cancel_requested(job_id: int) -> bool:
+    with _job_thread_lock:
+        return job_id in _job_cancel_requested
+
+
+def _register_job_pool(job_id: int, pool: CdswRayWorkerPool) -> None:
+    with _job_thread_lock:
+        _job_pools[job_id] = pool
+
+
+def _unregister_job_pool(job_id: int) -> None:
+    with _job_thread_lock:
+        _job_pools.pop(job_id, None)
+
+
+def stop_active_job_workers(job_id: int) -> None:
+    with _job_thread_lock:
+        pool = _job_pools.get(job_id)
+    if pool is not None:
+        try:
+            pool.stop_all()
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to stop workers for job %s", job_id)
+
+
+def _raise_if_cancelled(job_id: int) -> None:
+    if is_training_job_cancel_requested(job_id):
+        raise JobCancelledError("Stopped by user")
 
 
 def job_is_running(job_id: int) -> bool:
@@ -88,6 +134,16 @@ def run_training_job(job_id: int) -> None:
     try:
         job = db.get(TrainingJob, job_id)
         if not job:
+            return
+        if is_training_job_cancel_requested(job_id):
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("info", "Job stopped before provisioning started"),
+            )
+            _update_job(db, job_id, status="stopped", error_message="Stopped by user")
+            clear_training_job_cancel(job_id)
             return
         _update_job(db, job_id, status="provisioning")
         append_job_log(
@@ -169,6 +225,8 @@ def run_training_job(job_id: int) -> None:
             )
         pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": gpus_per_worker}
         pool = CdswRayWorkerPool(**pool_kwargs)
+        _register_job_pool(job_id, pool)
+        _raise_if_cancelled(job_id)
 
         needs_cai_ray_head = bool(live_ip) and not (
             platform.ray_local_mode and not pool.is_remote
@@ -504,6 +562,7 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
 
+        _raise_if_cancelled(job_id)
         _update_job(
             db,
             job_id,
@@ -699,11 +758,35 @@ def run_training_job(job_id: int) -> None:
                 init_mode=cfg.init_mode,
                 training_metrics=metrics,
             )
+    except JobCancelledError:
+        append_job_log(
+            db,
+            job_id,
+            "framework",
+            framework_line("info", "Training stopped by user"),
+        )
+        job_row = db.get(TrainingJob, job_id)
+        if job_row and job_row.status != "stopped":
+            _update_job(db, job_id, status="stopped", error_message="Stopped by user")
+        if job_row and job_row.worker_group:
+            job_row.worker_group.status = "stopped"
+            db.commit()
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Training job %s failed", job_id)
-        append_job_log(db, job_id, "framework", framework_line("fail", f"Job failed: {exc}"))
-        _update_job(db, job_id, status="failed", error_message=str(exc))
+        if is_training_job_cancel_requested(job_id):
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line("info", "Training stopped by user"),
+            )
+            _update_job(db, job_id, status="stopped", error_message="Stopped by user")
+        else:
+            logger.exception("Training job %s failed", job_id)
+            append_job_log(db, job_id, "framework", framework_line("fail", f"Job failed: {exc}"))
+            _update_job(db, job_id, status="failed", error_message=str(exc))
     finally:
+        clear_training_job_cancel(job_id)
+        _unregister_job_pool(job_id)
         if pool is not None:
             keep = os.environ.get("PLATFORM_KEEP_WORKERS_ON_FAIL", "").lower() in (
                 "1",

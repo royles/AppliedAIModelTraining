@@ -42,6 +42,7 @@ from app.services.cai_networking import (
 from app.services.job_delete import delete_training_job
 from app.services.project_delete import delete_project
 from app.services.job_log import build_job_logs
+from app.services.job_cancel import stop_training_job
 from app.services.job_lifecycle import restart_training_job
 from app.services.job_runner import enqueue_training_job, scale_job_workers
 from app.services.model_registry import (
@@ -522,6 +523,15 @@ def restart_job(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _job_to_read(db, job)
+
+
+@router.post("/jobs/{job_id}/stop", response_model=TrainingJobRead)
+def stop_job(job_id: int, db: Session = Depends(get_db)) -> TrainingJobRead:
+    try:
+        job = stop_training_job(db, job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _job_to_read(db, job)
 
 

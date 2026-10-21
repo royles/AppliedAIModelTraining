@@ -18,6 +18,7 @@ from app.services.job_progress import read_progress
 logger = logging.getLogger(__name__)
 
 _ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
+_RESTARTABLE_STATUSES = frozenset({"failed", "stopped", "succeeded"})
 
 
 def reconcile_stale_jobs(db: Session, *, reason: str) -> int:
@@ -55,11 +56,10 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
         raise ValueError("Job not found")
     if job_is_running(job_id):
         raise RuntimeError("Job is already running in this framework process")
-    if job.status != "failed":
+    if job.status not in _RESTARTABLE_STATUSES:
         raise ValueError(
-            f"Only failed tasks can be restarted (current status={job.status}). "
-            "If the framework was restarted, refresh the task list — interrupted runs "
-            "are marked failed automatically."
+            f"Only finished tasks can be run again (current status={job.status}). "
+            "Stop an active run first, or wait for it to finish."
         )
 
     artifact_dir = (REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve()
