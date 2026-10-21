@@ -167,7 +167,7 @@ body {
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  padding: 0.2rem 0.55rem;
+  padding: var(--cdl-pill-padding-y, 0.2rem) var(--cdl-pill-padding-x, 0.7rem);
   border-radius: 999px;
   border: 1px solid var(--cdl-border-strong);
   background: var(--cdl-bg-app);
@@ -1297,7 +1297,7 @@ button.btn-danger:hover:not(:disabled) {
 
 .ray-pill {
   font-size: 0.72rem;
-  padding: 0.15rem 0.5rem;
+  padding: var(--cdl-pill-padding-y, 0.2rem) var(--cdl-pill-padding-x, 0.7rem);
 }
 
 .ray-dashboard {
@@ -1516,7 +1516,7 @@ button.btn-danger:hover:not(:disabled) {
 .dist-pill {
   font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.2rem 0.55rem;
+  padding: var(--cdl-pill-padding-y, 0.2rem) var(--cdl-pill-padding-x, 0.7rem);
   border-radius: 999px;
   white-space: nowrap;
   text-transform: uppercase;

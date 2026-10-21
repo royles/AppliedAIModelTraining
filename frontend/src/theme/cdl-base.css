@@ -328,11 +328,17 @@ textarea:focus {
 }
 
 .pill {
+  display: inline-block;
+  padding: var(--cdl-pill-padding-y) var(--cdl-pill-padding-x);
+  border-radius: var(--cdl-radius-pill);
+  font-size: var(--cdl-text-xs);
+  line-height: 1.35;
   background: var(--cdl-bg-app);
   color: var(--cdl-text-secondary);
   border: 1px solid var(--cdl-border-subtle);
   text-transform: none;
   font-weight: var(--cdl-font-weight-medium);
+  white-space: nowrap;
 }
 
 .pill.succeeded {

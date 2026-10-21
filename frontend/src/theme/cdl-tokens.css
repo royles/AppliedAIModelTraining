@@ -35,6 +35,8 @@
   --cdl-radius-md: 6px;
   --cdl-radius-lg: 8px;
   --cdl-radius-pill: 999px;
+  --cdl-pill-padding-y: 0.2rem;
+  --cdl-pill-padding-x: 0.7rem;
 
   /* Light theme (default) */
   --cdl-bg-app: #f4f4f4;
