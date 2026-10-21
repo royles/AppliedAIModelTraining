@@ -534,6 +534,7 @@ export default function App() {
               </p>
             </header>
             <TaskCardGrid
+              projects={projects}
               jobs={jobs}
               onSelect={openTask}
               onRequestDelete={requestDeleteJob}
