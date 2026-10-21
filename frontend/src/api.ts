@@ -368,6 +368,8 @@ export const api = {
     openai_model_id?: string;
     num_workers?: number;
     gpus_per_worker?: number;
+    worker_cpu?: number;
+    worker_memory_gb?: number;
     max_steps?: number;
     task_blueprint?: Record<string, unknown>;
     task_version_id?: number;

@@ -289,3 +289,22 @@ textarea:focus {
   gap: var(--cdl-space-2);
   padding: 0 var(--cdl-space-4) var(--cdl-space-4);
 }
+
+.worker-size-presets {
+  margin-bottom: var(--cdl-space-4);
+}
+
+.worker-size-presets-intro {
+  margin: 0 0 var(--cdl-space-2);
+}
+
+.worker-size-preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cdl-space-2);
+}
+
+.worker-size-preset-active {
+  border-color: var(--cdl-primary) !important;
+  color: var(--cdl-primary) !important;
+}

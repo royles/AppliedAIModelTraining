@@ -74,7 +74,7 @@ All subprocesses (Ray, uvicorn, CDSW workers) use **`sys.executable`** / system 
 
 Create a project and start a training job from the UI, or via `POST /api/jobs`.
 
-Ray and CDSW worker defaults are editable in the UI and persisted in SQLite (`GET`/`PUT` `/api/platform/settings`).
+Ray and CDSW worker defaults are editable in the UI and persisted in SQLite (`GET`/`PUT` `/api/platform/settings`). For **large multi-GPU worker nodes** (CPU, memory, GPUs per engine, CML profile IDs), see **[docs/CDSW_LARGE_GPU_WORKERS.md](docs/CDSW_LARGE_GPU_WORKERS.md)**.
 
 Scale GPU workers on a running job (CML/CDSW only):
 

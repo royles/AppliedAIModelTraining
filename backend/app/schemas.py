@@ -80,6 +80,18 @@ class TrainingJobCreate(BaseModel):
     openai_model_id: str | None = None
     num_workers: int = Field(default=1, ge=1, le=32)
     gpus_per_worker: int = Field(default=0, ge=0, le=8)
+    worker_cpu: float | None = Field(
+        default=None,
+        gt=0,
+        le=128,
+        description="Override platform worker CPU for this job's CDSW engines.",
+    )
+    worker_memory_gb: float | None = Field(
+        default=None,
+        ge=8,
+        le=512,
+        description="Override platform worker memory (GiB) for this job's CDSW engines.",
+    )
     # Legacy flat fields (applied as overrides when transformer is omitted)
     model_name: str | None = None
     epochs: int = Field(default=1, ge=1, le=100)

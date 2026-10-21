@@ -5,6 +5,8 @@ import {
   type PlatformSettings,
   type RaySettings,
 } from "./api";
+import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
+import type { WorkerSizePreset } from "./workerSizePresets";
 
 type Props = {
   onSaved?: () => void;
@@ -17,6 +19,18 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
   const [cdsw, setCdsw] = useState<CdswWorkerSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [workerPresetId, setWorkerPresetId] = useState<string | null>(null);
+
+  function applyWorkerPreset(p: WorkerSizePreset) {
+    if (!cdsw) return;
+    setWorkerPresetId(p.id);
+    setCdsw({
+      ...cdsw,
+      worker_cpu: p.worker_cpu,
+      worker_memory_gb: p.worker_memory_gb,
+      gpus_per_worker: p.gpus_per_worker,
+    });
+  }
 
   useEffect(() => {
     api.getPlatformSettings().then((s) => {
@@ -119,6 +133,11 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
 
         <div>
           <h3>CDSW workers</h3>
+          <WorkerSizePresetBar
+            selectedPresetId={workerPresetId}
+            disabled={saving}
+            onApply={applyWorkerPreset}
+          />
           <label>
             Worker CPU
             <input
@@ -126,7 +145,10 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
               min={0.1}
               step={0.5}
               value={cdsw.worker_cpu}
-              onChange={(e) => setCdsw({ ...cdsw, worker_cpu: Number(e.target.value) })}
+              onChange={(e) => {
+                setWorkerPresetId(null);
+                setCdsw({ ...cdsw, worker_cpu: Number(e.target.value) });
+              }}
             />
           </label>
           <label>
@@ -135,9 +157,10 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
               type="number"
               min={1}
               value={cdsw.worker_memory_gb}
-              onChange={(e) =>
-                setCdsw({ ...cdsw, worker_memory_gb: Number(e.target.value) })
-              }
+              onChange={(e) => {
+                setWorkerPresetId(null);
+                setCdsw({ ...cdsw, worker_memory_gb: Number(e.target.value) });
+              }}
             />
           </label>
           <label>
@@ -147,9 +170,10 @@ export function PlatformSettingsPanel({ onSaved, title = "Framework Configuratio
               min={0}
               max={8}
               value={cdsw.gpus_per_worker}
-              onChange={(e) =>
-                setCdsw({ ...cdsw, gpus_per_worker: Number(e.target.value) })
-              }
+              onChange={(e) => {
+                setWorkerPresetId(null);
+                setCdsw({ ...cdsw, gpus_per_worker: Number(e.target.value) });
+              }}
             />
           </label>
           <label>

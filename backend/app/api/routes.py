@@ -45,6 +45,7 @@ from app.services.job_log import build_job_logs
 from app.services.job_cancel import stop_training_job
 from app.services.job_lifecycle import restart_training_job
 from app.services.job_runner import enqueue_training_job, scale_job_workers
+from app.services.worker_resources import merge_worker_resources_into_config_json
 from app.services.model_registry import (
     get_trained_model_for_job,
     openai_model_ids_for_jobs,
@@ -485,7 +486,11 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
         batch_size=cfg.per_device_train_batch_size,
         learning_rate=cfg.learning_rate,
         max_steps=cfg.max_steps,
-        config_json=cfg.to_json(),
+        config_json=merge_worker_resources_into_config_json(
+            cfg.to_json(),
+            worker_cpu=payload.worker_cpu,
+            worker_memory_gb=payload.worker_memory_gb,
+        ),
         status="queued",
     )
     db.add(job)

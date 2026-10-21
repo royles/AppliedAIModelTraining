@@ -23,6 +23,8 @@ import {
 } from "./modelTaskBlueprint";
 import { blueprintReady, buildTrainingBlueprint, type BlueprintStep, type DatasetPreview } from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
+import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
+import type { WorkerSizePreset } from "./workerSizePresets";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type Props = {
@@ -64,6 +66,10 @@ type Props = {
   onJobWorkersChange: (n: number) => void;
   jobGpus: number;
   onJobGpusChange: (n: number) => void;
+  jobWorkerCpu: number;
+  onJobWorkerCpuChange: (n: number) => void;
+  jobWorkerMemoryGb: number;
+  onJobWorkerMemoryGbChange: (n: number) => void;
   onCreateJob: (blueprint: ModelTaskBlueprintFile) => void | Promise<void>;
   startBusy: boolean;
   dataset: TrainingDatasetConfig;
@@ -145,6 +151,10 @@ export function ModelTasksPanel(props: Props) {
     onJobWorkersChange,
     jobGpus,
     onJobGpusChange,
+    jobWorkerCpu,
+    onJobWorkerCpuChange,
+    jobWorkerMemoryGb,
+    onJobWorkerMemoryGbChange,
     onCreateJob,
     startBusy,
     dataset,
@@ -170,6 +180,15 @@ export function ModelTasksPanel(props: Props) {
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [minCorpusChars, setMinCorpusChars] = useState<number | null>(null);
+  const [workerPresetId, setWorkerPresetId] = useState<string | null>("large");
+
+  function applyWorkerPreset(p: WorkerSizePreset) {
+    setWorkerPresetId(p.id);
+    onJobWorkerCpuChange(p.worker_cpu);
+    onJobWorkerMemoryGbChange(p.worker_memory_gb);
+    onJobGpusChange(p.gpus_per_worker);
+  }
+
   const [savedBlueprints, setSavedBlueprints] = useState<
     { id: string; name: string; updated_at?: string }[]
   >([]);
@@ -210,6 +229,8 @@ export function ModelTasksPanel(props: Props) {
       openai_model_id: openaiModelId,
       num_workers: jobWorkers,
       gpus_per_worker: jobGpus,
+      worker_cpu: jobWorkerCpu,
+      worker_memory_gb: jobWorkerMemoryGb,
       max_steps: maxSteps,
       init_mode: initMode,
       task_type: taskType,
@@ -231,6 +252,8 @@ export function ModelTasksPanel(props: Props) {
       openaiModelId,
       jobWorkers,
       jobGpus,
+      jobWorkerCpu,
+      jobWorkerMemoryGb,
       maxSteps,
       initMode,
       taskType,
@@ -519,16 +542,61 @@ export function ModelTasksPanel(props: Props) {
         );
       case "compute":
         return (
-          <div className="arch-grid">
-            <label>
-              Ray / CDSW workers for new jobs
-              <ValidatedNumberField value={jobWorkers} min={1} max={32} onChange={onJobWorkersChange} />
-            </label>
-            <label>
-              GPUs per worker
-              <ValidatedNumberField value={jobGpus} min={0} max={8} onChange={onJobGpusChange} />
-            </label>
-          </div>
+          <>
+            <WorkerSizePresetBar
+              selectedPresetId={workerPresetId}
+              disabled={startBusy}
+              onApply={applyWorkerPreset}
+            />
+            <div className="arch-grid">
+              <label>
+                Ray / CDSW worker engines (nodes)
+                <ValidatedNumberField value={jobWorkers} min={1} max={32} onChange={onJobWorkersChange} />
+              </label>
+              <label>
+                CPUs per engine
+                <ValidatedNumberField
+                  value={jobWorkerCpu}
+                  min={0.5}
+                  max={128}
+                  integer={false}
+                  onChange={(n) => {
+                    setWorkerPresetId(null);
+                    onJobWorkerCpuChange(n);
+                  }}
+                />
+              </label>
+              <label>
+                Memory per engine (GiB)
+                <ValidatedNumberField
+                  value={jobWorkerMemoryGb}
+                  min={8}
+                  max={512}
+                  onChange={(n) => {
+                    setWorkerPresetId(null);
+                    onJobWorkerMemoryGbChange(n);
+                  }}
+                />
+              </label>
+              <label>
+                GPUs per engine
+                <ValidatedNumberField
+                  value={jobGpus}
+                  min={1}
+                  max={8}
+                  onChange={(n) => {
+                    setWorkerPresetId(null);
+                    onJobGpusChange(n);
+                  }}
+                />
+              </label>
+            </div>
+            <p className="hint">
+              Set <strong>CML resource profile / accelerator IDs</strong> under Framework Configuration so
+              each engine lands on GPU-capable hardware. Turn off low-memory mode there for distributed
+              GPU training.
+            </p>
+          </>
         );
       case "register":
         return (

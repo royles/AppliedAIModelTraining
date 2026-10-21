@@ -14,6 +14,8 @@ export type ModelTaskBlueprintFile = {
   openai_model_id: string;
   num_workers: number;
   gpus_per_worker: number;
+  worker_cpu?: number;
+  worker_memory_gb?: number;
   max_steps: number;
   init_mode: "from_scratch" | "pretrained";
   task_type: "causal_lm" | "sequence_classification";
@@ -68,6 +70,8 @@ export function wizardStateFromBlueprint(b: ModelTaskBlueprintFile): ModelTaskWi
     openai_model_id: b.openai_model_id,
     num_workers: b.num_workers,
     gpus_per_worker: b.gpus_per_worker,
+    worker_cpu: b.worker_cpu,
+    worker_memory_gb: b.worker_memory_gb,
     max_steps: b.max_steps,
     init_mode: b.init_mode,
     task_type: b.task_type,

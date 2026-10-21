@@ -46,7 +46,9 @@ export default function App() {
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
 
   const [jobWorkers, setJobWorkers] = useState(1);
-  const [jobGpus, setJobGpus] = useState(0);
+  const [jobGpus, setJobGpus] = useState(1);
+  const [jobWorkerCpu, setJobWorkerCpu] = useState(16);
+  const [jobWorkerMemoryGb, setJobWorkerMemoryGb] = useState(64);
   const [projects, setProjects] = useState<Project[]>([]);
   const [jobs, setJobs] = useState<TrainingJob[]>([]);
   const [presets, setPresets] = useState<TransformerPreset[]>([]);
@@ -111,7 +113,9 @@ export default function App() {
   useEffect(() => {
     api.getPlatformSettings().then((s) => {
       setJobWorkers(s.cdsw_workers.default_job_num_workers);
-      setJobGpus(s.cdsw_workers.gpus_per_worker);
+      setJobGpus(Math.max(1, s.cdsw_workers.gpus_per_worker || 1));
+      setJobWorkerCpu(s.cdsw_workers.worker_cpu);
+      setJobWorkerMemoryGb(s.cdsw_workers.worker_memory_gb);
     });
     api.uiBuildInfo().then((info) => {
       if (info.status === "ready") {
@@ -153,6 +157,8 @@ export default function App() {
     setOpenaiModelId(s.openai_model_id);
     setJobWorkers(s.num_workers);
     setJobGpus(s.gpus_per_worker);
+    if (s.worker_cpu != null) setJobWorkerCpu(s.worker_cpu);
+    if (s.worker_memory_gb != null) setJobWorkerMemoryGb(s.worker_memory_gb);
     setMaxSteps(s.max_steps);
     setInitMode(s.init_mode);
     setTaskType(s.task_type);
@@ -332,6 +338,13 @@ export default function App() {
     if (!deleteJobTarget) return;
     setJobBusy(true);
     try {
+      if (isJobActive(deleteJobTarget.status)) {
+        try {
+          await api.stopJob(deleteJobTarget.id);
+        } catch {
+          /* proceed with delete if stop races with completion */
+        }
+      }
       await api.deleteJob(deleteJobTarget.id);
       if (selectedJobId === deleteJobTarget.id) {
         closeTask();
@@ -358,6 +371,8 @@ export default function App() {
       openai_model_id: openaiModelId,
       num_workers: jobWorkers,
       gpus_per_worker: jobGpus,
+      worker_cpu: jobWorkerCpu,
+      worker_memory_gb: jobWorkerMemoryGb,
       max_steps: maxSteps,
       task_blueprint: blueprint,
       save_as_task: true,
@@ -586,6 +601,10 @@ export default function App() {
             onJobWorkersChange={setJobWorkers}
             jobGpus={jobGpus}
             onJobGpusChange={setJobGpus}
+            jobWorkerCpu={jobWorkerCpu}
+            onJobWorkerCpuChange={setJobWorkerCpu}
+            jobWorkerMemoryGb={jobWorkerMemoryGb}
+            onJobWorkerMemoryGbChange={setJobWorkerMemoryGb}
             onCreateJob={onCreateJob}
             onApplyBlueprint={applyModelTaskBlueprint}
             dataset={dataset}

@@ -36,6 +36,11 @@ from app.services.ray_cluster_watch import (
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
+from app.services.worker_resources import (
+    format_worker_spec_line,
+    remote_driver_launch_spec,
+    resolve_worker_launch_spec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +228,13 @@ def run_training_job(job_id: int) -> None:
                     f"Job GPUs/worker was 0; using platform default {gpus_per_worker}.",
                 ),
             )
-        pool_kwargs = {**worker_pool_kwargs(platform), "gpus_per_worker": gpus_per_worker}
+        worker_spec = resolve_worker_launch_spec(job, platform)
+        pool_kwargs = {
+            **worker_pool_kwargs(platform),
+            "cpu": float(worker_spec["cpu"]),
+            "memory_gb": float(worker_spec["memory_gb"]),
+            "gpus_per_worker": int(worker_spec["gpus_per_worker"]),
+        }
         pool = CdswRayWorkerPool(**pool_kwargs)
         _register_job_pool(job_id, pool)
         _raise_if_cancelled(job_id)
@@ -317,6 +328,15 @@ def run_training_job(job_id: int) -> None:
             )
 
         if launch_cdsw_workers:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "worker",
+                    format_worker_spec_line(worker_spec, num_workers=job.num_workers),
+                ),
+            )
             from app.services.ray_cai_networking import (
                 build_worker_connectivity_probe_code,
                 poll_worker_connectivity_probe,
@@ -654,12 +674,13 @@ def run_training_job(job_id: int) -> None:
                 ray_auth_token=ensure_ray_auth_token(),
             )
             driver_head = head
+            driver_spec = remote_driver_launch_spec(worker_spec)
             pool.launch(
                 1,
                 driver_head,
                 code=build_remote_train_driver_code(job_id, driver_head),
-                cpu=2.0,
-                memory_gb=12.0,
+                cpu=float(driver_spec["cpu"]),
+                memory_gb=float(driver_spec["memory_gb"]),
                 gpus_per_worker=0,
             )
             append_job_log(
