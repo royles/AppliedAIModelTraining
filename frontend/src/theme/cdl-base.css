@@ -39,7 +39,7 @@ h6 {
 /* Sidebar — dark rail (CDP navigation pattern) */
 .sidebar {
   background: var(--cdl-bg-sidebar);
-  border-right: 1px solid #1a1a1a;
+  border-right: 1px solid var(--cdl-border-sidebar);
 }
 
 .sidebar-brand h1 {

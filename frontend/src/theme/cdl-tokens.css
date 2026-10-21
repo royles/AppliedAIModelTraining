@@ -1,10 +1,12 @@
 /**
  * Cloudera Design Language (CDL 4.0) — console-oriented tokens.
+ * Default: light. Dark: prefers-color-scheme: dark (OS/browser).
  * Reference: https://design.cloudera.com/9f23dd142/p/62bbf8-welcome-to-cdl-40
- * Grid: 12 columns, 24px gutters/margins (Engineering@Cloudera).
  */
 :root {
-  /* Typography — single sans family, clear hierarchy */
+  color-scheme: light;
+
+  /* Typography */
   --cdl-font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --cdl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --cdl-text-xs: 0.75rem;
@@ -19,7 +21,7 @@
   --cdl-line-tight: 1.25;
   --cdl-line-normal: 1.5;
 
-  /* Spacing — 4px base; CDL grid margin/gutter 24px */
+  /* Spacing — CDL grid margin/gutter 24px */
   --cdl-space-1: 0.25rem;
   --cdl-space-2: 0.5rem;
   --cdl-space-3: 0.75rem;
@@ -34,13 +36,14 @@
   --cdl-radius-lg: 8px;
   --cdl-radius-pill: 999px;
 
-  /* CDP-style light shell (CDL console default) */
+  /* Light theme (default) */
   --cdl-bg-app: #f4f4f4;
   --cdl-bg-surface: #ffffff;
   --cdl-bg-elevated: #ffffff;
   --cdl-bg-sidebar: #2c2c2c;
   --cdl-bg-sidebar-hover: #3d3d3d;
   --cdl-bg-sidebar-active: #424242;
+  --cdl-border-sidebar: #1a1a1a;
   --cdl-border-subtle: #d8d8d8;
   --cdl-border-strong: #b0b0b0;
 
@@ -51,7 +54,6 @@
   --cdl-text-on-dark-muted: #c8c8c8;
   --cdl-text-link: #0066cc;
 
-  /* Cloudera brand accent (primary actions) */
   --cdl-primary: #e06323;
   --cdl-primary-hover: #c8551c;
   --cdl-primary-active: #a84618;
@@ -67,7 +69,8 @@
   --cdl-info: #0277bd;
   --cdl-info-bg: #e1f5fe;
 
-  --cdl-focus-ring: 2px solid #0066cc;
+  --cdl-focus-ring-color: #0066cc;
+  --cdl-focus-ring: 2px solid var(--cdl-focus-ring-color);
   --cdl-focus-offset: 2px;
 
   --cdl-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
@@ -78,6 +81,47 @@
 
   --sidebar-width: 240px;
   --sidebar-width-collapsed: 52px;
+
+  /* Legacy hooks in styles.css (Ray map, etc.) */
+  --cdl-code-bg: #f0f0f0;
+  --cdl-log-bg: #fafafa;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --cdl-bg-app: #0b1220;
+    --cdl-bg-surface: #141f33;
+    --cdl-bg-elevated: #1a2842;
+    --cdl-bg-sidebar: #070d18;
+    --cdl-bg-sidebar-hover: #121a2b;
+    --cdl-bg-sidebar-active: #1e293b;
+    --cdl-border-sidebar: #243049;
+    --cdl-border-subtle: #243049;
+    --cdl-border-strong: #3d4f6f;
+
+    --cdl-text-primary: #e8eef7;
+    --cdl-text-secondary: #cbd5e1;
+    --cdl-text-muted: #94a3b8;
+    --cdl-text-on-dark: #e8eef7;
+    --cdl-text-on-dark-muted: #94a3b8;
+    --cdl-text-link: #93c5fd;
+
+    --cdl-primary-muted: #3d2817;
+    --cdl-success-bg: #14532d;
+    --cdl-warning-bg: #422006;
+    --cdl-error-bg: #450a0a;
+    --cdl-info-bg: #0c4a6e;
+
+    --cdl-focus-ring-color: #60a5fa;
+
+    --cdl-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+    --cdl-shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+
+    --cdl-code-bg: #0f1729;
+    --cdl-log-bg: #0f1729;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
