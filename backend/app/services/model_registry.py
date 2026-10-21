@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models import TrainedModel, TrainingJob
 from app.services.model_card import build_training_metadata, generate_model_card
+from app.services.model_lineage import build_lineage_snapshot, card_content_hash, load_job_blueprint_file
 from app.services.model_lifecycle import (
     STATE_BENCHMARKED,
     STATE_RETIRED,
@@ -67,6 +68,12 @@ def register_trained_model(
         artifact_path=str(path),
         init_mode=init_mode,
     )
+    lineage = build_lineage_snapshot(db, job)
+    metadata["lineage_snapshot"] = lineage
+    metadata["card_content_hash"] = None
+    blueprint = load_job_blueprint_file(job.id)
+    if blueprint:
+        metadata["task_blueprint"] = blueprint
     now = datetime.now(timezone.utc)
     record = TrainedModel(
         job_id=job.id,
@@ -84,7 +91,11 @@ def register_trained_model(
     )
     db.add(record)
     db.flush()
-    record.model_card_markdown = generate_model_card(record, job=job)
+    card = generate_model_card(record, job=job)
+    record.model_card_markdown = card
+    meta = json.loads(record.metadata_json or "{}")
+    meta["card_content_hash"] = card_content_hash(card)
+    record.metadata_json = json.dumps(meta)
     db.commit()
     db.refresh(record)
     return record
@@ -123,11 +134,10 @@ def update_registry_entry(
         if record.lifecycle_state != STATE_RETIRED:
             record.lifecycle_state = STATE_BENCHMARKED
     if model_card_markdown is not None:
-        record.model_card_markdown = model_card_markdown
+        raise ValueError(
+            "model_card_markdown is immutable after registration; register a new model version instead"
+        )
     record.updated_at = datetime.now(timezone.utc)
-    job = db.get(TrainingJob, record.job_id)
-    if model_card_markdown is None and (description is not None or benchmark is not None):
-        record.model_card_markdown = generate_model_card(record, job=job)
     db.commit()
     db.refresh(record)
     return record
@@ -137,12 +147,9 @@ def refresh_model_card(db: Session, registry_id: int) -> TrainedModel:
     record = db.get(TrainedModel, registry_id)
     if not record:
         raise ValueError("Registry entry not found")
-    job = db.get(TrainingJob, record.job_id)
-    record.model_card_markdown = generate_model_card(record, job=job)
-    record.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(record)
-    return record
+    raise ValueError(
+        "Model cards are immutable after registration. Register a new model from a new job run."
+    )
 
 
 def get_model_by_openai_id(db: Session, model_id: str) -> TrainedModel | None:

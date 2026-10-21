@@ -94,8 +94,13 @@ export function PlatformStatusBar({ jobs, onOpenTask }: Props) {
     ["queued", "provisioning", "running"].includes(j.status),
   )?.id;
 
+  const liveSummary = `${apiOk ? "API connected" : "API offline"} · ${ray.label} · ${tasks.label}`;
+
   return (
     <header className="platform-status-bar" aria-label="Platform status">
+      <div className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {liveSummary}
+      </div>
       <div className="platform-status-inner">
         <StatusPill
           label="UX ready"

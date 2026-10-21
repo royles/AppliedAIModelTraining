@@ -45,6 +45,9 @@ def init_db() -> None:
     _sqlite_add_column_if_missing("training_jobs", "config_json", "config_json TEXT")
     _sqlite_add_column_if_missing("training_jobs", "log_json", "log_json TEXT")
     _sqlite_add_column_if_missing(
+        "training_jobs", "task_version_id", "task_version_id INTEGER REFERENCES task_versions(id)"
+    )
+    _sqlite_add_column_if_missing(
         "platform_settings",
         "non_distributed_low_memory_mode",
         "non_distributed_low_memory_mode INTEGER DEFAULT 0",

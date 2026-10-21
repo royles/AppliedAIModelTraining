@@ -84,9 +84,27 @@ export type TransformerPreset = {
   config: TransformerConfig;
 };
 
+export type TaskDefinition = {
+  id: number;
+  project_id: number;
+  name: string;
+  created_at: string;
+};
+
+export type TaskVersion = {
+  id: number;
+  task_id: number;
+  version: number;
+  content_hash: string;
+  spec: Record<string, unknown>;
+  created_at: string;
+};
+
 export type TrainingJob = {
   id: number;
   experiment_id: number;
+  project_id?: number;
+  task_version_id?: number | null;
   name: string;
   status: string;
   model_name: string;
@@ -276,6 +294,21 @@ export const api = {
     request<{ status: string; project_id: string }>(`/api/projects/${projectId}`, {
       method: "DELETE",
     }),
+  listProjectTasks: (projectId: number) =>
+    request<TaskDefinition[]>(`/api/projects/${projectId}/tasks`),
+  createProjectTask: (projectId: number, body: { name: string }) =>
+    request<TaskDefinition>(`/api/projects/${projectId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listTaskVersions: (taskId: number) => request<TaskVersion[]>(`/api/tasks/${taskId}/versions`),
+  createTaskVersion: (taskId: number, spec: Record<string, unknown>) =>
+    request<TaskVersion>(`/api/tasks/${taskId}/versions`, {
+      method: "POST",
+      body: JSON.stringify({ spec }),
+    }),
+  getTaskVersion: (versionId: number) =>
+    request<TaskVersion>(`/api/task-versions/${versionId}`),
   /** @deprecated Use listProjects */
   listExperiments: () => request<Project[]>("/api/experiments"),
   /** @deprecated Use createProject */
@@ -333,6 +366,9 @@ export const api = {
     gpus_per_worker?: number;
     max_steps?: number;
     task_blueprint?: Record<string, unknown>;
+    task_version_id?: number;
+    save_as_task?: boolean;
+    task_name?: string;
   }) =>
     request<TrainingJob>("/api/jobs", {
       method: "POST",

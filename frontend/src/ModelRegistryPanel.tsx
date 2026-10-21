@@ -47,6 +47,7 @@ export function ModelRegistryPanel() {
 
   const selected = models.find((m) => m.id === selectedId) ?? null;
   const projectGroups = useMemo(() => groupModelsByProject(models), [models]);
+  const lineage = (selected?.metadata?.lineage_snapshot ?? null) as Record<string, unknown> | null;
 
   const load = useCallback(async () => {
     try {
@@ -87,8 +88,8 @@ export function ModelRegistryPanel() {
       <header className="main-panel-header">
         <h2>Model registry</h2>
         <p className="hint">
-          Models are grouped by <strong>project</strong> (the same collection used in Model Tasks).
-          Each model comes from a training <strong>job</strong>; re-run the job to train a new version.
+          Registered models are <strong>immutable</strong> snapshots (lineage, model card). Lifecycle
+          changes only; new training requires a new job run and registry entry.
         </p>
       </header>
 
@@ -146,10 +147,34 @@ export function ModelRegistryPanel() {
                 <span>{selected.project_name ?? "—"}</span>
               </li>
               <li><span>OpenAI id</span><span><code>{selected.openai_model_id}</code></span></li>
-              <li><span>Job</span><span>#{selected.job_id} {selected.job_name ?? ""}</span></li>
+              <li><span>Job run</span><span>#{selected.job_id} {selected.job_name ?? ""}</span></li>
               <li><span>Task type</span><span>{selected.task_type}</span></li>
               <li><span>Base</span><span>{selected.base_model}</span></li>
             </ul>
+
+            {lineage && (
+              <div className="registry-lineage-block" aria-label="Immutable lineage snapshot">
+                <h4>Lineage (frozen at registration)</h4>
+                <ul className="kv registry-meta">
+                  <li>
+                    <span>Task</span>
+                    <span>
+                      {String(lineage.task_name ?? "—")} v{String(lineage.task_version ?? "—")}
+                    </span>
+                  </li>
+                  <li>
+                    <span>Task version id</span>
+                    <span>{String(lineage.task_version_id ?? "—")}</span>
+                  </li>
+                  <li>
+                    <span>Config hash</span>
+                    <span>
+                      <code>{String(lineage.content_hash ?? "—").slice(0, 16)}…</code>
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            )}
 
             {allowed.length > 0 && (
               <div className="registry-actions">

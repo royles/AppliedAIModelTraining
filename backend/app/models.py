@@ -19,6 +19,37 @@ class Experiment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     jobs: Mapped[list["TrainingJob"]] = relationship(back_populates="experiment")
+    tasks: Mapped[list["TaskDefinition"]] = relationship(back_populates="project")
+
+
+class TaskDefinition(Base):
+    """Long-lived task identity within a project (configuration is versioned)."""
+
+    __tablename__ = "task_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    project: Mapped["Experiment"] = relationship(back_populates="tasks")
+    versions: Mapped[list["TaskVersion"]] = relationship(back_populates="task")
+
+
+class TaskVersion(Base):
+    """Immutable snapshot of a task configuration (append-only spec_json)."""
+
+    __tablename__ = "task_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("task_definitions.id"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    spec_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    task: Mapped["TaskDefinition"] = relationship(back_populates="versions")
+    jobs: Mapped[list["TrainingJob"]] = relationship(back_populates="task_version")
 
 
 class TrainingJob(Base):
@@ -26,6 +57,9 @@ class TrainingJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), nullable=False)
+    task_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("task_versions.id"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     model_name: Mapped[str] = mapped_column(String(128), default="distilbert-base-uncased")
@@ -46,6 +80,7 @@ class TrainingJob(Base):
     )
 
     experiment: Mapped["Experiment"] = relationship(back_populates="jobs")
+    task_version: Mapped["TaskVersion | None"] = relationship(back_populates="jobs")
     worker_group: Mapped["WorkerGroup | None"] = relationship(
         back_populates="job", uselist=False
     )

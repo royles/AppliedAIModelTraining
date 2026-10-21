@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 type Props = {
+  id?: string;
+  "aria-describedby"?: string;
   value: number;
   onChange: (n: number) => void;
   min?: number;
@@ -10,6 +12,8 @@ type Props = {
 };
 
 export function ValidatedNumberField({
+  id,
+  "aria-describedby": ariaDescribedBy,
   value,
   onChange,
   min,
@@ -57,10 +61,13 @@ export function ValidatedNumberField({
   return (
     <span className="validated-number-field">
       <input
+        id={id}
         type="text"
         inputMode={integer ? "numeric" : "decimal"}
         disabled={disabled}
         value={text}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={ariaDescribedBy}
         className={error ? "input-invalid" : undefined}
         onChange={(e) => {
           setText(e.target.value);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Project, TrainingJob } from "./api";
+import type { Project, TaskDefinition, TaskVersion, TrainingJob } from "./api";
 
 type Props = {
   projects: Project[];
@@ -19,6 +19,11 @@ type Props = {
   projectBusy: boolean;
   jobBusy: boolean;
   onInvalidateBlueprint: () => void;
+  taskDefinitions?: TaskDefinition[];
+  taskVersions?: TaskVersion[];
+  selectedTaskId?: number | null;
+  onSelectedTaskIdChange?: (id: number | null) => void;
+  onApplyTaskVersion?: (spec: Record<string, unknown>) => void;
 };
 
 export function ProjectJobsHierarchy(props: Props) {
@@ -40,6 +45,11 @@ export function ProjectJobsHierarchy(props: Props) {
     projectBusy,
     jobBusy,
     onInvalidateBlueprint,
+    taskDefinitions = [],
+    taskVersions = [],
+    selectedTaskId = null,
+    onSelectedTaskIdChange,
+    onApplyTaskVersion,
   } = props;
 
   const selected = projects.find((p) => p.id === selectedProjectId) ?? null;
@@ -66,12 +76,12 @@ export function ProjectJobsHierarchy(props: Props) {
   return (
     <div className="project-jobs-hierarchy">
       <p className="hint hierarchy-intro">
-        <strong>Project → Jobs.</strong> A project is a collection of models. Each job defines a
-        training run; re-run a job to train a new model version (same blueprint settings unless you
-        change them below).
+        <strong>Project → Task → Job.</strong> Projects are long-lived. A{" "}
+        <strong>task</strong> is a versioned JSON configuration. A <strong>job</strong> is one execution
+        of that configuration.
       </p>
 
-      <div className="project-jobs-columns">
+      <div className="project-jobs-columns project-jobs-columns-three">
         <section className="project-jobs-column card nested-card" aria-label="Projects">
           <header className="hierarchy-column-header">
             <h4>Projects</h4>
@@ -189,10 +199,65 @@ export function ProjectJobsHierarchy(props: Props) {
           )}
         </section>
 
-        <section className="project-jobs-column card nested-card" aria-label="Jobs">
+        <section className="project-jobs-column card nested-card" aria-label="Task configurations">
           <header className="hierarchy-column-header">
             <h4>
-              Jobs
+              Tasks
+              {selected ? (
+                <span className="hint hierarchy-subtitle">in {selected.name}</span>
+              ) : null}
+            </h4>
+          </header>
+          {!selected ? (
+            <p className="hint">Select a project to see task definitions.</p>
+          ) : taskDefinitions.length === 0 ? (
+            <p className="hint">
+              No saved tasks yet. Use <strong>Save task version</strong> in the wizard or start a job
+              (creates v1 automatically).
+            </p>
+          ) : (
+            <ul className="hierarchy-project-list">
+              {taskDefinitions.map((t) => {
+                const active = t.id === selectedTaskId;
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      className={`hierarchy-project-select ${active ? "active" : ""}`}
+                      onClick={() => onSelectedTaskIdChange?.(t.id)}
+                    >
+                      <span className="hierarchy-project-name">{t.name}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {selectedTaskId != null && taskVersions.length > 0 && (
+            <div className="hierarchy-task-versions">
+              <h5 className="hint">Versions</h5>
+              <ul className="hierarchy-version-list">
+                {taskVersions.map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-compact"
+                      title={`Hash ${v.content_hash.slice(0, 12)}…`}
+                      onClick={() => onApplyTaskVersion?.(v.spec)}
+                    >
+                      v{v.version}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <section className="project-jobs-column card nested-card" aria-label="Job runs">
+          <header className="hierarchy-column-header">
+            <h4>
+              Runs
               {selected ? (
                 <span className="hint hierarchy-subtitle">in {selected.name}</span>
               ) : null}
@@ -200,10 +265,10 @@ export function ProjectJobsHierarchy(props: Props) {
           </header>
 
           {!selected ? (
-            <p className="hint">Select a project to see its jobs.</p>
+            <p className="hint">Select a project to see job runs.</p>
           ) : projectJobs.length === 0 ? (
             <p className="hint">
-              No jobs in this project yet. Complete the blueprint below and click{" "}
+              No runs yet. Complete the wizard and click{" "}
               <strong>Start job</strong> to queue training.
             </p>
           ) : (
@@ -243,8 +308,9 @@ export function ProjectJobsHierarchy(props: Props) {
                         </span>
                       </div>
                       <p className="hint hierarchy-job-meta">
-                        Job #{job.id}
-                        {job.openai_model_id ? ` · model id ${job.openai_model_id}` : ""}
+                        Run #{job.id}
+                        {job.task_version_id ? ` · task version id ${job.task_version_id}` : " · legacy"}
+                        {job.openai_model_id ? ` · ${job.openai_model_id}` : ""}
                       </p>
                       <div className="hierarchy-row-actions">
                         <button

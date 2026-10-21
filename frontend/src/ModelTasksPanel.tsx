@@ -1,4 +1,12 @@
-import type { Project, TrainingDatasetConfig, TrainingJob, TransformerPreset, TokenizerBuildConfig } from "./api";
+import type {
+  Project,
+  TaskDefinition,
+  TaskVersion,
+  TrainingDatasetConfig,
+  TrainingJob,
+  TransformerPreset,
+  TokenizerBuildConfig,
+} from "./api";
 import { api } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
@@ -165,6 +173,32 @@ export function ModelTasksPanel(props: Props) {
   >([]);
   const [blueprintMessage, setBlueprintMessage] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const [projectTasks, setProjectTasks] = useState<TaskDefinition[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [taskVersions, setTaskVersions] = useState<TaskVersion[]>([]);
+
+  useEffect(() => {
+    setSelectedTaskId(null);
+    setTaskVersions([]);
+    if (selectedProjectId == null) {
+      setProjectTasks([]);
+      return;
+    }
+    api.listProjectTasks(selectedProjectId).then(setProjectTasks).catch(() => setProjectTasks([]));
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (selectedTaskId == null) {
+      setTaskVersions([]);
+      return;
+    }
+    api.listTaskVersions(selectedTaskId).then(setTaskVersions).catch(() => setTaskVersions([]));
+  }, [selectedTaskId]);
+
+  const reloadProjectTasks = useCallback(() => {
+    if (selectedProjectId == null) return;
+    api.listProjectTasks(selectedProjectId).then(setProjectTasks).catch(() => setProjectTasks([]));
+  }, [selectedProjectId]);
 
   const wizardState: ModelTaskWizardState = useMemo(
     () => ({
@@ -368,6 +402,14 @@ export function ModelTasksPanel(props: Props) {
             projectBusy={projectBusy}
             jobBusy={jobBusy}
             onInvalidateBlueprint={() => {}}
+            taskDefinitions={projectTasks}
+            taskVersions={taskVersions}
+            selectedTaskId={selectedTaskId}
+            onSelectedTaskIdChange={setSelectedTaskId}
+            onApplyTaskVersion={(spec) => {
+              onApplyBlueprint(parseModelTaskBlueprintFile(spec));
+              setBlueprintMessage("Loaded task version into wizard");
+            }}
           />
         );
       case "mode":
@@ -506,10 +548,10 @@ export function ModelTasksPanel(props: Props) {
   return (
     <div className="settings-page model-tasks-page model-task-wizard">
       <header className="main-panel-header">
-        <h2>Model Tasks</h2>
+        <h2>Task configurations</h2>
         <p className="hint">
-          Step through the wizard to configure a training task. Settings are saved to{" "}
-          <code>data/blueprints/_draft.json</code> as you edit.
+          Configure a versioned task JSON, then start a <strong>job run</strong>. Draft autosave:{" "}
+          <code>data/blueprints/_draft.json</code>.
         </p>
       </header>
 
@@ -544,16 +586,40 @@ export function ModelTasksPanel(props: Props) {
             type="button"
             className="btn-secondary"
             onClick={async () => {
-              const name = window.prompt("Blueprint name", jobName || "my-blueprint");
+              if (!selectedProjectId) {
+                setBlueprintMessage("Select a project first");
+                return;
+              }
+              const name = window.prompt("Task name", jobName || "my-task");
+              if (!name?.trim()) return;
+              let taskId = selectedTaskId;
+              if (!taskId) {
+                const created = await api.createProjectTask(selectedProjectId, { name: name.trim() });
+                taskId = created.id;
+                setSelectedTaskId(created.id);
+              }
+              const ver = await api.createTaskVersion(taskId, blueprintFile as unknown as Record<string, unknown>);
+              setBlueprintMessage(`Saved task version v${ver.version}`);
+              reloadProjectTasks();
+              setTaskVersions(await api.listTaskVersions(taskId));
+            }}
+          >
+            Save task version
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={async () => {
+              const name = window.prompt("Blueprint file name", jobName || "my-blueprint");
               if (!name?.trim()) return;
               const file = buildModelTaskBlueprint(wizardState, name.trim());
               await api.saveTaskBlueprint(file);
-              setBlueprintMessage(`Saved blueprint “${name.trim()}”`);
+              setBlueprintMessage(`Exported blueprint “${name.trim()}” to data/blueprints/`);
               const list = await api.listTaskBlueprints();
               setSavedBlueprints(list);
             }}
           >
-            Save blueprint
+            Export JSON file
           </button>
         </div>
         {savedBlueprints.length > 0 && (

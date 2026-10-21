@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
-from app.models import Experiment, TrainingJob
+from app.models import Experiment, TaskDefinition, TaskVersion, TrainingJob
 from app.schemas import (
     ArchitectureSummary,
     ExperimentCreate,
@@ -16,6 +16,10 @@ from app.schemas import (
     HealthResponse,
     ScaleWorkersRequest,
     JobRestartRequest,
+    TaskDefinitionCreate,
+    TaskDefinitionRead,
+    TaskVersionCreate,
+    TaskVersionRead,
     TrainingJobCreate,
     TrainingJobUpdate,
     TrainingJobRead,
@@ -64,6 +68,15 @@ from app.static_ui import read_ui_build_info
 from app.training.transformer_config import (
     TransformerTrainingConfig,
     list_presets,
+)
+from app.services.task_versions import (
+    create_task,
+    create_task_with_version,
+    create_version,
+    get_task,
+    get_version,
+    list_tasks_for_project,
+    list_versions,
 )
 from app.services.task_blueprint_store import (
     delete_named,
@@ -364,6 +377,63 @@ def remove_project(project_id: int, db: Session = Depends(get_db)) -> dict[str, 
     return {"status": "deleted", "project_id": str(project_id)}
 
 
+def _version_to_read(row: TaskVersion) -> TaskVersionRead:
+    import json
+
+    spec = json.loads(row.spec_json)
+    return TaskVersionRead(
+        id=row.id,
+        task_id=row.task_id,
+        version=row.version,
+        content_hash=row.content_hash,
+        spec=spec,
+        created_at=row.created_at,
+    )
+
+
+@router.get("/projects/{project_id}/tasks", response_model=list[TaskDefinitionRead])
+def list_project_tasks(project_id: int, db: Session = Depends(get_db)) -> list[TaskDefinition]:
+    if not db.get(Experiment, project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return list_tasks_for_project(db, project_id)
+
+
+@router.post("/projects/{project_id}/tasks", response_model=TaskDefinitionRead)
+def create_project_task(
+    project_id: int, payload: TaskDefinitionCreate, db: Session = Depends(get_db)
+) -> TaskDefinition:
+    try:
+        return create_task(db, project_id=project_id, name=payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/tasks/{task_id}/versions", response_model=list[TaskVersionRead])
+def list_task_versions(task_id: int, db: Session = Depends(get_db)) -> list[TaskVersionRead]:
+    if not get_task(db, task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return [_version_to_read(v) for v in list_versions(db, task_id)]
+
+
+@router.post("/tasks/{task_id}/versions", response_model=TaskVersionRead)
+def post_task_version(
+    task_id: int, payload: TaskVersionCreate, db: Session = Depends(get_db)
+) -> TaskVersionRead:
+    try:
+        row = create_version(db, task_id=task_id, spec=payload.spec)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _version_to_read(row)
+
+
+@router.get("/task-versions/{version_id}", response_model=TaskVersionRead)
+def get_task_version(version_id: int, db: Session = Depends(get_db)) -> TaskVersionRead:
+    row = get_version(db, version_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Task version not found")
+    return _version_to_read(row)
+
+
 @router.get("/jobs", response_model=list[TrainingJobRead])
 def list_jobs(db: Session = Depends(get_db)) -> list[TrainingJobRead]:
     jobs = list(db.scalars(select(TrainingJob).order_by(TrainingJob.created_at.desc())))
@@ -389,8 +459,23 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
     gpus_per_worker = payload.gpus_per_worker
     if gpus_per_worker <= 0 and platform.gpus_per_worker > 0:
         gpus_per_worker = platform.gpus_per_worker
+
+    task_version_id = payload.task_version_id
+    if task_version_id is not None and not get_version(db, task_version_id):
+        raise HTTPException(status_code=404, detail="Task version not found")
+    if task_version_id is None and payload.task_blueprint and payload.save_as_task:
+        task_name = (payload.task_name or payload.name).strip()
+        _, version = create_task_with_version(
+            db,
+            project_id=payload.experiment_id,
+            task_name=task_name,
+            spec=payload.task_blueprint,
+        )
+        task_version_id = version.id
+
     job = TrainingJob(
         experiment_id=payload.experiment_id,
+        task_version_id=task_version_id,
         name=payload.name,
         model_name=cfg.to_train_dict(job_id=0, artifact_dir=".")["model_name"],
         num_workers=payload.num_workers,

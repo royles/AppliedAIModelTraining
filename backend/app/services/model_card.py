@@ -58,6 +58,7 @@ def generate_model_card(
     extra_notes: str | None = None,
 ) -> str:
     meta = _parse_json(record.metadata_json)
+    lineage = meta.get("lineage_snapshot") or {}
     arch = _parse_json(record.architecture_json)
     bench = _parse_json(record.benchmark_json)
     job_name = meta.get("job_name") or (job.name if job else f"job #{record.job_id}")
@@ -90,6 +91,14 @@ def generate_model_card(
         "",
         f"- **Source:** {dataset}",
         f"- **Job id:** #{record.job_id}",
+        "",
+        "## Lineage (immutable snapshot)",
+        "",
+        f"- **Project:** {lineage.get('project_name') or '—'} (id={lineage.get('project_id', '—')})",
+        f"- **Task:** {lineage.get('task_name') or '—'} "
+        f"(id={lineage.get('task_id', '—')}, version={lineage.get('task_version', '—')})",
+        f"- **Task version id:** {lineage.get('task_version_id', '—')}",
+        f"- **Config hash:** `{lineage.get('content_hash') or '—'}`",
         "",
         "## Training procedure",
         "",

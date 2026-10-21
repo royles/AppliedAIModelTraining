@@ -9,7 +9,9 @@ import {
   type TokenizerBuildConfig,
   type TrainingJob,
 } from "./api";
+import { AppSidebar, type NavView } from "./components/AppSidebar";
 import { PlatformStatusBar } from "./PlatformStatusBar";
+import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import { ModelRegistryPanel } from "./ModelRegistryPanel";
 import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
@@ -35,9 +37,8 @@ import {
   type ModelTaskBlueprintFile,
 } from "./modelTaskBlueprint";
 
-type NavView = "tasks" | "registry" | "framework" | "model-tasks";
-
 export default function App() {
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed();
   const [nav, setNav] = useState<NavView>("tasks");
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
 
@@ -342,6 +343,8 @@ export default function App() {
       gpus_per_worker: jobGpus,
       max_steps: maxSteps,
       task_blueprint: blueprint,
+      save_as_task: true,
+      task_name: jobName,
       transformer: {
         init_mode: initMode,
         task_type: taskType,
@@ -419,60 +422,24 @@ export default function App() {
 
   return (
     <div className="app-root">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <PlatformStatusBar jobs={jobs} onOpenTask={openTask} />
       <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h1>Applied AI</h1>
-          <p className="subtitle">Model Training</p>
-        </div>
-        <nav className="sidebar-nav" aria-label="Main">
-          {(
-            [
-              {
-                id: "tasks" as NavView,
-                label: `Tasks${jobs.length > 0 ? ` (${jobs.length})` : ""}`,
-              },
-              {
-                id: "registry" as NavView,
-                label: `Model registry${registryModels.length > 0 ? ` (${registryModels.length})` : ""}`,
-              },
-              { id: "framework" as NavView, label: "Framework Configuration" },
-              { id: "model-tasks" as NavView, label: "Model Tasks" },
-            ] as const
-          ).map((item) => {
-            const active =
-              item.id === "tasks"
-                ? nav === "tasks" || selectedJobId !== null
-                : nav === item.id && selectedJobId === null;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={active ? "active" : undefined}
-                aria-current={active ? "page" : undefined}
-                onClick={() => goNav(item.id)}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-        {platformVersion && (
-          <p
-            className="hint sidebar-ui-build"
-            title={
-              uiBundleId
-                ? `Platform release ${platformVersion} · asset bundle ${uiBundleId} (cache hash)`
-                : `Platform release ${platformVersion}`
-            }
-          >
-            Platform {platformVersion}
-          </p>
-        )}
-      </aside>
+        <AppSidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+          nav={nav}
+          selectedJobId={selectedJobId}
+          jobCount={jobs.length}
+          registryCount={registryModels.length}
+          platformVersion={platformVersion}
+          uiBundleId={uiBundleId}
+          onNavigate={goNav}
+        />
 
-      <main className="main-panel">
+      <main id="main-content" className="main-panel" tabIndex={-1}>
         <header className="main-panel-header compact">
           <p className="subtitle">
             Ray · CDSW workers · OpenAI-compatible <code>/v1</code> API
@@ -509,9 +476,9 @@ export default function App() {
         ) : nav === "tasks" ? (
           <>
             <header className="main-panel-header">
-              <h2>Model task runs</h2>
+              <h2>Job runs</h2>
               <p className="hint">
-                Click a card to open live framework and training logs. Trained models appear in{" "}
+                Executions of task configurations. Click a card for live logs. Trained models appear in{" "}
                 <button type="button" className="link-button" onClick={openRegistry}>
                   Model registry
                 </button>

@@ -1,6 +1,7 @@
 import { Component, type ReactNode, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import "./theme/cdl-tokens.css";
 import "./styles.css";
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

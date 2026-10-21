@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.training.architecture import TransformerArchitectureConfig
 from app.training.transformer_config import TransformerTrainingConfig
@@ -26,9 +26,49 @@ class ExperimentRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TaskDefinitionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+class TaskDefinitionRead(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TaskVersionCreate(BaseModel):
+    spec: dict[str, Any] = Field(description="Full model task blueprint JSON")
+
+
+class TaskVersionRead(BaseModel):
+    id: int
+    task_id: int
+    version: int
+    content_hash: str
+    spec: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class TrainingJobCreate(BaseModel):
     experiment_id: int
     name: str
+    task_version_id: int | None = Field(
+        default=None,
+        description="Run an existing immutable task version.",
+    )
+    save_as_task: bool = Field(
+        default=True,
+        description="When task_blueprint is sent, persist a new task version before running.",
+    )
+    task_name: str | None = Field(
+        default=None,
+        description="Name for a new task definition when save_as_task is true.",
+    )
     preset: str | None = Field(
         default="scratch_gpt2_tiny",
         description="Named preset; merged with transformer overrides.",
@@ -68,6 +108,8 @@ class TrainingJobUpdate(BaseModel):
 class TrainingJobRead(BaseModel):
     id: int
     experiment_id: int
+    project_id: int | None = None
+    task_version_id: int | None = None
     name: str
     status: str
     model_name: str
@@ -86,6 +128,12 @@ class TrainingJobRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def fill_project_id(self) -> "TrainingJobRead":
+        if self.project_id is None:
+            self.project_id = self.experiment_id
+        return self
 
 
 class UiBuildFeaturesRead(BaseModel):
