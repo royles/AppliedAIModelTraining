@@ -112,7 +112,7 @@ export function TrainingBlueprintChecklist(props: Props) {
   );
 
   const steps = useMemo(() => buildTrainingBlueprint(ctx), [ctx]);
-  const ready = blueprintReady(steps, confirmedStepIds);
+  const ready = blueprintReady(steps, confirmedStepIds, ctx);
 
   useEffect(() => {
     onStepsChange?.(steps);

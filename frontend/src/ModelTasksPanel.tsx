@@ -25,7 +25,14 @@ import {
 } from "./modelTaskBlueprint";
 import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
 import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
-import { blueprintReady, buildTrainingBlueprint, type BlueprintStep } from "./trainingBlueprint";
+import { DatasetPreviewBanner } from "./components/DatasetPreviewBanner";
+import {
+  blueprintReady,
+  buildTrainingBlueprint,
+  corpusMeetsMinimum,
+  type BlueprintContext,
+  type BlueprintStep,
+} from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
 import { ModelTaskTrainingOptions } from "./components/ModelTaskTrainingOptions";
 import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
@@ -190,7 +197,7 @@ export function ModelTasksPanel(props: Props) {
   } = props;
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset);
+  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset, 650, taskType);
   const minCorpusChars = useDebouncedMinCorpusChars({
     initMode,
     tokenizer,
@@ -308,28 +315,27 @@ export function ModelTasksPanel(props: Props) {
     api.listTaskBlueprints().then(setSavedBlueprints).catch(() => setSavedBlueprints([]));
   }, []);
 
-  const blueprintSteps: BlueprintStep[] = useMemo(
-    () =>
-      buildTrainingBlueprint({
-        initMode,
-        tokenizer,
-        vocabSize,
-        hiddenSize,
-        layers,
-        heads,
-        maxSteps,
-        jobWorkers,
-        jobGpus,
-        dataset,
-        selectedProjectId,
-        jobName,
-        openaiModelId,
-        paramEstimate,
-        datasetPreview: preview,
-        datasetPreviewLoading: previewLoading,
-        datasetPreviewError: previewError,
-        minCorpusChars,
-      }),
+  const blueprintContext: BlueprintContext = useMemo(
+    () => ({
+      initMode,
+      tokenizer,
+      vocabSize,
+      hiddenSize,
+      layers,
+      heads,
+      maxSteps,
+      jobWorkers,
+      jobGpus,
+      dataset,
+      selectedProjectId,
+      jobName,
+      openaiModelId,
+      paramEstimate,
+      datasetPreview: preview,
+      datasetPreviewLoading: previewLoading,
+      datasetPreviewError: previewError,
+      minCorpusChars,
+    }),
     [
       initMode,
       tokenizer,
@@ -352,6 +358,11 @@ export function ModelTasksPanel(props: Props) {
     ],
   );
 
+  const blueprintSteps: BlueprintStep[] = useMemo(
+    () => buildTrainingBlueprint(blueprintContext),
+    [blueprintContext],
+  );
+
   const stepById = useMemo(
     () => new Map(blueprintSteps.map((s) => [s.id, s])),
     [blueprintSteps],
@@ -360,7 +371,8 @@ export function ModelTasksPanel(props: Props) {
   const currentStep = MODEL_TASK_WIZARD_STEPS[currentStepIndex];
   const currentBlueprintStep = stepById.get(currentStep.id);
   const canGoNext = currentBlueprintStep?.done ?? false;
-  const ready = blueprintReady(blueprintSteps);
+  const ready = blueprintReady(blueprintSteps, undefined, blueprintContext);
+  const corpusOk = corpusMeetsMinimum(blueprintContext);
   const isLastStep = currentStepIndex >= MODEL_TASK_WIZARD_STEPS.length - 1;
 
   const stepDescription = currentBlueprintStep?.description;
@@ -452,24 +464,6 @@ export function ModelTasksPanel(props: Props) {
       case "dataset":
         return (
           <>
-            <p
-              className={`hint dataset-preview-status${previewError && dataset.source !== "builtin" ? " blueprint-warn" : ""}`}
-              aria-live="polite"
-            >
-              {previewLoading && dataset.source !== "builtin"
-                ? "Validating dataset in the background (you can keep editing)…"
-                : previewError && dataset.source !== "builtin"
-                  ? `Dataset preview: ${previewError}`
-                  : preview
-                    ? `Preview: ${preview.examples.toLocaleString()} examples · ${preview.total_characters.toLocaleString()} characters${
-                        preview.preview_capped
-                          ? ` (summary: first ${preview.sample_limit ?? 100} records — training uses full split)`
-                          : ""
-                      }`
-                    : dataset.source !== "builtin"
-                      ? "Fill in the fields below; preview runs automatically after you pause typing."
-                      : null}
-            </p>
             <ModelTaskTrainingOptions
               section="prompt"
               taskType={taskType}
@@ -482,18 +476,31 @@ export function ModelTasksPanel(props: Props) {
         );
       case "tokenizer":
         return (
-          <FromScratchConfigFields
-            section="tokenizer"
-            initMode={initMode}
-            onInitModeChange={onInitModeChange}
-            tokenizer={tokenizer}
-            onTokenizerChange={onTokenizerChange}
-            vocabSize={vocabSize}
-            onVocabSizeChange={onVocabSizeChange}
-            maxSteps={maxSteps}
-            hiddenSize={hiddenSize}
-            layers={layers}
-          />
+          <>
+            {previewLoading && dataset.source !== "builtin" && (
+              <p className="hint dataset-preview-status" aria-live="polite">
+                Dataset preview still running in the background — you can continue; Start run
+                checks corpus size when preview finishes.
+              </p>
+            )}
+            {!previewLoading && previewError && dataset.source !== "builtin" && (
+              <p className="hint blueprint-warn" aria-live="polite">
+                Dataset preview: {previewError}
+              </p>
+            )}
+            <FromScratchConfigFields
+              section="tokenizer"
+              initMode={initMode}
+              onInitModeChange={onInitModeChange}
+              tokenizer={tokenizer}
+              onTokenizerChange={onTokenizerChange}
+              vocabSize={vocabSize}
+              onVocabSizeChange={onVocabSizeChange}
+              maxSteps={maxSteps}
+              hiddenSize={hiddenSize}
+              layers={layers}
+            />
+          </>
         );
       case "architecture":
         return (
@@ -740,6 +747,14 @@ export function ModelTasksPanel(props: Props) {
         onSelectIndex={setCurrentStepIndex}
       />
 
+      <DatasetPreviewBanner
+        dataset={dataset}
+        preview={preview}
+        previewLoading={previewLoading}
+        previewError={previewError}
+        minCorpusChars={minCorpusChars}
+      />
+
       <div className="model-task-wizard-body">
         <WizardStepCard
           title={currentStep.title}
@@ -776,6 +791,11 @@ export function ModelTasksPanel(props: Props) {
             >
               {startBusy ? "Starting…" : "Start job"}
             </button>
+          )}
+          {isLastStep && !corpusOk && initMode === "from_scratch" && !ready && (
+            <p className="hint blueprint-warn">
+              Waiting for dataset preview to confirm BPE corpus size (or add more text).
+            </p>
           )}
         </footer>
       </div>

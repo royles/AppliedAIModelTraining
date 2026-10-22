@@ -285,14 +285,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  datasetPreview: (dataset: TrainingDatasetConfig) =>
+  datasetPreview: (
+    dataset: TrainingDatasetConfig,
+    taskType: "causal_lm" | "sequence_classification" = "causal_lm",
+  ) =>
     request<{
       examples: number;
       total_characters: number;
       source: string;
       preview_capped?: boolean;
       sample_limit?: number | null;
-    }>("/api/training/dataset/preview", {
+    }>(`/api/training/dataset/preview?task_type=${encodeURIComponent(taskType)}`, {
       method: "POST",
       body: JSON.stringify(dataset),
     }),

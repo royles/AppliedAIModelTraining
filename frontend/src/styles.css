@@ -484,6 +484,65 @@ body {
   font-weight: 600;
 }
 
+.dataset-preview-banner {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-subtle, #3d4f6f);
+  border-radius: 8px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+}
+
+.dataset-preview-banner strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.dataset-preview-banner-muted {
+  opacity: 0.85;
+}
+
+.dataset-preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.dataset-preview-cap {
+  flex: 1 1 100%;
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.dataset-preview-error {
+  margin: 0.35rem 0 0;
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.dataset-preview-ok {
+  color: #86efac;
+}
+
+.dataset-preview-spinner {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.35rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.1em;
+  animation: dataset-preview-spin 0.7s linear infinite;
+}
+
+@keyframes dataset-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .blueprint-start-actions {
   margin-top: 1rem;
   padding-top: 1rem;

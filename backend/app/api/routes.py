@@ -241,7 +241,11 @@ def dataset_preview(
 ) -> dict[str, int | str | bool | None]:
     preview_cfg, preview_capped, sample_limit = _preview_dataset_config(dataset)
     try:
-        texts, _ = load_training_samples(preview_cfg.model_dump(), task_type=task_type)
+        texts, _ = load_training_samples(
+            preview_cfg.model_dump(),
+            task_type=task_type,
+            for_preview=True,
+        )
     except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportError as exc:

@@ -57,6 +57,7 @@ def prepare_causal_lm_texts(
     *,
     source: str,
     chunk_chars: int | None = None,
+    min_chunk_chars: int = _MIN_CHUNK_CHARS,
 ) -> list[str]:
     """
     Normalize and optionally chunk training strings for causal LM.
@@ -77,7 +78,7 @@ def prepare_causal_lm_texts(
             continue
         if should_chunk and len(normalized) > max_chars:
             out.extend(chunk_text_for_lm(normalized, max_chars=max_chars))
-        elif len(normalized) >= _MIN_CHUNK_CHARS:
+        elif len(normalized) >= min_chunk_chars:
             out.append(normalized)
         elif not should_chunk and normalized:
             out.append(normalized)

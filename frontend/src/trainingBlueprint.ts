@@ -94,15 +94,16 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
         : "Load preview to measure examples and characters.",
       done: (() => {
         const configured = datasetConfigLooksComplete(ctx.dataset);
-        if (ctx.datasetPreviewError) return false;
         if (ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset") {
           if (ctx.dataset.source === "builtin") return false;
           if (!configured) return false;
           if (ctx.datasetPreviewLoading) return true;
-          if (!ctx.datasetPreview) return configured;
-          if (ctx.datasetPreview.examples < 1) return false;
-          const min = ctx.minCorpusChars ?? 10_000;
-          return corpusChars(ctx) >= min;
+          if (ctx.datasetPreviewError) return true;
+          if (!ctx.datasetPreview) return true;
+          return ctx.datasetPreview.examples >= 1;
+        }
+        if (ctx.datasetPreviewError && ctx.dataset.source !== "builtin") {
+          return configured;
         }
         if (ctx.dataset.source === "inline") {
           return (ctx.dataset.texts?.length ?? 0) > 0;
@@ -131,7 +132,12 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
         if (ctx.tokenizer.mode !== "train_bpe_from_dataset") return true;
         const min = ctx.minCorpusChars ?? 10_000;
         const vocabOk = ctx.vocabSize === (ctx.tokenizer.vocab_size ?? ctx.vocabSize);
-        return vocabOk && corpusChars(ctx) >= min && ctx.dataset.source !== "builtin";
+        if (ctx.dataset.source === "builtin") return false;
+        if (!datasetConfigLooksComplete(ctx.dataset)) return false;
+        if (ctx.datasetPreviewLoading) return vocabOk;
+        if (ctx.datasetPreviewError) return vocabOk;
+        if (!ctx.datasetPreview) return vocabOk;
+        return vocabOk && corpusChars(ctx) >= min;
       })(),
     },
     {
@@ -208,10 +214,25 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
   });
 }
 
+export function corpusMeetsMinimum(ctx: BlueprintContext): boolean {
+  if (ctx.initMode !== "from_scratch") return true;
+  if (ctx.tokenizer.mode !== "train_bpe_from_dataset") return true;
+  if (ctx.dataset.source === "builtin") return false;
+  if (!ctx.datasetPreview || ctx.datasetPreviewLoading) return false;
+  const min = ctx.minCorpusChars ?? 10_000;
+  return corpusChars(ctx) >= min;
+}
+
 export function blueprintReady(
   steps: BlueprintStep[],
   confirmedStepIds?: ReadonlySet<string>,
+  ctx?: BlueprintContext,
 ): boolean {
   if (steps.length === 0) return false;
-  return steps.every((s) => s.done && (confirmedStepIds ? confirmedStepIds.has(s.id) : true));
+  const stepsOk = steps.every(
+    (s) => s.done && (confirmedStepIds ? confirmedStepIds.has(s.id) : true),
+  );
+  if (!stepsOk) return false;
+  if (ctx && !corpusMeetsMinimum(ctx)) return false;
+  return true;
 }

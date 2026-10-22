@@ -125,31 +125,38 @@ def _parse_hf_dataset_id(raw: str) -> tuple[str, str | None]:
     return text, None
 
 
-def _load_huggingface(cfg: TrainingDatasetConfig) -> tuple[list[str], list[int] | None]:
+def _open_hf_split(cfg: TrainingDatasetConfig, *, streaming: bool):
     from datasets import load_dataset
 
     assert cfg.hf_dataset
     repo, inline_config = _parse_hf_dataset_id(cfg.hf_dataset)
     config_name = (cfg.hf_config or "").strip() or inline_config
+    kwargs: dict[str, Any] = {"split": cfg.hf_split, "streaming": streaming}
     if config_name:
-        ds = load_dataset(repo, config_name, split=cfg.hf_split)
-    else:
-        try:
-            ds = load_dataset(repo, split=cfg.hf_split)
-        except ValueError as exc:
-            msg = str(exc)
-            if "Config name is missing" in msg or "pick one among the available configs" in msg:
-                raise ValueError(
-                    f"Hugging Face dataset '{repo}' requires a config name "
-                    f"(e.g. wikitext-103-raw-v1). Set dataset.hf_config or use "
-                    f"'{repo}:wikitext-103-raw-v1'. Original error: {msg}"
-                ) from exc
-            raise
-    limit = cfg.max_samples or len(ds)
+        return load_dataset(repo, config_name, **kwargs)
+    try:
+        return load_dataset(repo, **kwargs)
+    except ValueError as exc:
+        msg = str(exc)
+        if "Config name is missing" in msg or "pick one among the available configs" in msg:
+            raise ValueError(
+                f"Hugging Face dataset '{repo}' requires a config name "
+                f"(e.g. wikitext-103-raw-v1). Set dataset.hf_config or use "
+                f"'{repo}:wikitext-103-raw-v1'. Original error: {msg}"
+            ) from exc
+        raise
+
+
+def _collect_hf_rows(
+    cfg: TrainingDatasetConfig,
+    ds,
+    *,
+    limit: int | None,
+) -> tuple[list[str], list[int] | None]:
     texts: list[str] = []
     labels: list[int] = []
     for i, row in enumerate(ds):
-        if i >= limit:
+        if limit is not None and i >= limit:
             break
         if cfg.hf_text_column not in row:
             raise ValueError(f"HF column '{cfg.hf_text_column}' not in dataset row")
@@ -159,10 +166,53 @@ def _load_huggingface(cfg: TrainingDatasetConfig) -> tuple[list[str], list[int] 
     return texts, labels if cfg.hf_label_column else None
 
 
+def _load_huggingface(cfg: TrainingDatasetConfig) -> tuple[list[str], list[int] | None]:
+    limit = cfg.max_samples
+    if limit is not None:
+        return _load_huggingface_capped(cfg, limit)
+
+    ds = _open_hf_split(cfg, streaming=False)
+    return _collect_hf_rows(cfg, ds, limit=len(ds))
+
+
+def _load_huggingface_capped(
+    cfg: TrainingDatasetConfig,
+    limit: int,
+) -> tuple[list[str], list[int] | None]:
+    """
+    Load at most ``limit`` rows without downloading every HF shard.
+
+    Prefer split slicing (``train[:N]``); fall back to streaming iteration.
+    """
+    from datasets import load_dataset
+
+    assert cfg.hf_dataset
+    repo, inline_config = _parse_hf_dataset_id(cfg.hf_dataset)
+    config_name = (cfg.hf_config or "").strip() or inline_config
+    base_split = (cfg.hf_split or "train").strip() or "train"
+    sliced_split = f"{base_split}[:{limit}]"
+
+    try:
+        if config_name:
+            ds = load_dataset(repo, config_name, split=sliced_split)
+        else:
+            ds = load_dataset(repo, split=sliced_split)
+        return _collect_hf_rows(cfg, ds, limit=None)
+    except Exception as exc:  # noqa: BLE001
+        logger.info(
+            "HF capped load via split slice failed (%s); falling back to streaming",
+            exc,
+        )
+
+    ds = _open_hf_split(cfg, streaming=True)
+    return _collect_hf_rows(cfg, ds, limit=limit)
+
+
 def load_training_samples(
     dataset_cfg: dict[str, Any] | TrainingDatasetConfig,
     *,
     task_type: str,
+    for_preview: bool = False,
 ) -> tuple[list[str], list[int] | None]:
     cfg = (
         dataset_cfg
@@ -216,7 +266,10 @@ def load_training_samples(
         from app.training.lm_text_utils import prepare_causal_lm_texts
 
         before = len(texts)
-        texts = prepare_causal_lm_texts(texts, source=cfg.source)
+        prep_kwargs: dict[str, Any] = {"source": cfg.source}
+        if for_preview:
+            prep_kwargs["min_chunk_chars"] = 1
+        texts = prepare_causal_lm_texts(texts, **prep_kwargs)
         if len(texts) != before:
             labels = None
             logger.info(
