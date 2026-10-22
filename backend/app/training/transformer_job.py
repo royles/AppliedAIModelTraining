@@ -109,10 +109,28 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     model = _maybe_apply_lora(model, config)
 
-    from app.training.dataset_loader import load_training_samples
+    from app.training.dataset_sharding import load_dataset_shard_for_worker
 
     dataset_cfg = config.get("dataset") or {"source": "builtin", "builtin_name": "platform_demo"}
-    texts, label_list = load_training_samples(dataset_cfg, task_type=task)
+    try:
+        ctx = ray.train.get_context()
+        rank_for_data = ctx.get_world_rank()
+        world_for_data = ctx.get_world_size()
+    except Exception:  # noqa: BLE001
+        rank_for_data, world_for_data = 0, 1
+
+    if world_for_data > 1 and config.get("dataset_shards_prepared"):
+        texts, label_list = load_dataset_shard_for_worker(
+            artifact_dir=artifact_dir,
+            dataset_cfg=dataset_cfg,
+            task_type=task,
+            rank=rank_for_data,
+            world_size=world_for_data,
+        )
+    else:
+        from app.training.dataset_loader import load_training_samples
+
+        texts, label_list = load_training_samples(dataset_cfg, task_type=task)
     if task == "causal_lm":
         enc = tokenizer(
             texts,
@@ -534,6 +552,42 @@ def run_transformer_training(
     except RuntimeError as exc:
         _framework(framework_line("fail", str(exc)))
         raise
+
+    if num_workers > 1:
+        from app.training.dataset_sharding import prepare_dataset_shards_on_driver
+
+        dataset_cfg = train_config.get("dataset") or {
+            "source": "builtin",
+            "builtin_name": "platform_demo",
+        }
+        task_type = str(train_config.get("task_type") or "causal_lm")
+        artifact_dir = str(train_config.get("artifact_dir") or "")
+        train_config["dataset_shards_prepared"] = False
+        if artifact_dir:
+            try:
+                meta = prepare_dataset_shards_on_driver(
+                    artifact_dir=artifact_dir,
+                    dataset_cfg=dataset_cfg,
+                    task_type=task_type,
+                    world_size=num_workers,
+                )
+                train_config["dataset_shards_prepared"] = True
+                _framework(
+                    framework_line(
+                        "train",
+                        f"Dataset sharded on driver: {meta.get('total_examples')} examples → "
+                        f"{num_workers} worker shard(s) (one load, per-rank tokenization)",
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                _framework(
+                    framework_line(
+                        "warn",
+                        f"Driver dataset sharding failed ({exc}); workers will load full corpus each",
+                    )
+                )
+    else:
+        train_config["dataset_shards_prepared"] = False
 
     scaling = ScalingConfig(
         num_workers=num_workers,

@@ -61,5 +61,6 @@ For “many large GPU machines”, increase **worker engines** and keep **GPUs p
 | `launch_workers` fails | CPU/memory/GPU request exceeds profile maximum |
 | Training only on session | Low memory mode on; or `num_workers=0` / workers API unavailable |
 | OOM on large model | Raise **memory per engine** and/or reduce batch size in the task |
+| OOM with many workers | Corpus is loaded **once on the driver** and split across ranks; each worker tokenizes only its shard. Use **`dataset.max_samples`** and lower **max seq length** if token tensors still OOM |
 
 See also [CAI_RAY_NETWORKING.md](CAI_RAY_NETWORKING.md) and the README architecture section.
