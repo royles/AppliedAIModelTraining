@@ -602,16 +602,19 @@ body {
   margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.35rem;
   align-items: center;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: thin;
 }
 
 .model-task-wizard-stepper-item {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
-  min-width: 5rem;
+  flex: 0 0 auto;
+  min-width: 4.5rem;
 }
 
 .model-task-wizard-step {
@@ -649,7 +652,79 @@ body {
 }
 
 .model-task-wizard-step-card {
-  min-height: 12rem;
+  min-height: 0;
+}
+
+.model-task-wizard .model-task-wizard-step-card {
+  overflow: visible;
+}
+
+.wizard-step-compact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-3, 0.75rem);
+}
+
+.wizard-step-compact .architecture-form-grid {
+  margin: 0;
+}
+
+.wizard-step-footnote {
+  margin: 0;
+  font-size: var(--cdl-text-xs, 0.75rem);
+}
+
+.wizard-inline-fieldset {
+  margin: 0;
+  padding: var(--cdl-space-3, 0.75rem);
+  border: 1px solid var(--cdl-border-subtle, #243049);
+  border-radius: var(--cdl-radius-md, 8px);
+}
+
+.wizard-inline-fieldset legend {
+  padding: 0 0.35rem;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  font-weight: 600;
+}
+
+.dataset-fields-compact label {
+  margin-bottom: 0.35rem;
+}
+
+.dataset-fields-compact .arch-grid,
+.dataset-fields-compact .dataset-advanced-grid {
+  gap: 0.5rem;
+}
+
+.architecture-metrics-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  border: none;
+}
+
+.architecture-metrics-inline div {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.transformer-diagram-wrap-compact {
+  padding: var(--cdl-space-2, 0.5rem);
+  border: none;
+  background: transparent;
+}
+
+.transformer-diagram-wrap-compact .transformer-diagram-scroll {
+  overflow: hidden;
+}
+
+.transformer-diagram-wrap-compact .transformer-diagram {
+  min-width: 0;
+  max-height: 11rem;
+  width: 100%;
 }
 
 .model-task-wizard-step-header h3 {
@@ -657,10 +732,66 @@ body {
 }
 
 .model-task-wizard-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--cdl-space-3, 0.75rem);
+}
+
+.model-task-wizard-footer-actions {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 0 1rem;
+  flex-wrap: wrap;
+  gap: var(--cdl-space-3, 0.75rem);
+  align-items: center;
+}
+
+.wizard-step-validation {
+  margin: 0 0 var(--cdl-space-4, 1rem);
+  padding: var(--cdl-space-3, 0.75rem) var(--cdl-space-4, 1rem);
+  border: 1px solid #b45309;
+  border-radius: var(--cdl-radius-md, 8px);
+  background: rgba(180, 83, 9, 0.12);
+}
+
+.wizard-step-validation strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  color: #fcd34d;
+}
+
+.wizard-validation-problem {
+  margin: 0.35rem 0 0;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  color: var(--cdl-text-primary, #e8eef7);
+  line-height: 1.45;
+}
+
+.wizard-validation-fix {
+  margin: 0.5rem 0 0;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+.wizard-validation-fix-label {
+  font-weight: 600;
+  color: #86efac;
+}
+
+.wizard-footer-block-reason {
+  margin: 0;
+  padding: var(--cdl-space-3, 0.75rem) var(--cdl-space-4, 1rem);
+  border: 1px solid #854d0e;
+  border-radius: var(--cdl-radius-md, 8px);
+  background: rgba(180, 83, 9, 0.08);
+  max-width: 42rem;
+}
+
+.wizard-footer-block-reason strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #fde68a;
+  font-size: var(--cdl-text-sm, 0.8125rem);
 }
 
 .model-tasks-blueprint-layout {

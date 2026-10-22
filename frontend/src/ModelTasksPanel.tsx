@@ -13,8 +13,11 @@ import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
 import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
-import { ProjectJobsHierarchy } from "./ProjectJobsHierarchy";
 import { ValidatedNumberField } from "./ValidatedNumberField";
+import { DiagramWizardStep } from "./components/DiagramWizardStep";
+import { GeometryWizardStep } from "./components/GeometryWizardStep";
+import { PresetWizardStep } from "./components/PresetWizardStep";
+import { ProjectWizardStep } from "./components/ProjectWizardStep";
 import {
   buildModelTaskBlueprint,
   downloadBlueprintJson,
@@ -29,9 +32,9 @@ import {
   type BlueprintStep,
   wizardSettingsValid,
 } from "./trainingBlueprint";
+import { WizardValidationCallout } from "./components/WizardValidationCallout";
+import { wizardFirstBlockMessage, wizardStepBlockMessage } from "./wizardStepValidation";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
-import { ArchitectureStepFields } from "./components/ArchitectureStepFields";
-import { ModelTaskTrainingOptions } from "./components/ModelTaskTrainingOptions";
 import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
 import type { WorkerSizePreset } from "./workerSizePresets";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -349,7 +352,10 @@ export function ModelTasksPanel(props: Props) {
 
   const currentStep = MODEL_TASK_WIZARD_STEPS[currentStepIndex];
   const currentBlueprintStep = stepById.get(currentStep.id);
+  const canGoNext = currentBlueprintStep?.done ?? false;
+  const stepBlock = wizardStepBlockMessage(currentStep.id, blueprintContext);
   const ready = wizardSettingsValid(blueprintContext);
+  const startBlock = wizardFirstBlockMessage(blueprintContext);
   const isLastStep = currentStepIndex >= MODEL_TASK_WIZARD_STEPS.length - 1;
 
   const stepDescription = currentBlueprintStep?.description;
@@ -385,43 +391,17 @@ export function ModelTasksPanel(props: Props) {
     switch (stepId) {
       case "project":
         return (
-          <>
-            <ProjectJobsHierarchy
-              projects={projects}
-              jobs={jobs}
-              selectedProjectId={selectedProjectId}
-              onSelectedProjectIdChange={onSelectedProjectIdChange}
-              newProjectName={newProjectName}
-              onNewProjectNameChange={onNewProjectNameChange}
-              newProjectDescription={newProjectDescription}
-              onNewProjectDescriptionChange={onNewProjectDescriptionChange}
-              onCreateProject={onCreateProject}
-              onUpdateProject={onUpdateProject}
-              onDeleteProject={onDeleteProject}
-              onUpdateJobName={onUpdateJobName}
-              onRequestDeleteJob={onRequestDeleteJob}
-              onRunJob={onRunJob}
-              onStopJob={onStopJob}
-              projectBusy={projectBusy}
-              jobBusy={jobBusy}
-              onInvalidateBlueprint={() => {}}
-              taskDefinitions={projectTasks}
-              taskVersions={taskVersions}
-              selectedTaskId={selectedTaskId}
-              onSelectedTaskIdChange={setSelectedTaskId}
-              onApplyTaskVersion={(spec) => {
-                onApplyBlueprint(parseModelTaskBlueprintFile(spec));
-                setBlueprintMessage("Loaded task version into wizard");
-              }}
-            />
-            {selectedProjectId != null && (
-              <PlatformSettingsPanel
-                projectId={selectedProjectId}
-                title="Project Ray configuration"
-                onSaved={onProjectRaySettingsSaved}
-              />
-            )}
-          </>
+          <ProjectWizardStep
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onSelectedProjectIdChange={onSelectedProjectIdChange}
+            newProjectName={newProjectName}
+            onNewProjectNameChange={onNewProjectNameChange}
+            newProjectDescription={newProjectDescription}
+            onNewProjectDescriptionChange={onNewProjectDescriptionChange}
+            onCreateProject={onCreateProject}
+            projectBusy={projectBusy}
+          />
         );
       case "mode":
         return (
@@ -438,39 +418,9 @@ export function ModelTasksPanel(props: Props) {
             layers={layers}
           />
         );
-      case "dataset":
+      case "preset":
         return (
-          <>
-            <ModelTaskTrainingOptions
-              section="prompt"
-              taskType={taskType}
-              onTaskTypeChange={onTaskTypeChange}
-              promptFormat={promptFormat}
-              onPromptFormatChange={onPromptFormatChange}
-            />
-            <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
-          </>
-        );
-      case "tokenizer":
-        return (
-          <>
-            <FromScratchConfigFields
-              section="tokenizer"
-              initMode={initMode}
-              onInitModeChange={onInitModeChange}
-              tokenizer={tokenizer}
-              onTokenizerChange={onTokenizerChange}
-              vocabSize={vocabSize}
-              onVocabSizeChange={onVocabSizeChange}
-              maxSteps={maxSteps}
-              hiddenSize={hiddenSize}
-              layers={layers}
-            />
-          </>
-        );
-      case "architecture":
-        return (
-          <ArchitectureStepFields
+          <PresetWizardStep
             presets={presets}
             preset={preset}
             onPresetChange={onPresetChange}
@@ -479,46 +429,110 @@ export function ModelTasksPanel(props: Props) {
             onTaskTypeChange={onTaskTypeChange}
             promptFormat={promptFormat}
             onPromptFormatChange={onPromptFormatChange}
+          />
+        );
+      case "dataset":
+        return <DatasetConfigFields value={dataset} onChange={onDatasetChange} compact />;
+      case "tokenizer":
+        return (
+          <FromScratchConfigFields
+            section="tokenizer"
             initMode={initMode}
-            archFamily={archFamily}
+            onInitModeChange={onInitModeChange}
+            tokenizer={tokenizer}
+            onTokenizerChange={onTokenizerChange}
+            vocabSize={vocabSize}
+            onVocabSizeChange={onVocabSizeChange}
+            maxSteps={maxSteps}
+            hiddenSize={hiddenSize}
+            layers={layers}
+          />
+        );
+      case "geometry":
+        return (
+          <GeometryWizardStep
+            initMode={initMode}
             hiddenSize={hiddenSize}
             layers={layers}
             heads={heads}
             maxPosition={maxPosition}
             vocabSize={vocabSize}
             intermediateSize={intermediateSize}
-            tieWordEmbeddings={tieWordEmbeddings}
             paramEstimate={paramEstimate}
-            baseModel={baseModel}
-            useLora={useLora}
             onHiddenSizeChange={onHiddenSizeChange}
             onLayersChange={onLayersChange}
             onHeadsChange={onHeadsChange}
             onMaxPositionChange={onMaxPositionChange}
           />
         );
+      case "diagram":
+        return (
+          <DiagramWizardStep
+            presetTitle={selectedPreset?.title}
+            family={archFamily}
+            initMode={initMode}
+            taskType={taskType}
+            baseModel={baseModel}
+            useLora={useLora}
+            hiddenSize={hiddenSize}
+            layers={layers}
+            heads={heads}
+            vocabSize={vocabSize}
+            maxPosition={maxPosition}
+            intermediateSize={intermediateSize}
+            tieWordEmbeddings={tieWordEmbeddings}
+            paramEstimate={paramEstimate}
+          />
+        );
       case "training":
         return (
-          <label>
-            Training steps (max_steps)
-            <ValidatedNumberField value={maxSteps} min={10} max={500_000} onChange={onMaxStepsChange} />
-          </label>
+          <div className="wizard-step-compact">
+            <label className="architecture-field">
+              <span className="architecture-field-label">Training steps (max_steps)</span>
+              <ValidatedNumberField value={maxSteps} min={10} max={500_000} onChange={onMaxStepsChange} />
+            </label>
+            <p className="hint wizard-step-footnote">
+              Gradient-step budget for the Ray Train loop (smoke tests often use 40–500 steps).
+            </p>
+          </div>
         );
-      case "compute":
+      case "ray":
+        return selectedProjectId != null ? (
+          <PlatformSettingsPanel
+            projectId={selectedProjectId}
+            title="Project Ray configuration"
+            onSaved={onProjectRaySettingsSaved}
+          />
+        ) : (
+          <p className="hint wizard-step-footnote">Select a project on step 1 to edit Ray defaults.</p>
+        );
+      case "workers":
         return (
-          <>
+          <div className="wizard-step-compact">
             <WorkerSizePresetBar
               selectedPresetId={workerPresetId}
               disabled={startBusy}
               onApply={applyWorkerPreset}
             />
-            <div className="arch-grid">
-              <label>
-                Ray / CDSW worker engines (nodes)
+            <div className="architecture-form-grid architecture-form-grid-2">
+              <label className="architecture-field">
+                <span className="architecture-field-label">Worker engines</span>
                 <ValidatedNumberField value={jobWorkers} min={1} max={32} onChange={onJobWorkersChange} />
               </label>
-              <label>
-                CPUs per engine
+              <label className="architecture-field">
+                <span className="architecture-field-label">GPUs per engine</span>
+                <ValidatedNumberField
+                  value={jobGpus}
+                  min={1}
+                  max={8}
+                  onChange={(n) => {
+                    setWorkerPresetId(null);
+                    onJobGpusChange(n);
+                  }}
+                />
+              </label>
+              <label className="architecture-field">
+                <span className="architecture-field-label">CPUs per engine</span>
                 <ValidatedNumberField
                   value={jobWorkerCpu}
                   min={0.5}
@@ -530,8 +544,8 @@ export function ModelTasksPanel(props: Props) {
                   }}
                 />
               </label>
-              <label>
-                Memory per engine (GiB)
+              <label className="architecture-field">
+                <span className="architecture-field-label">Memory (GiB)</span>
                 <ValidatedNumberField
                   value={jobWorkerMemoryGb}
                   min={8}
@@ -542,38 +556,21 @@ export function ModelTasksPanel(props: Props) {
                   }}
                 />
               </label>
-              <label>
-                GPUs per engine
-                <ValidatedNumberField
-                  value={jobGpus}
-                  min={1}
-                  max={8}
-                  onChange={(n) => {
-                    setWorkerPresetId(null);
-                    onJobGpusChange(n);
-                  }}
-                />
-              </label>
             </div>
-            <p className="hint">
-              Set <strong>CML resource profile / accelerator IDs</strong> under Framework Configuration so
-              each engine lands on GPU-capable hardware. Turn off low-memory mode there for distributed
-              GPU training.
-            </p>
-          </>
+          </div>
         );
       case "register":
         return (
-          <>
-            <label>
-              OpenAI model id
-              <input value={openaiModelId} onChange={(e) => onOpenaiModelIdChange(e.target.value)} />
-            </label>
-            <label>
-              Job name
+          <div className="wizard-step-compact architecture-form-grid architecture-form-grid-2">
+            <label className="architecture-field">
+              <span className="architecture-field-label">Job name</span>
               <input value={jobName} onChange={(e) => onJobNameChange(e.target.value)} />
             </label>
-          </>
+            <label className="architecture-field">
+              <span className="architecture-field-label">OpenAI model id</span>
+              <input value={openaiModelId} onChange={(e) => onOpenaiModelIdChange(e.target.value)} />
+            </label>
+          </div>
         );
       default:
         return null;
@@ -685,46 +682,64 @@ export function ModelTasksPanel(props: Props) {
         onSelectIndex={setCurrentStepIndex}
       />
 
-      <DatasetConfigNotice dataset={dataset} />
+      {currentStep.id === "dataset" && <DatasetConfigNotice dataset={dataset} />}
 
       <div className="model-task-wizard-body">
         <WizardStepCard
           title={currentStep.title}
           description={stepDescription}
         >
-          {currentBlueprintStep && !currentBlueprintStep.done && currentBlueprintStep.requirement && (
-            <p className="hint">{currentBlueprintStep.requirement}</p>
-          )}
+          {stepBlock && <WizardValidationCallout block={stepBlock} />}
           {renderStepBody(currentStep.id)}
         </WizardStepCard>
 
         <footer className="model-task-wizard-footer">
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={currentStepIndex === 0}
-            onClick={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
-          >
-            Back
-          </button>
-          {!isLastStep ? (
+          <div className="model-task-wizard-footer-actions">
             <button
               type="button"
-              onClick={() => setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))}
+              className="btn-secondary"
+              disabled={currentStepIndex === 0}
+              onClick={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
             >
-              Next
+              Back
             </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!ready || startBusy}
-              onClick={() => void onCreateJob(blueprintFile)}
-            >
-              {startBusy ? "Starting…" : "Start job"}
-            </button>
+            {!isLastStep ? (
+              <button
+                type="button"
+                disabled={!canGoNext}
+                aria-describedby={!canGoNext && stepBlock ? "wizard-next-block-reason" : undefined}
+                onClick={() =>
+                  setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))
+                }
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!ready || startBusy}
+                aria-describedby={!ready && startBlock ? "wizard-start-block-reason" : undefined}
+                onClick={() => void onCreateJob(blueprintFile)}
+              >
+                {startBusy ? "Starting…" : "Start job"}
+              </button>
+            )}
+          </div>
+          {!isLastStep && !canGoNext && stepBlock && (
+            <WizardValidationCallout
+              id="wizard-next-block-reason"
+              variant="footer"
+              title="Next is disabled"
+              block={stepBlock}
+            />
           )}
-          {isLastStep && !ready && (
-            <p className="hint">Fill required fields on earlier steps to enable Start job.</p>
+          {isLastStep && !ready && startBlock && (
+            <WizardValidationCallout
+              id="wizard-start-block-reason"
+              variant="footer"
+              title="Start job is disabled"
+              block={startBlock}
+            />
           )}
         </footer>
       </div>

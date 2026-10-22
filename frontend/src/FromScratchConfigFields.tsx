@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, type TokenizerBuildConfig } from "./api";
+import type { TokenizerBuildConfig } from "./api";
+import { recommendedMinCorpusChars } from "./localFromScratchHints";
 import { ValidatedNumberField } from "./ValidatedNumberField";
 
 type Props = {
@@ -27,36 +27,6 @@ export function FromScratchConfigFields({
   hiddenSize,
   layers,
 }: Props) {
-  const [guidance, setGuidance] = useState<Record<string, unknown> | null>(null);
-
-  useEffect(() => {
-    if (initMode !== "from_scratch") {
-      setGuidance(null);
-      return;
-    }
-    api
-      .fromScratchGuidance({
-        init_mode: "from_scratch",
-        task_type: "causal_lm",
-        architecture: {
-          family: "gpt2",
-          vocab_size: vocabSize,
-          hidden_size: hiddenSize,
-          num_hidden_layers: layers,
-          num_attention_heads: 4,
-          max_position_embeddings: 512,
-          tie_word_embeddings: true,
-        },
-        tokenizer,
-        max_steps: maxSteps,
-        max_seq_length: 256,
-        per_device_train_batch_size: 2,
-        learning_rate: 6e-4,
-      })
-      .then(setGuidance)
-      .catch(() => setGuidance(null));
-  }, [initMode, tokenizer, vocabSize, maxSteps, hiddenSize, layers]);
-
   function patchTokenizer(partial: Partial<TokenizerBuildConfig>) {
     const next = { ...tokenizer, ...partial };
     onTokenizerChange(next);
@@ -70,6 +40,9 @@ export function FromScratchConfigFields({
 
   const wrapper = section === "all" ? "article" : "div";
   const Wrapper = wrapper as "article" | "div";
+
+  const tokVocab = tokenizer.vocab_size ?? vocabSize;
+  const minCorpus = recommendedMinCorpusChars(tokVocab);
 
   return (
     <Wrapper className={section === "all" ? "card" : "blueprint-section-fields"}>
@@ -100,8 +73,9 @@ export function FromScratchConfigFields({
       {showTokenizer && initMode === "from_scratch" && (
         <>
           <p className="hint">
-            True from-scratch builds train a <strong>BPE tokenizer on your dataset</strong> and
-            randomly initialize the transformer to match that vocabulary.
+            True from-scratch builds train a <strong>BPE tokenizer on your dataset</strong> when the
+            job runs. Corpus size is checked at run time (rough guide: ≥{minCorpus.toLocaleString()}{" "}
+            characters for this vocab).
           </p>
           <label>
             Tokenizer
@@ -146,25 +120,12 @@ export function FromScratchConfigFields({
               </label>
             </div>
           )}
-          {guidance && (
-            <div className="guidance-box">
-              <p className="hint">
-                Min corpus size:{" "}
-                <strong>
-                  {(guidance.min_corpus_characters as number)?.toLocaleString()} characters
-                </strong>
-                · Est. parameters:{" "}
-                <strong>
-                  {(guidance.estimated_parameters as number)?.toLocaleString()}
-                </strong>
-              </p>
-              <ul className="guidance-notes">
-                {(guidance.notes as string[])?.map((n) => (
-                  <li key={n}>{n}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="guidance-box">
+            <p className="hint">
+              Geometry snapshot: d={hiddenSize}, L={layers}, max_steps={maxSteps.toLocaleString()}
+              (parameter estimate updates on the Architecture step when available).
+            </p>
+          </div>
         </>
       )}
 

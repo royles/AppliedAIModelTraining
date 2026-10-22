@@ -5,9 +5,10 @@ import { ValidatedNumberField } from "./ValidatedNumberField";
 type Props = {
   value: TrainingDatasetConfig;
   onChange: (next: TrainingDatasetConfig) => void;
+  compact?: boolean;
 };
 
-export function DatasetConfigFields({ value, onChange }: Props) {
+export function DatasetConfigFields({ value, onChange, compact = false }: Props) {
   const [files, setFiles] = useState<{ path: string; kind: string }[]>([]);
 
   useEffect(() => {
@@ -18,13 +19,16 @@ export function DatasetConfigFields({ value, onChange }: Props) {
     onChange({ ...value, ...partial });
   }
 
+  const Wrapper = compact ? "div" : "article";
   return (
-    <article className="card">
-      <h3>Training dataset</h3>
-      <p className="hint">
-        Corpus for Ray Train: project files, Hugging Face, Iceberg tables, or Parquet on S3
-        (<code>s3://bucket/prefix/</code>). Session needs S3/Iceberg credentials via env or CAI mounts.
-      </p>
+    <Wrapper className={compact ? "wizard-step-compact dataset-fields-compact" : "card"}>
+      {!compact && <h3>Training dataset</h3>}
+      {!compact && (
+        <p className="hint">
+          Corpus for Ray Train: project files, Hugging Face, Iceberg tables, or Parquet on S3
+          (<code>s3://bucket/prefix/</code>). Session needs S3/Iceberg credentials via env or CAI mounts.
+        </p>
+      )}
       <label>
         Source
         <select
@@ -59,7 +63,7 @@ export function DatasetConfigFields({ value, onChange }: Props) {
         <label>
           Training texts (one example per blank line)
           <textarea
-            rows={8}
+            rows={compact ? 3 : 8}
             value={(value.texts ?? []).join("\n\n")}
             onChange={(e) => {
               const texts = e.target.value
@@ -273,6 +277,6 @@ export function DatasetConfigFields({ value, onChange }: Props) {
           />
         </label>
       </div>
-    </article>
+    </Wrapper>
   );
 }

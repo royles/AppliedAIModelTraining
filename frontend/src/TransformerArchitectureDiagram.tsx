@@ -17,6 +17,7 @@ type Props = {
   intermediateSize: number;
   tieWordEmbeddings: boolean;
   paramEstimate: number | null;
+  compact?: boolean;
 };
 
 function familyLabel(family: ArchFamily, taskType: TaskType): string {
@@ -41,6 +42,7 @@ export function TransformerArchitectureDiagram({
   intermediateSize,
   tieWordEmbeddings,
   paramEstimate,
+  compact = false,
 }: Props) {
   const headDim =
     heads > 0 && hiddenSize % heads === 0 ? hiddenSize / heads : null;
@@ -57,11 +59,13 @@ export function TransformerArchitectureDiagram({
   }${useLora ? " · LoRA" : ""}`;
 
   return (
-    <div className="transformer-diagram-wrap">
-      <p className="hint diagram-caption">
-        {presetTitle ? `${presetTitle} · ` : ""}
-        {archSummary}. Edit values in the geometry section below.
-      </p>
+    <div className={`transformer-diagram-wrap${compact ? " transformer-diagram-wrap-compact" : ""}`}>
+      {!compact && (
+        <p className="hint diagram-caption">
+          {presetTitle ? `${presetTitle} · ` : ""}
+          {archSummary}. Edit values on the Geometry step.
+        </p>
+      )}
       <div className="transformer-diagram-scroll">
         <svg
           className="transformer-diagram"
@@ -231,12 +235,12 @@ export function TransformerArchitectureDiagram({
           )}
         </svg>
       </div>
-      {paramEstimate !== null && fromScratch && (
+      {!compact && paramEstimate !== null && fromScratch && (
         <p className="hint diagram-params">
           ~{paramEstimate.toLocaleString()} trainable parameters (estimate)
         </p>
       )}
-      {!fromScratch && (
+      {!compact && !fromScratch && (
         <p className="hint diagram-params">
           Geometry follows the selected preset checkpoint; fine-tune updates weights (full or LoRA).
         </p>

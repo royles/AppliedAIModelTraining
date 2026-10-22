@@ -1,5 +1,5 @@
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
-import { datasetConfigLooksComplete } from "./datasetValidation";
+import { validateDatasetConfig } from "./datasetValidation";
 
 export type BlueprintContext = {
   initMode: "from_scratch" | "pretrained";
@@ -32,16 +32,13 @@ export type BlueprintStep = {
 const OPENAI_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 
 function datasetStepDone(ctx: BlueprintContext): boolean {
-  const configured = datasetConfigLooksComplete(ctx.dataset);
+  if (!validateDatasetConfig(ctx.dataset).valid) {
+    return false;
+  }
   if (ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset") {
-    if (ctx.dataset.source === "builtin") return false;
-    return configured;
+    return ctx.dataset.source !== "builtin";
   }
-  if (ctx.dataset.source === "inline") {
-    return (ctx.dataset.texts?.length ?? 0) > 0;
-  }
-  if (ctx.dataset.source === "builtin") return true;
-  return configured;
+  return true;
 }
 
 function tokenizerStepDone(ctx: BlueprintContext): boolean {
@@ -56,11 +53,11 @@ function tokenizerStepDone(ctx: BlueprintContext): boolean {
     tokVocab <= 256_000 &&
     (ctx.tokenizer.min_frequency ?? 2) >= 1 &&
     ctx.dataset.source !== "builtin" &&
-    datasetConfigLooksComplete(ctx.dataset)
+    validateDatasetConfig(ctx.dataset).valid
   );
 }
 
-function architectureStepDone(ctx: BlueprintContext): boolean {
+function geometryStepDone(ctx: BlueprintContext): boolean {
   return (
     ctx.hiddenSize > 0 &&
     ctx.layers > 0 &&
@@ -69,106 +66,112 @@ function architectureStepDone(ctx: BlueprintContext): boolean {
   );
 }
 
+function workersStepDone(ctx: BlueprintContext): boolean {
+  return ctx.jobWorkers >= 1 && ctx.jobWorkers <= 32 && ctx.jobGpus >= 1;
+}
+
 export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
   const steps: Omit<BlueprintStep, "waitingOn">[] = [
     {
       id: "project",
-      title: "Project & jobs",
-      description:
-        "Projects are collections of models. Each job under a project runs training and can produce a registered model. " +
-        "Pick the active project here, then configure the blueprint below and start a new job—or re-run an existing job to train again.",
+      title: "Project",
+      description: "Choose which project owns this training job.",
       dependsOn: [],
-      requirement: "Select a project for this job (create one if empty).",
-      volumetrics: "One project record in the platform database.",
+      requirement: "Select or create a project.",
+      volumetrics: "One project record.",
       done: ctx.selectedProjectId !== null,
     },
     {
       id: "mode",
       title: "Training mode",
-      description:
-        "Choose whether to train from random weights or fine-tune a Hugging Face checkpoint. " +
-        "From scratch needs a corpus-fit tokenizer; fine-tuning reuses preset weights and is usually faster to useful quality.",
-      dependsOn: [],
+      description: "Pretrain (random init) or fine-tune a Hugging Face checkpoint.",
+      dependsOn: ["project"],
       requirement:
         ctx.initMode === "from_scratch"
-          ? "Full from scratch: random weights + corpus-fit tokenizer."
-          : "Fine-tune: load a pretrained Hugging Face checkpoint from the preset.",
-      volumetrics:
-        ctx.initMode === "from_scratch"
-          ? "No base checkpoint weights loaded."
-          : "Preset supplies base_model (e.g. distilgpt2, gpt2).",
+          ? "Random init; BPE fits on corpus at job run."
+          : "Load weights from the preset checkpoint.",
+      volumetrics: ctx.initMode,
+      done: true,
+    },
+    {
+      id: "preset",
+      title: "Model & task",
+      description: "Model scale template, objective (causal LM for GPT-style), and prompt layout.",
+      dependsOn: ["mode"],
+      requirement: "Preset and task type selected.",
+      volumetrics: "Preset template",
       done: true,
     },
     {
       id: "dataset",
-      title: "Training dataset",
-      description:
-        "Point training at inline text, files under data/datasets, Hugging Face, Iceberg tables, " +
-        "or Parquet on S3. Corpus loading and size checks run when the job starts.",
-      dependsOn: ["mode"],
-      requirement:
-        ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset"
-          ? "Non-demo source with required fields filled in (HF id, file path, etc.)."
-          : "Required fields filled in for the chosen source.",
-      volumetrics: `${ctx.dataset.source} · validated at job run`,
+      title: "Dataset",
+      description: "Raw corpus — sharding and tokenization run when the job starts.",
+      dependsOn: ["preset"],
+      requirement: "Required fields valid for the chosen source.",
+      volumetrics: ctx.dataset.source,
       done: datasetStepDone(ctx),
     },
     {
       id: "tokenizer",
-      title: "Tokenizer & vocabulary",
-      description:
-        "The tokenizer maps text to token ids your model will use. " +
-        "BPE is trained on your corpus when the job runs.",
+      title: "Tokenizer",
+      description: "Byte-pair vocabulary: train on corpus (scratch) or reuse checkpoint tokenizer.",
       dependsOn: ["dataset"],
-      requirement:
-        ctx.tokenizer.mode === "train_bpe_from_dataset"
-          ? "BPE options set; target vocab in 256–256k."
-          : "GPT-2 BPE vocabulary (50,257) or saved artifact.",
-      volumetrics: `vocab_size ${(ctx.tokenizer.vocab_size ?? ctx.vocabSize).toLocaleString()} · min_frequency ${ctx.tokenizer.min_frequency ?? 2}`,
+      requirement: "Vocab and BPE settings in range.",
+      volumetrics: `vocab ${(ctx.tokenizer.vocab_size ?? ctx.vocabSize).toLocaleString()}`,
       done: tokenizerStepDone(ctx),
     },
     {
-      id: "architecture",
-      title: "Transformer geometry",
-      description:
-        "Set hidden size, layer count, and attention heads (hidden size must divide evenly by heads). " +
-        "Presets provide starting points; the diagram summarizes capacity and parameter count.",
+      id: "geometry",
+      title: "Geometry",
+      description: "Width, depth, heads, and context length (defaults come from the preset).",
       dependsOn: ["tokenizer"],
       requirement: "hidden_size divisible by num_attention_heads.",
-      volumetrics: `d=${ctx.hiddenSize} · L=${ctx.layers} · H=${ctx.heads} · ~${
-        ctx.paramEstimate?.toLocaleString() ?? "?"
-      } params`,
-      done: architectureStepDone(ctx),
+      volumetrics: `d=${ctx.hiddenSize}`,
+      done: geometryStepDone(ctx),
+    },
+    {
+      id: "diagram",
+      title: "Architecture diagram",
+      description: "Review the decoder stack before scheduling training steps.",
+      dependsOn: ["geometry"],
+      requirement: "Review the block diagram.",
+      volumetrics: `L=${ctx.layers} · H=${ctx.heads}`,
+      done: true,
     },
     {
       id: "training",
-      title: "Optimization schedule",
-      description:
-        "max_steps caps how many optimizer updates Ray Train will run. " +
-        "Short runs are fine for plumbing checks; meaningful from-scratch models usually need thousands of steps or more.",
-      dependsOn: ["architecture"],
+      title: "Schedule",
+      description: "Optimization budget in gradient steps (max_steps).",
+      dependsOn: ["diagram"],
       requirement: "max_steps between 10 and 500,000.",
-      volumetrics: `max_steps ${ctx.maxSteps.toLocaleString()}`,
+      volumetrics: String(ctx.maxSteps),
       done: ctx.maxSteps >= 10 && ctx.maxSteps <= 500_000,
     },
     {
-      id: "compute",
-      title: "Ray / CDSW compute",
-      description:
-        "Workers and GPUs per worker control distributed Ray Train and optional Cloudera AI engines.",
+      id: "ray",
+      title: "Ray defaults",
+      description: "Optional per-project Ray settings used by distributed training.",
       dependsOn: ["training"],
-      requirement: "1–32 workers; GPUs per worker ≥ 1.",
-      volumetrics: `${ctx.jobWorkers} worker(s) · ${ctx.jobGpus} GPU/worker`,
-      done: ctx.jobWorkers >= 1 && ctx.jobWorkers <= 32 && ctx.jobGpus >= 1,
+      requirement: "Optional — adjust or leave defaults.",
+      volumetrics: "Saved on project",
+      done: true,
+    },
+    {
+      id: "workers",
+      title: "Workers & GPUs",
+      description: "Ray Train worker count and GPUs per engine for this run.",
+      dependsOn: ["ray"],
+      requirement: "1–32 workers; ≥1 GPU per worker.",
+      volumetrics: `${ctx.jobWorkers}×${ctx.jobGpus} GPU`,
+      done: workersStepDone(ctx),
     },
     {
       id: "register",
-      title: "Job metadata & /v1 id",
-      description:
-        "Name the job and set the OpenAI-compatible model id used when this run registers in the registry.",
-      dependsOn: ["compute"],
-      requirement: "Job name and OpenAI-compatible model id for registration after success.",
-      volumetrics: "model id 1–64 chars: letters, digits, . _ -",
+      title: "Register",
+      description: "Job name and OpenAI-compatible model id.",
+      dependsOn: ["workers"],
+      requirement: "Valid job name and model id.",
+      volumetrics: ctx.openaiModelId || "—",
       done: ctx.jobName.trim().length > 0 && OPENAI_ID.test(ctx.openaiModelId.trim()),
     },
   ];
@@ -181,7 +184,6 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
   });
 }
 
-/** Local field checks only — no dataset download or preview. */
 export function wizardSettingsValid(ctx: BlueprintContext): boolean {
   return buildTrainingBlueprint(ctx).every((s) => s.done);
 }
