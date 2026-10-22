@@ -189,8 +189,8 @@ export function TransformerNetworkDiagram(props: TransformerNetworkDiagramProps)
         >
           <defs>
             <linearGradient id={`${uid}-bg`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#0b1220" />
-              <stop offset="100%" stopColor="#111827" />
+              <stop offset="0%" stopColor="#0f172a" />
+              <stop offset="100%" stopColor="#1e293b" />
             </linearGradient>
             <linearGradient id={`${uid}-flow`} x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.15" />
@@ -294,11 +294,11 @@ export function TransformerNetworkDiagram(props: TransformerNetworkDiagramProps)
                   rx="6"
                   className={isHero ? "tn-layer tn-layer-active" : "tn-layer"}
                 />
-                <text x="10" y="18" className="tn-sublabel">
+                <text x="10" y="17" className="tn-sublabel">
                   Layer {layerIdx}
                 </text>
-                <text x="10" y="24" className="tn-mini-flow">
-                  {isCausal ? "MHA→FFN" : "MHA→FFN"}
+                <text x="10" y="26" className="tn-mini-flow">
+                  MHA → FFN
                 </text>
                 {isHero && (
                   <text x="130" y="18" textAnchor="end" className="tn-hero-tag">
@@ -457,7 +457,7 @@ export function TransformerNetworkDiagram(props: TransformerNetworkDiagramProps)
 
           {/* Width annotation */}
           <rect x={pad} y={H - pad - 28} width={W - pad * 2} height="20" rx="4" fill={`url(#${uid}-flow)`} />
-          <text x={W / 2} y={H - pad - 14} textAnchor="middle" className="tn-mono">
+          <text x={W / 2} y={H - pad - 14} textAnchor="middle" className="tn-footer-note">
             Hidden width d={hiddenSize} flows through every block · {layers}×(attn + FFN) · ~
             {formatCompactCount(breakdown.allLayers)} params in blocks
           </text>

@@ -2306,6 +2306,294 @@ button.btn-danger:hover:not(:disabled) {
   gap: var(--cdl-space-3, 0.75rem);
 }
 
+/* —— Network layout diagram (Architecture wizard) —— */
+.transformer-network-viz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-3, 0.75rem);
+}
+
+.transformer-network-viz-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--cdl-space-3, 0.75rem);
+  align-items: flex-start;
+}
+
+.transformer-network-viz-title {
+  margin: 0;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  font-weight: 600;
+  color: var(--cdl-text-primary, #1a1a1a);
+}
+
+.transformer-network-viz-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin: 0;
+  font-size: var(--cdl-text-xs, 0.75rem);
+}
+
+.transformer-network-viz-stats div {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.transformer-network-viz-stats dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--cdl-text-muted, #6b7280);
+}
+
+.transformer-network-viz-stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--cdl-text-primary, #1a1a1a);
+}
+
+.transformer-network-viz-embedded-lead {
+  margin: 0 0 0.35rem;
+}
+
+.transformer-network-viz-canvas {
+  border: 1px solid var(--cdl-border-subtle, #243049);
+  border-radius: var(--cdl-radius-md, 10px);
+  overflow: hidden;
+  background: #0b1220;
+}
+
+.transformer-network-viz-embedded .transformer-network-viz-canvas {
+  max-height: min(420px, 55vh);
+  overflow: auto;
+}
+
+.transformer-network-viz-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 640px;
+}
+
+.transformer-network-viz-svg .tn-label {
+  fill: #f1f5f9;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.transformer-network-viz-svg .tn-section {
+  fill: #93c5fd;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.transformer-network-viz-svg .tn-sublabel {
+  fill: #e2e8f0;
+  font-size: 10px;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.transformer-network-viz-svg .tn-mono {
+  fill: #cbd5e1;
+  font-size: 9px;
+  font-family: var(--cdl-font-mono, ui-monospace, monospace);
+}
+
+.transformer-network-viz-svg .tn-mini-flow {
+  fill: #94a3b8;
+  font-size: 8px;
+  font-family: var(--cdl-font-sans, system-ui, sans-serif);
+}
+
+.transformer-network-viz-svg .tn-ellipsis {
+  fill: #64748b;
+  font-size: 16px;
+}
+
+.transformer-network-viz-svg .tn-hero-tag {
+  fill: #7dd3fc;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.transformer-network-viz-svg .tn-residual-label {
+  fill: #ffedd5;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.transformer-network-viz-svg .tn-lora {
+  fill: #fde68a;
+  font-size: 9px;
+}
+
+.transformer-network-viz-svg .tn-add-text {
+  fill: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--cdl-font-sans, system-ui, sans-serif);
+}
+
+.transformer-network-viz-svg .tn-node {
+  fill: #152238;
+  stroke: #3b82f6;
+  stroke-width: 1.5;
+}
+
+.transformer-network-viz-svg .tn-node-muted {
+  fill: #121c30;
+  stroke: #64748b;
+  stroke-width: 1.25;
+}
+
+.transformer-network-viz-svg .tn-node-out {
+  fill: #152238;
+  stroke: #a78bfa;
+  stroke-width: 1.5;
+}
+
+.transformer-network-viz-svg .tn-layer {
+  fill: #132038;
+  stroke: #475569;
+  stroke-width: 1;
+}
+
+.transformer-network-viz-svg .tn-layer-active {
+  fill: #1a2844;
+  stroke: #38bdf8;
+  stroke-width: 2;
+}
+
+.transformer-network-viz-svg .tn-hero-frame {
+  fill: #0f1729;
+  stroke: #60a5fa;
+  stroke-width: 1.5;
+}
+
+.transformer-network-viz-svg .tn-submod {
+  fill: #1e293b;
+  stroke: #64748b;
+  stroke-width: 1;
+}
+
+.transformer-network-viz-svg .tn-submod-attn {
+  fill: #1a2332;
+  stroke: #818cf8;
+  stroke-width: 1.25;
+}
+
+.transformer-network-viz-svg .tn-submod-ffn {
+  fill: #1a2332;
+  stroke: #34d399;
+  stroke-width: 1.25;
+}
+
+.transformer-network-viz-svg .tn-head {
+  fill: #1e3a5f;
+  stroke: #38bdf8;
+  stroke-width: 0.75;
+}
+
+.transformer-network-viz-svg .tn-causal-mask {
+  fill: #0ea5e9;
+  stroke: none;
+}
+
+.transformer-network-viz-svg .tn-ffn-bar {
+  fill: #134e4a;
+  stroke: #2dd4bf;
+  stroke-width: 1;
+}
+
+.transformer-network-viz-svg .tn-ffn-expand {
+  fill: #164e63;
+  stroke: #22d3ee;
+  stroke-width: 1;
+}
+
+.transformer-network-viz-svg .tn-embed-col {
+  fill: #6366f1;
+  stroke: #818cf8;
+  stroke-width: 0.25;
+}
+
+.transformer-network-viz-svg .tn-mini-bar {
+  fill: #334155;
+  stroke: #475569;
+  stroke-width: 0.5;
+}
+
+.transformer-network-viz-svg .tn-add {
+  fill: #ea580c;
+  stroke: #fdba74;
+  stroke-width: 1;
+}
+
+.transformer-network-viz-svg .tn-arrow {
+  stroke: #67e8f9;
+  stroke-width: 2;
+  fill: none;
+}
+
+.transformer-network-viz-svg .tn-arrow-thin {
+  stroke: #94a3b8;
+  stroke-width: 1.25;
+  fill: none;
+}
+
+.transformer-network-viz-svg .tn-footer-note {
+  fill: #f8fafc;
+  font-size: 9px;
+  font-weight: 500;
+  font-family: var(--cdl-font-mono, ui-monospace, monospace);
+}
+
+.transformer-network-viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+  font-size: var(--cdl-text-xs, 0.75rem);
+}
+
+.transformer-network-viz-legend div {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.transformer-network-viz-legend dt {
+  font-weight: 600;
+  color: var(--cdl-text-muted, #6b7280);
+}
+
+.transformer-network-viz-legend dd {
+  margin: 0;
+  color: var(--cdl-text-primary, #1a1a1a);
+}
+
+.architecture-geometry-blend {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: var(--cdl-space-4, 1rem);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .architecture-geometry-blend {
+    grid-template-columns: 1fr;
+  }
+}
+
+.architecture-geometry-blend-fields,
+.architecture-geometry-blend-viz {
+  min-width: 0;
+}
+
 .transformer-diagram-wrap {
   margin: 0;
   padding: var(--cdl-space-4, 1rem);
