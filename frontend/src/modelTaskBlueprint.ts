@@ -1,4 +1,9 @@
-import type { TrainingDatasetConfig, TokenizerBuildConfig, TransformerConfig } from "./api";
+import type {
+  PromptFormatSetting,
+  TrainingDatasetConfig,
+  TokenizerBuildConfig,
+  TransformerConfig,
+} from "./api";
 
 export const MODEL_TASK_BLUEPRINT_KIND = "model_task_blueprint";
 export const MODEL_TASK_BLUEPRINT_SCHEMA_VERSION = 1;
@@ -19,6 +24,7 @@ export type ModelTaskBlueprintFile = {
   max_steps: number;
   init_mode: "from_scratch" | "pretrained";
   task_type: "causal_lm" | "sequence_classification";
+  prompt_format: PromptFormatSetting;
   arch_family: "gpt2" | "bert";
   vocab_size: number;
   hidden_size: number;
@@ -75,6 +81,7 @@ export function wizardStateFromBlueprint(b: ModelTaskBlueprintFile): ModelTaskWi
     max_steps: b.max_steps,
     init_mode: b.init_mode,
     task_type: b.task_type,
+    prompt_format: b.prompt_format ?? "auto",
     arch_family: b.arch_family,
     vocab_size: b.vocab_size,
     hidden_size: b.hidden_size,

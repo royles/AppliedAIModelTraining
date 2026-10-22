@@ -1,5 +1,6 @@
 import type {
   Project,
+  PromptFormatSetting,
   TaskDefinition,
   TaskVersion,
   TrainingDatasetConfig,
@@ -26,6 +27,7 @@ import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
 import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
 import { blueprintReady, buildTrainingBlueprint, type BlueprintStep } from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
+import { ModelTaskTrainingOptions } from "./components/ModelTaskTrainingOptions";
 import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
 import type { WorkerSizePreset } from "./workerSizePresets";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -87,6 +89,9 @@ type Props = {
   onMaxPositionChange: (n: number) => void;
   archFamily: "gpt2" | "bert";
   taskType: "causal_lm" | "sequence_classification";
+  onTaskTypeChange: (t: "causal_lm" | "sequence_classification") => void;
+  promptFormat: PromptFormatSetting;
+  onPromptFormatChange: (p: PromptFormatSetting) => void;
   intermediateSize: number;
   tieWordEmbeddings: boolean;
   baseModel?: string | null;
@@ -173,6 +178,9 @@ export function ModelTasksPanel(props: Props) {
     onMaxPositionChange,
     archFamily,
     taskType,
+    onTaskTypeChange,
+    promptFormat,
+    onPromptFormatChange,
     intermediateSize,
     tieWordEmbeddings,
     baseModel,
@@ -246,6 +254,7 @@ export function ModelTasksPanel(props: Props) {
       max_steps: maxSteps,
       init_mode: initMode,
       task_type: taskType,
+      prompt_format: promptFormat,
       arch_family: archFamily,
       vocab_size: vocabSize,
       hidden_size: hiddenSize,
@@ -269,6 +278,7 @@ export function ModelTasksPanel(props: Props) {
       maxSteps,
       initMode,
       taskType,
+      promptFormat,
       archFamily,
       vocabSize,
       hiddenSize,
@@ -460,6 +470,13 @@ export function ModelTasksPanel(props: Props) {
                       ? "Fill in the fields below; preview runs automatically after you pause typing."
                       : null}
             </p>
+            <ModelTaskTrainingOptions
+              section="prompt"
+              taskType={taskType}
+              onTaskTypeChange={onTaskTypeChange}
+              promptFormat={promptFormat}
+              onPromptFormatChange={onPromptFormatChange}
+            />
             <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
           </>
         );
@@ -481,6 +498,13 @@ export function ModelTasksPanel(props: Props) {
       case "architecture":
         return (
           <>
+            <ModelTaskTrainingOptions
+              section="task"
+              taskType={taskType}
+              onTaskTypeChange={onTaskTypeChange}
+              promptFormat={promptFormat}
+              onPromptFormatChange={onPromptFormatChange}
+            />
             <label>
               Preset
               <select value={preset} onChange={(e) => onPresetChange(e.target.value)}>

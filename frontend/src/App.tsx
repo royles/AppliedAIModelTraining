@@ -7,6 +7,7 @@ import {
   type TransformerPreset,
   type TrainingDatasetConfig,
   type TokenizerBuildConfig,
+  type PromptFormatSetting,
   type TrainingJob,
 } from "./api";
 import { AppSidebar, type NavView } from "./components/AppSidebar";
@@ -73,6 +74,7 @@ export default function App() {
   const [maxPosition, setMaxPosition] = useState(512);
   const [archFamily, setArchFamily] = useState<TransformerArchitecture["family"]>("gpt2");
   const [taskType, setTaskType] = useState<"causal_lm" | "sequence_classification">("causal_lm");
+  const [promptFormat, setPromptFormat] = useState<PromptFormatSetting>("auto");
   const [intermediateSize, setIntermediateSize] = useState(DEFAULT_HIDDEN_SIZE * 4);
   const [tieWordEmbeddings, setTieWordEmbeddings] = useState(true);
   const [maxSteps, setMaxSteps] = useState(DEFAULT_MAX_STEPS);
@@ -172,6 +174,7 @@ export default function App() {
     setMaxSteps(s.max_steps);
     setInitMode(s.init_mode);
     setTaskType(s.task_type);
+    setPromptFormat(s.prompt_format ?? "auto");
     setArchFamily(s.arch_family);
     setVocabSize(s.vocab_size);
     setHiddenSize(s.hidden_size);
@@ -261,6 +264,11 @@ export default function App() {
   function handleVocabSizeChange(n: number) {
     setVocabSize(n);
     setTokenizer((t) => ({ ...t, vocab_size: n }));
+  }
+
+  function handleTaskTypeChange(next: "causal_lm" | "sequence_classification") {
+    setTaskType(next);
+    setArchFamily(next === "causal_lm" ? "gpt2" : "bert");
   }
 
   const handleJobUpdated = useCallback((fresh: TrainingJob) => {
@@ -390,6 +398,7 @@ export default function App() {
       transformer: {
         init_mode: initMode,
         task_type: taskType,
+        prompt_format: taskType === "causal_lm" ? promptFormat : "auto",
         tokenizer,
         architecture: {
           family: archFamily,
@@ -628,6 +637,9 @@ export default function App() {
             onMaxPositionChange={setMaxPosition}
             archFamily={archFamily}
             taskType={taskType}
+            onTaskTypeChange={handleTaskTypeChange}
+            promptFormat={promptFormat}
+            onPromptFormatChange={setPromptFormat}
             intermediateSize={intermediateSize}
             tieWordEmbeddings={tieWordEmbeddings}
             baseModel={selectedPreset?.config.base_model}

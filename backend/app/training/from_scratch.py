@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.training.dataset_loader import load_training_samples
-from app.training.lm_text_utils import detect_prompt_format
+from app.training.lm_text_utils import resolve_prompt_format
 from app.training.tokenizer_config import TokenizerBuildConfig
 from app.training.tokenizer_trainer import (
     recommended_min_corpus_chars,
@@ -75,7 +75,8 @@ def prepare_from_scratch_training(
             )
         return train_config
     texts, _ = load_training_samples(cfg.dataset.model_dump(), task_type=cfg.task_type)
-    train_config["prompt_format"] = detect_prompt_format(texts)
+    setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
+    train_config["prompt_format"] = resolve_prompt_format(setting, texts)
     _log_early = log or (lambda m: logger.info(m))
     _log_early(
         f"Training prompt format: {train_config['prompt_format']} "

@@ -6,6 +6,7 @@ import re
 from typing import Literal
 
 PromptFormat = Literal["platform_user_assistant", "raw_lm"]
+PromptFormatSetting = Literal["auto", "platform_user_assistant", "raw_lm"]
 
 _MIN_CHUNK_CHARS = 32
 _DEFAULT_CHUNK_CHARS = 1800
@@ -96,3 +97,19 @@ def detect_prompt_format(texts: list[str]) -> PromptFormat:
     if hits >= max(1, len(sample) // 8):
         return "platform_user_assistant"
     return "raw_lm"
+
+
+def resolve_prompt_format(
+    setting: str | None,
+    texts: list[str] | None,
+    *,
+    fallback: PromptFormat = "raw_lm",
+) -> PromptFormat:
+    """Apply explicit prompt_format or infer from corpus when setting is auto."""
+    if setting and setting not in ("auto", ""):
+        if setting in ("raw_lm", "platform_user_assistant"):
+            return setting  # type: ignore[return-value]
+        raise ValueError(f"Unsupported prompt_format: {setting}")
+    if texts:
+        return detect_prompt_format(texts)
+    return fallback

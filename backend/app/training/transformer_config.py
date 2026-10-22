@@ -19,6 +19,7 @@ from app.training.tokenizer_config import TokenizerBuildConfig
 
 
 TaskType = Literal["causal_lm", "sequence_classification"]
+PromptFormatSetting = Literal["auto", "raw_lm", "platform_user_assistant"]
 
 
 class TransformerTrainingConfig(BaseModel):
@@ -31,6 +32,13 @@ class TransformerTrainingConfig(BaseModel):
     task_type: TaskType = Field(
         default="causal_lm",
         description="causal_lm for chat/OpenAI-style models; sequence_classification for classifiers.",
+    )
+    prompt_format: PromptFormatSetting = Field(
+        default="auto",
+        description=(
+            "causal_lm only: auto infers from dataset; raw_lm = plain continuation; "
+            "platform_user_assistant = User:/Assistant: chat template at inference."
+        ),
     )
     architecture: TransformerArchitectureConfig = Field(
         default_factory=TransformerArchitectureConfig,
@@ -329,6 +337,7 @@ TRANSFORMER_PRESETS: dict[str, TransformerPreset] = {
             init_mode="pretrained",
             task_type="sequence_classification",
             base_model="distilbert-base-uncased",
+            architecture=TransformerArchitectureConfig(family="bert"),
             max_seq_length=128,
             learning_rate=3e-5,
             per_device_train_batch_size=16,

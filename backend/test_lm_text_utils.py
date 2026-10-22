@@ -3,6 +3,7 @@
 from app.training.lm_text_utils import (
     chunk_text_for_lm,
     detect_prompt_format,
+    resolve_prompt_format,
     normalize_causal_lm_text,
     prepare_causal_lm_texts,
 )
@@ -26,6 +27,13 @@ def test_detect_chat_vs_raw():
     wiki = [" = Mars = \n\nMars is the fourth planet."]
     assert detect_prompt_format(chat) == "platform_user_assistant"
     assert detect_prompt_format(wiki) == "raw_lm"
+
+
+def test_resolve_prompt_format_explicit_and_auto():
+    assert resolve_prompt_format("raw_lm", None) == "raw_lm"
+    assert resolve_prompt_format("platform_user_assistant", None) == "platform_user_assistant"
+    wiki = [" = Mars = \n\nMars is the fourth planet."]
+    assert resolve_prompt_format("auto", wiki) == "raw_lm"
 
 
 def test_prepare_hf_style_expands_rows():

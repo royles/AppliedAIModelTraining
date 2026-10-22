@@ -62,9 +62,12 @@ export type TrainingDatasetConfig = {
   repeat?: number;
 };
 
+export type PromptFormatSetting = "auto" | "raw_lm" | "platform_user_assistant";
+
 export type TransformerConfig = {
   init_mode: "from_scratch" | "pretrained";
   task_type: "causal_lm" | "sequence_classification";
+  prompt_format?: PromptFormatSetting;
   architecture: TransformerArchitecture;
   base_model?: string | null;
   max_seq_length: number;
