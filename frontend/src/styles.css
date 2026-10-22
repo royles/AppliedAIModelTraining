@@ -2045,12 +2045,128 @@ button.btn-danger:hover:not(:disabled) {
   margin-top: 1rem;
 }
 
+.architecture-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-6, 1.5rem);
+}
+
+.architecture-section {
+  margin: 0;
+}
+
+.architecture-section-title {
+  margin: 0 0 var(--cdl-space-3, 0.75rem);
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cdl-text-secondary, #b8c5da);
+}
+
+.architecture-section-lead {
+  margin: 0 0 var(--cdl-space-4, 1rem);
+  max-width: 42rem;
+}
+
+.architecture-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: var(--cdl-space-4, 1rem);
+  align-items: start;
+}
+
+.architecture-form-grid-2 {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.architecture-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-2, 0.35rem);
+  margin: 0;
+  font-size: var(--cdl-text-sm, 0.8125rem);
+  color: var(--cdl-text-secondary, #b8c5da);
+}
+
+.architecture-field-label {
+  font-weight: 500;
+  color: var(--cdl-text-primary, #e8eef7);
+}
+
+.architecture-field-hint {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--cdl-text-muted, #9fb0c9);
+}
+
+.architecture-field select,
+.architecture-field .validated-number-field input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: var(--cdl-text-base, 0.875rem);
+  min-height: 2.375rem;
+}
+
+.architecture-field-span .model-task-training-options {
+  gap: var(--cdl-space-3, 0.75rem);
+}
+
+.architecture-field-span .model-task-training-options label {
+  margin-bottom: 0;
+}
+
+.architecture-field-span .model-task-training-options .hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.architecture-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--cdl-space-3, 0.75rem);
+  margin: var(--cdl-space-4, 1rem) 0 0;
+  padding: var(--cdl-space-3, 0.75rem) var(--cdl-space-4, 1rem);
+  background: var(--cdl-bg-surface, #0b1220);
+  border: 1px solid var(--cdl-border-subtle, #243049);
+  border-radius: var(--cdl-radius-md, 8px);
+}
+
+.architecture-metrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.architecture-metrics dt {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cdl-text-muted, #9fb0c9);
+}
+
+.architecture-metrics dd {
+  margin: 0;
+  font-size: var(--cdl-text-base, 0.875rem);
+  font-variant-numeric: tabular-nums;
+  color: var(--cdl-text-primary, #e8eef7);
+}
+
+.model-task-training-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cdl-space-3, 0.75rem);
+}
+
 .transformer-diagram-wrap {
-  margin: 1rem 0 0.5rem;
-  padding: 1rem;
-  background: #070d18;
-  border: 1px solid #243049;
-  border-radius: 10px;
+  margin: 0;
+  padding: var(--cdl-space-4, 1rem);
+  background: var(--cdl-bg-surface, #070d18);
+  border: 1px solid var(--cdl-border-subtle, #243049);
+  border-radius: var(--cdl-radius-md, 10px);
 }
 
 .diagram-caption {
@@ -2091,22 +2207,22 @@ button.btn-danger:hover:not(:disabled) {
 
 .transformer-diagram .diagram-title {
   fill: #e8eef7;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
 }
 
 .transformer-diagram .diagram-sub {
   fill: #9fb0c9;
-  font-size: 9px;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 10px;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
 }
 
 .transformer-diagram .diagram-inner-title {
   fill: #b8c5da;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--cdl-font-sans, "IBM Plex Sans", system-ui, sans-serif);
 }
 
 .transformer-diagram .diagram-warn {

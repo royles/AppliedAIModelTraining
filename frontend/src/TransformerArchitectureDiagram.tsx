@@ -17,15 +17,7 @@ type Props = {
   intermediateSize: number;
   tieWordEmbeddings: boolean;
   paramEstimate: number | null;
-  onHiddenSizeChange: (value: number) => void;
-  onLayersChange: (value: number) => void;
-  onHeadsChange: (value: number) => void;
 };
-
-function clampInt(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-}
 
 function familyLabel(family: ArchFamily, taskType: TaskType): string {
   if (family === "bert" || taskType === "sequence_classification") {
@@ -49,9 +41,6 @@ export function TransformerArchitectureDiagram({
   intermediateSize,
   tieWordEmbeddings,
   paramEstimate,
-  onHiddenSizeChange,
-  onLayersChange,
-  onHeadsChange,
 }: Props) {
   const headDim =
     heads > 0 && hiddenSize % heads === 0 ? hiddenSize / heads : null;
@@ -70,9 +59,8 @@ export function TransformerArchitectureDiagram({
   return (
     <div className="transformer-diagram-wrap">
       <p className="hint diagram-caption">
-        {presetTitle ? `Preset: ${presetTitle} · ` : ""}
-        {archSummary} — d={hiddenSize}, L={layers}, H={heads}, vocab=
-        {vocabSize.toLocaleString()}, positions={maxPosition}
+        {presetTitle ? `${presetTitle} · ` : ""}
+        {archSummary}. Edit values in the geometry section below.
       </p>
       <div className="transformer-diagram-scroll">
         <svg
@@ -136,26 +124,9 @@ export function TransformerArchitectureDiagram({
             <text x="54" y="46" textAnchor="middle" className="diagram-sub">
               {fromScratch ? `${vocabSize.toLocaleString()} × d` : "from checkpoint"}
             </text>
-            {fromScratch ? (
-              <foreignObject x="14" y="58" width="80" height="40">
-                <label className="diagram-input-label">
-                  d (hidden)
-                  <input
-                    type="number"
-                    min={64}
-                    max={8192}
-                    value={hiddenSize}
-                    onChange={(e) =>
-                      onHiddenSizeChange(clampInt(Number(e.target.value), 64, 8192))
-                    }
-                  />
-                </label>
-              </foreignObject>
-            ) : (
-              <text x="54" y="72" textAnchor="middle" className="diagram-sub">
-                d ≈ {hiddenSize}
-              </text>
-            )}
+            <text x="54" y="72" textAnchor="middle" className="diagram-sub diagram-mono">
+              d = {hiddenSize}
+            </text>
           </g>
 
           <line x1="228" y1="126" x2="250" y2="126" className="diagram-arrow" markerEnd="url(#arrow)" />
@@ -192,44 +163,17 @@ export function TransformerArchitectureDiagram({
                 LoRA adapters on attention/MLP
               </text>
             )}
-            <text x="124" y={useLora ? 54 : 40} textAnchor="middle" className="diagram-sub">
-              repeated ×
+            <text x="124" y={useLora ? 58 : 44} textAnchor="middle" className="diagram-sub diagram-mono">
+              × {layers} layers
             </text>
-            <foreignObject x="88" y={useLora ? 58 : 44} width="72" height="36">
-              <label className="diagram-input-label diagram-input-inline">
-                layers
-                <input
-                  type="number"
-                  min={1}
-                  max={128}
-                  value={layers}
-                  onChange={(e) =>
-                    onLayersChange(clampInt(Number(e.target.value), 1, 128))
-                  }
-                  disabled={!fromScratch}
-                />
-              </label>
-            </foreignObject>
 
             <rect x="16" y="88" width="100" height="68" rx="6" className="diagram-inner" />
             <text x="66" y="108" textAnchor="middle" className="diagram-inner-title">
               {attentionLabel}
             </text>
-            <foreignObject x="22" y="118" width="88" height="32">
-              <label className="diagram-input-label diagram-input-compact">
-                heads
-                <input
-                  type="number"
-                  min={1}
-                  max={128}
-                  value={heads}
-                  onChange={(e) =>
-                    onHeadsChange(clampInt(Number(e.target.value), 1, 128))
-                  }
-                  disabled={!fromScratch}
-                />
-              </label>
-            </foreignObject>
+            <text x="66" y="148" textAnchor="middle" className="diagram-sub diagram-mono">
+              H = {heads}
+            </text>
 
             <text x="178" y="108" textAnchor="middle" className="diagram-sub">
               d_head = {headsValid ? headDim : "—"}

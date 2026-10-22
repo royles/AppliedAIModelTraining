@@ -14,7 +14,6 @@ import { FromScratchConfigFields } from "./FromScratchConfigFields";
 import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { ProjectJobsHierarchy } from "./ProjectJobsHierarchy";
-import { TransformerArchitectureDiagram } from "./TransformerArchitectureDiagram";
 import { ValidatedNumberField } from "./ValidatedNumberField";
 import {
   buildModelTaskBlueprint,
@@ -31,6 +30,7 @@ import {
   wizardSettingsValid,
 } from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
+import { ArchitectureStepFields } from "./components/ArchitectureStepFields";
 import { ModelTaskTrainingOptions } from "./components/ModelTaskTrainingOptions";
 import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
 import type { WorkerSizePreset } from "./workerSizePresets";
@@ -470,60 +470,32 @@ export function ModelTasksPanel(props: Props) {
         );
       case "architecture":
         return (
-          <>
-            <ModelTaskTrainingOptions
-              section="task"
-              taskType={taskType}
-              onTaskTypeChange={onTaskTypeChange}
-              promptFormat={promptFormat}
-              onPromptFormatChange={onPromptFormatChange}
-            />
-            <label>
-              Preset
-              <select value={preset} onChange={(e) => onPresetChange(e.target.value)}>
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name}>{p.title}</option>
-                ))}
-              </select>
-            </label>
-            <TransformerArchitectureDiagram
-              presetTitle={selectedPreset?.title}
-              family={archFamily}
-              initMode={initMode}
-              taskType={taskType}
-              baseModel={baseModel}
-              useLora={useLora}
-              hiddenSize={hiddenSize}
-              layers={layers}
-              heads={heads}
-              vocabSize={vocabSize}
-              maxPosition={maxPosition}
-              intermediateSize={intermediateSize}
-              tieWordEmbeddings={tieWordEmbeddings}
-              paramEstimate={paramEstimate}
-              onHiddenSizeChange={onHiddenSizeChange}
-              onLayersChange={onLayersChange}
-              onHeadsChange={onHeadsChange}
-            />
-            <div className="arch-grid arch-grid-compact">
-              <label>
-                Hidden size
-                <ValidatedNumberField value={hiddenSize} min={1} max={8192} onChange={onHiddenSizeChange} />
-              </label>
-              <label>
-                Layers
-                <ValidatedNumberField value={layers} min={1} max={128} onChange={onLayersChange} />
-              </label>
-              <label>
-                Attention heads
-                <ValidatedNumberField value={heads} min={1} max={128} onChange={onHeadsChange} />
-              </label>
-              <label>
-                Max positions
-                <ValidatedNumberField value={maxPosition} min={128} max={32768} onChange={onMaxPositionChange} />
-              </label>
-            </div>
-          </>
+          <ArchitectureStepFields
+            presets={presets}
+            preset={preset}
+            onPresetChange={onPresetChange}
+            selectedPreset={selectedPreset}
+            taskType={taskType}
+            onTaskTypeChange={onTaskTypeChange}
+            promptFormat={promptFormat}
+            onPromptFormatChange={onPromptFormatChange}
+            initMode={initMode}
+            archFamily={archFamily}
+            hiddenSize={hiddenSize}
+            layers={layers}
+            heads={heads}
+            maxPosition={maxPosition}
+            vocabSize={vocabSize}
+            intermediateSize={intermediateSize}
+            tieWordEmbeddings={tieWordEmbeddings}
+            paramEstimate={paramEstimate}
+            baseModel={baseModel}
+            useLora={useLora}
+            onHiddenSizeChange={onHiddenSizeChange}
+            onLayersChange={onLayersChange}
+            onHeadsChange={onHeadsChange}
+            onMaxPositionChange={onMaxPositionChange}
+          />
         );
       case "training":
         return (
