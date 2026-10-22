@@ -370,7 +370,6 @@ export function ModelTasksPanel(props: Props) {
 
   const currentStep = MODEL_TASK_WIZARD_STEPS[currentStepIndex];
   const currentBlueprintStep = stepById.get(currentStep.id);
-  const canGoNext = currentBlueprintStep?.done ?? false;
   const ready = blueprintReady(blueprintSteps, undefined, blueprintContext);
   const corpusOk = corpusMeetsMinimum(blueprintContext);
   const isLastStep = currentStepIndex >= MODEL_TASK_WIZARD_STEPS.length - 1;
@@ -761,7 +760,7 @@ export function ModelTasksPanel(props: Props) {
           description={stepDescription}
         >
           {currentBlueprintStep && !currentBlueprintStep.done && currentBlueprintStep.requirement && (
-            <p className="hint blueprint-warn">{currentBlueprintStep.requirement}</p>
+            <p className="hint">{currentBlueprintStep.requirement}</p>
           )}
           {renderStepBody(currentStep.id)}
         </WizardStepCard>
@@ -778,7 +777,6 @@ export function ModelTasksPanel(props: Props) {
           {!isLastStep ? (
             <button
               type="button"
-              disabled={!canGoNext}
               onClick={() => setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))}
             >
               Next
