@@ -14,8 +14,7 @@ import { FromScratchConfigFields } from "./FromScratchConfigFields";
 import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { ValidatedNumberField } from "./ValidatedNumberField";
-import { DiagramWizardStep } from "./components/DiagramWizardStep";
-import { GeometryWizardStep } from "./components/GeometryWizardStep";
+import { ArchitectureGeometryStep } from "./components/ArchitectureGeometryStep";
 import { PresetWizardStep } from "./components/PresetWizardStep";
 import { ProjectWizardStep } from "./components/ProjectWizardStep";
 import {
@@ -35,7 +34,7 @@ import {
 import { WizardValidationCallout } from "./components/WizardValidationCallout";
 import { wizardFirstBlockMessage, wizardStepBlockMessage } from "./wizardStepValidation";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
-import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
+import { ComputeWizardStep } from "./components/ComputeWizardStep";
 import type { WorkerSizePreset } from "./workerSizePresets";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -448,40 +447,27 @@ export function ModelTasksPanel(props: Props) {
             layers={layers}
           />
         );
-      case "geometry":
+      case "architecture":
         return (
-          <GeometryWizardStep
+          <ArchitectureGeometryStep
             initMode={initMode}
-            hiddenSize={hiddenSize}
-            layers={layers}
-            heads={heads}
-            maxPosition={maxPosition}
-            vocabSize={vocabSize}
-            intermediateSize={intermediateSize}
-            paramEstimate={paramEstimate}
-            onHiddenSizeChange={onHiddenSizeChange}
-            onLayersChange={onLayersChange}
-            onHeadsChange={onHeadsChange}
-            onMaxPositionChange={onMaxPositionChange}
-          />
-        );
-      case "diagram":
-        return (
-          <DiagramWizardStep
             presetTitle={selectedPreset?.title}
             family={archFamily}
-            initMode={initMode}
             taskType={taskType}
             baseModel={baseModel}
             useLora={useLora}
             hiddenSize={hiddenSize}
             layers={layers}
             heads={heads}
-            vocabSize={vocabSize}
             maxPosition={maxPosition}
+            vocabSize={vocabSize}
             intermediateSize={intermediateSize}
             tieWordEmbeddings={tieWordEmbeddings}
             paramEstimate={paramEstimate}
+            onHiddenSizeChange={onHiddenSizeChange}
+            onLayersChange={onLayersChange}
+            onHeadsChange={onHeadsChange}
+            onMaxPositionChange={onMaxPositionChange}
           />
         );
       case "training":
@@ -496,68 +482,24 @@ export function ModelTasksPanel(props: Props) {
             </p>
           </div>
         );
-      case "ray":
-        return selectedProjectId != null ? (
-          <PlatformSettingsPanel
-            projectId={selectedProjectId}
-            title="Project Ray configuration"
-            onSaved={onProjectRaySettingsSaved}
-          />
-        ) : (
-          <p className="hint wizard-step-footnote">Select a project on step 1 to edit Ray defaults.</p>
-        );
-      case "workers":
+      case "compute":
         return (
-          <div className="wizard-step-compact">
-            <WorkerSizePresetBar
-              selectedPresetId={workerPresetId}
-              disabled={startBusy}
-              onApply={applyWorkerPreset}
-            />
-            <div className="architecture-form-grid architecture-form-grid-2">
-              <label className="architecture-field">
-                <span className="architecture-field-label">Worker engines</span>
-                <ValidatedNumberField value={jobWorkers} min={1} max={32} onChange={onJobWorkersChange} />
-              </label>
-              <label className="architecture-field">
-                <span className="architecture-field-label">GPUs per engine</span>
-                <ValidatedNumberField
-                  value={jobGpus}
-                  min={1}
-                  max={8}
-                  onChange={(n) => {
-                    setWorkerPresetId(null);
-                    onJobGpusChange(n);
-                  }}
-                />
-              </label>
-              <label className="architecture-field">
-                <span className="architecture-field-label">CPUs per engine</span>
-                <ValidatedNumberField
-                  value={jobWorkerCpu}
-                  min={0.5}
-                  max={128}
-                  integer={false}
-                  onChange={(n) => {
-                    setWorkerPresetId(null);
-                    onJobWorkerCpuChange(n);
-                  }}
-                />
-              </label>
-              <label className="architecture-field">
-                <span className="architecture-field-label">Memory (GiB)</span>
-                <ValidatedNumberField
-                  value={jobWorkerMemoryGb}
-                  min={8}
-                  max={512}
-                  onChange={(n) => {
-                    setWorkerPresetId(null);
-                    onJobWorkerMemoryGbChange(n);
-                  }}
-                />
-              </label>
-            </div>
-          </div>
+          <ComputeWizardStep
+            selectedProjectId={selectedProjectId}
+            onProjectRaySettingsSaved={onProjectRaySettingsSaved}
+            workerPresetId={workerPresetId}
+            startBusy={startBusy}
+            jobWorkers={jobWorkers}
+            jobGpus={jobGpus}
+            jobWorkerCpu={jobWorkerCpu}
+            jobWorkerMemoryGb={jobWorkerMemoryGb}
+            onApplyWorkerPreset={applyWorkerPreset}
+            onClearWorkerPreset={() => setWorkerPresetId(null)}
+            onJobWorkersChange={onJobWorkersChange}
+            onJobGpusChange={onJobGpusChange}
+            onJobWorkerCpuChange={onJobWorkerCpuChange}
+            onJobWorkerMemoryGbChange={onJobWorkerMemoryGbChange}
+          />
         );
       case "register":
         return (
@@ -685,16 +627,8 @@ export function ModelTasksPanel(props: Props) {
       {currentStep.id === "dataset" && <DatasetConfigNotice dataset={dataset} />}
 
       <div className="model-task-wizard-body">
-        <WizardStepCard
-          title={currentStep.title}
-          description={stepDescription}
-        >
-          {stepBlock && <WizardValidationCallout block={stepBlock} />}
-          {renderStepBody(currentStep.id)}
-        </WizardStepCard>
-
-        <footer className="model-task-wizard-footer">
-          <div className="model-task-wizard-footer-actions">
+        <nav className="model-task-wizard-nav" aria-label="Wizard steps">
+          <div className="model-task-wizard-nav-actions">
             <button
               type="button"
               className="btn-secondary"
@@ -741,7 +675,15 @@ export function ModelTasksPanel(props: Props) {
               block={startBlock}
             />
           )}
-        </footer>
+        </nav>
+
+        <WizardStepCard
+          title={currentStep.title}
+          description={stepDescription}
+        >
+          {stepBlock && <WizardValidationCallout block={stepBlock} />}
+          {renderStepBody(currentStep.id)}
+        </WizardStepCard>
       </div>
     </div>
   );

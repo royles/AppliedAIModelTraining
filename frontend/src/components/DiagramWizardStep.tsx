@@ -1,4 +1,4 @@
-import { TransformerArchitectureDiagram } from "../TransformerArchitectureDiagram";
+import { TransformerNetworkDiagram } from "../TransformerNetworkDiagram";
 
 type Props = {
   presetTitle?: string;
@@ -19,8 +19,8 @@ type Props = {
 
 export function DiagramWizardStep(props: Props) {
   return (
-    <div className="wizard-step-compact wizard-step-diagram">
-      <TransformerArchitectureDiagram {...props} compact />
+    <div className="wizard-step-diagram-full">
+      <TransformerNetworkDiagram {...props} />
     </div>
   );
 }

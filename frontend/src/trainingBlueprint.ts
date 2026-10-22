@@ -57,7 +57,7 @@ function tokenizerStepDone(ctx: BlueprintContext): boolean {
   );
 }
 
-function geometryStepDone(ctx: BlueprintContext): boolean {
+function architectureStepDone(ctx: BlueprintContext): boolean {
   return (
     ctx.hiddenSize > 0 &&
     ctx.layers > 0 &&
@@ -66,7 +66,7 @@ function geometryStepDone(ctx: BlueprintContext): boolean {
   );
 }
 
-function workersStepDone(ctx: BlueprintContext): boolean {
+function computeStepDone(ctx: BlueprintContext): boolean {
   return ctx.jobWorkers >= 1 && ctx.jobWorkers <= 32 && ctx.jobGpus >= 1;
 }
 
@@ -121,55 +121,37 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
       done: tokenizerStepDone(ctx),
     },
     {
-      id: "geometry",
-      title: "Geometry",
-      description: "Width, depth, heads, and context length (defaults come from the preset).",
+      id: "architecture",
+      title: "Architecture",
+      description: "Edit geometry and review the live transformer layout from those numbers.",
       dependsOn: ["tokenizer"],
       requirement: "hidden_size divisible by num_attention_heads.",
-      volumetrics: `d=${ctx.hiddenSize}`,
-      done: geometryStepDone(ctx),
-    },
-    {
-      id: "diagram",
-      title: "Architecture diagram",
-      description: "Review the decoder stack before scheduling training steps.",
-      dependsOn: ["geometry"],
-      requirement: "Review the block diagram.",
-      volumetrics: `L=${ctx.layers} · H=${ctx.heads}`,
-      done: true,
+      volumetrics: `d=${ctx.hiddenSize} · L=${ctx.layers} · H=${ctx.heads}`,
+      done: architectureStepDone(ctx),
     },
     {
       id: "training",
       title: "Schedule",
       description: "Optimization budget in gradient steps (max_steps).",
-      dependsOn: ["diagram"],
+      dependsOn: ["architecture"],
       requirement: "max_steps between 10 and 500,000.",
       volumetrics: String(ctx.maxSteps),
       done: ctx.maxSteps >= 10 && ctx.maxSteps <= 500_000,
     },
     {
-      id: "ray",
-      title: "Ray defaults",
-      description: "Optional per-project Ray settings used by distributed training.",
+      id: "compute",
+      title: "Compute",
+      description: "Per-job Ray Train engines plus project Ray cluster and CML placement.",
       dependsOn: ["training"],
-      requirement: "Optional — adjust or leave defaults.",
-      volumetrics: "Saved on project",
-      done: true,
-    },
-    {
-      id: "workers",
-      title: "Workers & GPUs",
-      description: "Ray Train worker count and GPUs per engine for this run.",
-      dependsOn: ["ray"],
-      requirement: "1–32 workers; ≥1 GPU per worker.",
+      requirement: "1–32 workers; ≥1 GPU per worker for this run.",
       volumetrics: `${ctx.jobWorkers}×${ctx.jobGpus} GPU`,
-      done: workersStepDone(ctx),
+      done: computeStepDone(ctx),
     },
     {
       id: "register",
       title: "Register",
       description: "Job name and OpenAI-compatible model id.",
-      dependsOn: ["workers"],
+      dependsOn: ["compute"],
       requirement: "Valid job name and model id.",
       volumetrics: ctx.openaiModelId || "—",
       done: ctx.jobName.trim().length > 0 && OPENAI_ID.test(ctx.openaiModelId.trim()),

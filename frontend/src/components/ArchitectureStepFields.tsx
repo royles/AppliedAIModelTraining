@@ -1,6 +1,6 @@
 import type { TransformerPreset } from "../api";
 import { ModelTaskTrainingOptions } from "./ModelTaskTrainingOptions";
-import { TransformerArchitectureDiagram } from "../TransformerArchitectureDiagram";
+import { TransformerNetworkDiagram } from "../TransformerNetworkDiagram";
 import { ValidatedNumberField } from "../ValidatedNumberField";
 import type { PromptFormatSetting } from "../api";
 

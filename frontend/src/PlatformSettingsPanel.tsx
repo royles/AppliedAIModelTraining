@@ -15,6 +15,12 @@ type Props = {
   title?: string;
   saveLabel?: string;
   introHint?: string;
+  /** Compact layout inside the Model Tasks wizard compute step. */
+  embedded?: boolean;
+  /** CPU/memory/GPU/default worker count — hide when the wizard sets per-job sizing separately. */
+  showCdswWorkerSizing?: boolean;
+  /** Ray runtime fields (head address, local mode, etc.). */
+  showRay?: boolean;
 };
 
 export function PlatformSettingsPanel({
@@ -23,6 +29,9 @@ export function PlatformSettingsPanel({
   title = "Framework Configuration",
   saveLabel,
   introHint,
+  embedded = false,
+  showCdswWorkerSizing = true,
+  showRay = true,
 }: Props) {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [ray, setRay] = useState<RaySettings | null>(null);
@@ -83,29 +92,39 @@ export function PlatformSettingsPanel({
     }
   }
 
+  const Wrapper = embedded ? "div" : "article";
+  const wrapperClass = embedded ? "platform-settings-embedded" : "card wide";
+
   if (!settings || !ray || !cdsw) {
     return (
-      <article className="card wide">
-        <h2>{title}</h2>
+      <Wrapper className={wrapperClass}>
+        {!embedded && <h2>{title}</h2>}
         <p>{isProjectScope ? "Loading project Ray settings…" : "Loading platform settings…"}</p>
-      </article>
+      </Wrapper>
     );
   }
 
+  const runtimeHint = (
+    <>
+      Runtime: Ray <strong>{settings.runtime.ray_runtime}</strong>
+      · CDSW API <strong>{settings.runtime.cdsw_available ? "available" : "local sim"}</strong>
+      · detected head <code>{settings.runtime.detected_ray_head ?? "—"}</code>
+    </>
+  );
+
   return (
-    <article className="card wide">
-      <h2>{title}</h2>
+    <Wrapper className={wrapperClass}>
+      {!embedded && <h2>{title}</h2>}
       <p className="hint">
         {introHint ??
           (isProjectScope
             ? "This project’s Ray cluster and CDSW worker targets apply to every task and job run under it."
             : "Defaults copied into new projects. Each project keeps its own Ray configuration for runs.")}{" "}
-        Runtime: Ray <strong>{settings.runtime.ray_runtime}</strong>
-        · CDSW API <strong>{settings.runtime.cdsw_available ? "available" : "local sim"}</strong>
-        · detected head <code>{settings.runtime.detected_ray_head ?? "—"}</code>
+        {runtimeHint}
       </p>
 
-      <div className="settings-grid">
+      <div className={`settings-grid${!showRay || !showCdswWorkerSizing ? " settings-grid-single" : ""}`}>
+        {showRay && (
         <div>
           <h3>Ray</h3>
           <label className="checkbox-row">
@@ -159,64 +178,69 @@ export function PlatformSettingsPanel({
             the session only runs Ray control. Turn on only for small session-only training.
           </p>
         </div>
+        )}
 
         <div>
-          <h3>CDSW workers</h3>
-          <WorkerSizePresetBar
-            selectedPresetId={workerPresetId}
-            disabled={saving}
-            onApply={applyWorkerPreset}
-          />
-          <label>
-            Worker CPU
-            <input
-              type="number"
-              min={0.1}
-              step={0.5}
-              value={cdsw.worker_cpu}
-              onChange={(e) => {
-                setWorkerPresetId(null);
-                setCdsw({ ...cdsw, worker_cpu: Number(e.target.value) });
-              }}
-            />
-          </label>
-          <label>
-            Worker memory (GiB)
-            <input
-              type="number"
-              min={1}
-              value={cdsw.worker_memory_gb}
-              onChange={(e) => {
-                setWorkerPresetId(null);
-                setCdsw({ ...cdsw, worker_memory_gb: Number(e.target.value) });
-              }}
-            />
-          </label>
-          <label>
-            GPUs per worker (default for new jobs)
-            <input
-              type="number"
-              min={0}
-              max={8}
-              value={cdsw.gpus_per_worker}
-              onChange={(e) => {
-                setWorkerPresetId(null);
-                setCdsw({ ...cdsw, gpus_per_worker: Number(e.target.value) });
-              }}
-            />
-          </label>
-          <label>
-            Default job worker count
-            <input
-              type="number"
-              min={1}
-              max={32}
-              value={cdsw.default_job_num_workers}
-              onChange={(e) =>
-                setCdsw({ ...cdsw, default_job_num_workers: Number(e.target.value) })
-              }
-            />
-          </label>
+          <h3>{showCdswWorkerSizing ? "CDSW workers" : "CML worker placement"}</h3>
+          {showCdswWorkerSizing && (
+            <>
+              <WorkerSizePresetBar
+                selectedPresetId={workerPresetId}
+                disabled={saving}
+                onApply={applyWorkerPreset}
+              />
+              <label>
+                Worker CPU
+                <input
+                  type="number"
+                  min={0.1}
+                  step={0.5}
+                  value={cdsw.worker_cpu}
+                  onChange={(e) => {
+                    setWorkerPresetId(null);
+                    setCdsw({ ...cdsw, worker_cpu: Number(e.target.value) });
+                  }}
+                />
+              </label>
+              <label>
+                Worker memory (GiB)
+                <input
+                  type="number"
+                  min={1}
+                  value={cdsw.worker_memory_gb}
+                  onChange={(e) => {
+                    setWorkerPresetId(null);
+                    setCdsw({ ...cdsw, worker_memory_gb: Number(e.target.value) });
+                  }}
+                />
+              </label>
+              <label>
+                GPUs per worker (default for new jobs)
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={cdsw.gpus_per_worker}
+                  onChange={(e) => {
+                    setWorkerPresetId(null);
+                    setCdsw({ ...cdsw, gpus_per_worker: Number(e.target.value) });
+                  }}
+                />
+              </label>
+              <label>
+                Default job worker count
+                <input
+                  type="number"
+                  min={1}
+                  max={32}
+                  value={cdsw.default_job_num_workers}
+                  onChange={(e) =>
+                    setCdsw({ ...cdsw, default_job_num_workers: Number(e.target.value) })
+                  }
+                />
+              </label>
+            </>
+          )}
           <label>
             CML accelerator label ID
             <input
@@ -262,6 +286,6 @@ export function PlatformSettingsPanel({
           : saveLabel ?? (isProjectScope ? "Save project Ray settings" : "Save platform defaults")}
       </button>
       {message && <p className="hint">{message}</p>}
-    </article>
+    </Wrapper>
   );
 }

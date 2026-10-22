@@ -116,7 +116,7 @@ export function wizardStepBlockMessage(
       }
       return block(step.requirement, "Check vocab size and BPE options above.");
     }
-    case "geometry":
+    case "architecture":
       if (ctx.hiddenSize <= 0 || ctx.layers <= 0 || ctx.heads <= 0) {
         return block(
           "Hidden size, layer count, and head count must be positive.",
@@ -129,7 +129,7 @@ export function wizardStepBlockMessage(
           suggestHeadCount(ctx.hiddenSize, ctx.heads),
         );
       }
-      return block(step.requirement, "Adjust geometry until metrics look correct.");
+      return block(step.requirement, "Adjust geometry until the diagram and metrics look correct.");
     case "training":
       if (ctx.maxSteps < 10 || ctx.maxSteps > 500_000) {
         return block(
@@ -138,7 +138,7 @@ export function wizardStepBlockMessage(
         );
       }
       return block(step.requirement, "Set max_steps on the Schedule step.");
-    case "workers":
+    case "compute":
       if (ctx.jobWorkers < 1 || ctx.jobWorkers > 32) {
         return block(
           `Worker count is ${ctx.jobWorkers}; allowed range is 1–32.`,
@@ -151,7 +151,7 @@ export function wizardStepBlockMessage(
           "Set GPUs per engine to 1+, or use a single CPU worker for tiny models.",
         );
       }
-      return block(step.requirement, "Review worker and GPU fields on the Workers step.");
+      return block(step.requirement, "Review job engine sizing on the Compute step.");
     case "register":
       if (!ctx.jobName.trim()) {
         return block("Job name is empty.", "Enter a short label you will recognize in the job list.");
@@ -165,9 +165,6 @@ export function wizardStepBlockMessage(
       return block(step.requirement, "Fill job name and model id on this step.");
     case "mode":
     case "preset":
-    case "diagram":
-    case "ray":
-      return null;
     default:
       return block(step.requirement, "Complete the required fields on this step.");
   }
@@ -188,11 +185,9 @@ const WIZARD_STEP_ORDER = [
   "preset",
   "dataset",
   "tokenizer",
-  "geometry",
-  "diagram",
+  "architecture",
   "training",
-  "ray",
-  "workers",
+  "compute",
   "register",
 ] as const;
 

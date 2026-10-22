@@ -1,6 +1,5 @@
 /**
- * GPT-style training pipeline: project → mode → model/task → data → tokenizer →
- * architecture → schedule → cluster → register. One screen per step (split, don’t scroll).
+ * GPT-style training pipeline. Architecture step blends editable geometry + live network diagram.
  */
 export const MODEL_TASK_WIZARD_STEPS = [
   { id: "project", title: "Project" },
@@ -8,11 +7,9 @@ export const MODEL_TASK_WIZARD_STEPS = [
   { id: "preset", title: "Model & task" },
   { id: "dataset", title: "Dataset" },
   { id: "tokenizer", title: "Tokenizer" },
-  { id: "geometry", title: "Geometry" },
-  { id: "diagram", title: "Diagram" },
+  { id: "architecture", title: "Architecture" },
   { id: "training", title: "Schedule" },
-  { id: "ray", title: "Ray defaults" },
-  { id: "workers", title: "Workers" },
+  { id: "compute", title: "Compute" },
   { id: "register", title: "Register" },
 ] as const;
 

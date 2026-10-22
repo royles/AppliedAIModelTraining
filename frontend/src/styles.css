@@ -731,17 +731,26 @@ body {
   margin: 0 0 0.35rem;
 }
 
-.model-task-wizard-footer {
+.model-task-wizard-nav {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: var(--cdl-space-3, 0.75rem);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--cdl-space-3, 0.75rem) 0;
+  background: var(--cdl-bg-app, #f4f4f4);
+  border-bottom: 1px solid var(--cdl-border-subtle, #d8d8d8);
+  margin-bottom: 0.25rem;
 }
 
-.model-task-wizard-footer-actions {
+.model-task-wizard-nav-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--cdl-space-3, 0.75rem);
   align-items: center;
+  min-height: 2.25rem;
 }
 
 .wizard-step-validation {
