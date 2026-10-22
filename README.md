@@ -167,5 +167,6 @@ Check `GET /api/health` → `details.memory` for detected limits and recommendat
 | `PLATFORM_NCCL_DEFAULTS` | Default **`1`**: NCCL / PyTorch distributed env for multi-GPU Train (`0` = off) |
 | `PLATFORM_PYTHON` | Override interpreter for start/install (default: current `python3`) |
 | `PLATFORM_SKIP_DEP_CHECK` | Set `1` to skip automatic `pip install` in `start.py` |
+| `PLATFORM_LOG_LEVEL` | App console logging (default **`ERROR`** — warnings/info hidden). Use `INFO` when debugging. |
 | `PLATFORM_UVICORN_LOG_LEVEL` | With `PLATFORM_ACCESS_LOG=1`, uvicorn level (default `info`) |
-| `PLATFORM_ACCESS_LOG` | Set `1` for every HTTP line (default: **once per route**, then suppress 3s poll spam) |
+| `PLATFORM_ACCESS_LOG` | Set `1` to enable HTTP access logs (default: **off** for a quiet console) |

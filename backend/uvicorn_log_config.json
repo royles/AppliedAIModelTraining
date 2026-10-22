@@ -40,8 +40,17 @@
       "level": "ERROR"
     },
     "uvicorn.access": {
-      "handlers": ["access"],
-      "level": "INFO",
+      "handlers": [],
+      "level": "ERROR",
+      "propagate": false
+    },
+    "root": {
+      "handlers": ["default"],
+      "level": "ERROR"
+    },
+    "app": {
+      "handlers": ["default"],
+      "level": "ERROR",
       "propagate": false
     }
   }

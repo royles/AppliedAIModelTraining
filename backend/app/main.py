@@ -22,9 +22,10 @@ from app.services.cai_networking import (
 )
 from app.services.platform_settings import sync_platform_ray_head_from_session
 from app.middleware.path_prefix import PathPrefixMiddleware
+from app.logging_config import configure_platform_logging
 from app.static_ui import mount_static_ui
 
-logging.basicConfig(level=logging.INFO)
+configure_platform_logging()
 
 
 @asynccontextmanager

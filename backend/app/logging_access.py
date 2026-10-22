@@ -27,8 +27,8 @@ class LogEachRouteOnceFilter(logging.Filter):
         self._seen: set[str] = set()
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if os.environ.get("PLATFORM_ACCESS_LOG", "").lower() in ("1", "true", "yes"):
-            return True
+        if os.environ.get("PLATFORM_ACCESS_LOG", "").lower() not in ("1", "true", "yes"):
+            return False
         key = _route_key(record.getMessage())
         if key in self._seen:
             return False
