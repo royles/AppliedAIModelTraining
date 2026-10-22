@@ -430,7 +430,12 @@ export function ModelTasksPanel(props: Props) {
           />
         );
       case "dataset":
-        return <DatasetConfigFields value={dataset} onChange={onDatasetChange} compact />;
+        return (
+          <>
+            <DatasetConfigNotice dataset={dataset} />
+            <DatasetConfigFields value={dataset} onChange={onDatasetChange} compact />
+          </>
+        );
       case "tokenizer":
         return (
           <FromScratchConfigFields
@@ -623,41 +628,45 @@ export function ModelTasksPanel(props: Props) {
         onSelectIndex={setCurrentStepIndex}
       />
 
-      {currentStep.id === "dataset" && <DatasetConfigNotice dataset={dataset} />}
-
-      <div className="model-task-wizard-body">
-        <nav className="model-task-wizard-nav" aria-label="Wizard steps">
-          <div className="model-task-wizard-nav-actions">
+      <nav className="model-task-wizard-nav" aria-label="Wizard steps">
+        <div className="model-task-wizard-nav-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={currentStepIndex === 0}
+            onClick={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
+          >
+            Back
+          </button>
+          {!isLastStep ? (
             <button
               type="button"
-              className="btn-secondary"
-              disabled={currentStepIndex === 0}
-              onClick={() => setCurrentStepIndex((i) => Math.max(0, i - 1))}
+              disabled={!canGoNext}
+              aria-describedby={!canGoNext && stepBlock ? "wizard-next-block-reason" : undefined}
+              onClick={() =>
+                setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))
+              }
             >
-              Back
+              Next
             </button>
-            {!isLastStep ? (
-              <button
-                type="button"
-                disabled={!canGoNext}
-                aria-describedby={!canGoNext && stepBlock ? "wizard-next-block-reason" : undefined}
-                onClick={() =>
-                  setCurrentStepIndex((i) => Math.min(MODEL_TASK_WIZARD_STEPS.length - 1, i + 1))
-                }
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!ready || startBusy}
-                aria-describedby={!ready && startBlock ? "wizard-start-block-reason" : undefined}
-                onClick={() => void onCreateJob(blueprintFile)}
-              >
-                {startBusy ? "Starting…" : "Start job"}
-              </button>
-            )}
-          </div>
+          ) : (
+            <button
+              type="button"
+              disabled={!ready || startBusy}
+              aria-describedby={!ready && startBlock ? "wizard-start-block-reason" : undefined}
+              onClick={() => void onCreateJob(blueprintFile)}
+            >
+              {startBusy ? "Starting…" : "Start job"}
+            </button>
+          )}
+        </div>
+      </nav>
+
+      <div className="model-task-wizard-step-panel">
+        <WizardStepCard
+          title={currentStep.title}
+          description={stepDescription}
+        >
           {!isLastStep && !canGoNext && stepBlock && (
             <WizardValidationCallout
               id="wizard-next-block-reason"
@@ -674,13 +683,6 @@ export function ModelTasksPanel(props: Props) {
               block={startBlock}
             />
           )}
-        </nav>
-
-        <WizardStepCard
-          title={currentStep.title}
-          description={stepDescription}
-        >
-          {stepBlock && <WizardValidationCallout block={stepBlock} />}
           {renderStepBody(currentStep.id)}
         </WizardStepCard>
       </div>

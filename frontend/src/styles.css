@@ -594,7 +594,8 @@ body {
 }
 
 .model-task-wizard-stepper {
-  margin-bottom: 1.25rem;
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
 }
 
 .model-task-wizard-stepper-list {
@@ -645,10 +646,17 @@ body {
   flex-shrink: 0;
 }
 
-.model-task-wizard-body {
+.model-task-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.model-task-wizard-step-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-height: 0;
 }
 
 .model-task-wizard-step-card {
@@ -733,24 +741,21 @@ body {
 
 .model-task-wizard-nav {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--cdl-space-3, 0.75rem);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: var(--cdl-space-3, 0.75rem) 0;
-  background: var(--cdl-bg-app, #f4f4f4);
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0 0 var(--cdl-space-3, 0.75rem);
+  margin: 0 0 var(--cdl-space-3, 0.75rem);
   border-bottom: 1px solid var(--cdl-border-subtle, #d8d8d8);
-  margin-bottom: 0.25rem;
+  background: var(--cdl-bg-app, #f4f4f4);
 }
 
 .model-task-wizard-nav-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--cdl-space-3, 0.75rem);
   align-items: center;
   min-height: 2.25rem;
+  width: 100%;
 }
 
 .wizard-step-validation {
