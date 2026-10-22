@@ -212,6 +212,19 @@ def load_training_samples(
     if task_type == "sequence_classification" and labels is None:
         labels = [i % 2 for i in range(len(texts))]
 
+    if task_type == "causal_lm":
+        from app.training.lm_text_utils import prepare_causal_lm_texts
+
+        before = len(texts)
+        texts = prepare_causal_lm_texts(texts, source=cfg.source)
+        if len(texts) != before:
+            labels = None
+            logger.info(
+                "Causal LM text pipeline: %s rows -> %s training examples (chunk/normalize)",
+                before,
+                len(texts),
+            )
+
     logger.info(
         "Loaded dataset source=%s examples=%s task=%s",
         cfg.source,

@@ -84,6 +84,8 @@ def generate_model_card(
         "## Intended use",
         "",
         "- **Primary:** Experimental chat / completion via OpenAI-compatible `/v1/chat/completions`.",
+        "- **Prompt format:** `raw_lm` = continue plain text (WikiText-style jobs); "
+        "`platform_user_assistant` = User:/Assistant: turns (demo/starter corpora).",
         "- **Not for:** Production decisions without independent safety, bias, and quality review.",
         "- **Serving:** Promote to `production` in the Model Registry when approved.",
         "",

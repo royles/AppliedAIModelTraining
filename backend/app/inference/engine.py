@@ -10,7 +10,7 @@ from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
-from app.inference.generation import platform_generation_extras
+from app.inference.generation import platform_generation_extras, raw_lm_generation_extras
 from app.inference.prompting import messages_to_prompt, read_platform_config, use_platform_prompt_format
 from app.inference.schemas_openai import UsageInfo
 
@@ -85,6 +85,11 @@ def _build_generation_kwargs(
 ) -> dict:
     meta = read_platform_config(model_path)
     platform_model = use_platform_prompt_format(model_path, meta)
+    raw_lm = meta.get("prompt_format") == "raw_lm" or (
+        meta.get("init_mode") == "from_scratch"
+        and meta.get("task_type") == "causal_lm"
+        and not platform_model
+    )
     gen_kwargs: dict = {
         "max_new_tokens": max_tokens,
         "do_sample": temperature > 0,
@@ -98,6 +103,8 @@ def _build_generation_kwargs(
         gen_kwargs["do_sample"] = False
     if platform_model:
         gen_kwargs.update(platform_generation_extras(tokenizer))
+    elif raw_lm:
+        gen_kwargs.update(raw_lm_generation_extras(tokenizer))
     return gen_kwargs
 
 

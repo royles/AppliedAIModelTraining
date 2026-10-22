@@ -285,6 +285,19 @@ def run_training_job(job_id: int) -> None:
                 framework_line("ray", f"Ray head is up at {head} — continuing task setup"),
             )
 
+        if cfg.task_type == "causal_lm" and "prompt_format" not in train_config:
+            from app.training.dataset_loader import load_training_samples
+            from app.training.lm_text_utils import detect_prompt_format
+
+            try:
+                sample_texts, _ = load_training_samples(
+                    cfg.dataset.model_dump(), task_type=cfg.task_type
+                )
+                train_config["prompt_format"] = detect_prompt_format(sample_texts)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not detect prompt_format: %s", exc)
+                train_config["prompt_format"] = "raw_lm"
+
         if cfg.init_mode == "from_scratch":
             append_job_log(
                 db,

@@ -48,11 +48,32 @@ def read_platform_config(model_path: str | Path) -> dict[str, Any]:
 
 
 def use_platform_prompt_format(model_path: str | Path, meta: dict[str, Any]) -> bool:
-    if meta.get("prompt_format") == "platform_user_assistant":
-        return True
-    if meta.get("init_mode") == "from_scratch" and meta.get("task_type") == "causal_lm":
-        return True
-    return False
+    return meta.get("prompt_format") == "platform_user_assistant"
+
+
+def raw_lm_messages_to_prompt(messages: list[dict[str, str]]) -> str:
+    """
+    Plain continuation prompt for corpus-trained LMs (WikiText, etc.).
+
+    Uses the latest user turn (and optional system prefix) without User:/Assistant:
+    tokens the model was not trained on.
+    """
+    system_parts: list[str] = []
+    user_parts: list[str] = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = (msg.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "system":
+            system_parts.append(content)
+        elif role == "user":
+            user_parts.append(content)
+    prefix = "\n\n".join(system_parts).strip()
+    user = user_parts[-1] if user_parts else ""
+    if prefix and user:
+        return f"{prefix}\n\n{user}"
+    return user or prefix
 
 
 def messages_to_prompt(
@@ -71,6 +92,11 @@ def messages_to_prompt(
             except Exception:  # noqa: BLE001
                 pass
         return platform_messages_to_prompt(messages)
+
+    if meta.get("prompt_format") == "raw_lm" or (
+        meta.get("init_mode") == "from_scratch" and meta.get("task_type") == "causal_lm"
+    ):
+        return raw_lm_messages_to_prompt(messages)
 
     if hasattr(tokenizer, "apply_chat_template") and getattr(tokenizer, "chat_template", None):
         return tokenizer.apply_chat_template(

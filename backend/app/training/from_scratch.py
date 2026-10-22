@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.training.dataset_loader import load_training_samples
+from app.training.lm_text_utils import detect_prompt_format
 from app.training.tokenizer_config import TokenizerBuildConfig
 from app.training.tokenizer_trainer import (
     recommended_min_corpus_chars,
@@ -74,6 +75,12 @@ def prepare_from_scratch_training(
             )
         return train_config
     texts, _ = load_training_samples(cfg.dataset.model_dump(), task_type=cfg.task_type)
+    train_config["prompt_format"] = detect_prompt_format(texts)
+    _log_early = log or (lambda m: logger.info(m))
+    _log_early(
+        f"Training prompt format: {train_config['prompt_format']} "
+        "(chat API uses matching inference template)."
+    )
 
     def _log(msg: str) -> None:
         logger.info(msg)

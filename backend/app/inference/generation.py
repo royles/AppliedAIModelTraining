@@ -34,3 +34,16 @@ def platform_generation_extras(
         "repetition_penalty": 1.12,
         "stopping_criteria": StoppingCriteriaList([stops]),
     }
+
+
+def raw_lm_generation_extras(tokenizer: PreTrainedTokenizerBase) -> dict:
+    """Corpus LMs: stop at document end / runaway newlines, not chat turn markers."""
+    stop_strings: tuple[str, ...] = ("<|endoftext|>",)
+    if tokenizer.eos_token:
+        stop_strings = (tokenizer.eos_token, *stop_strings)
+    stops = StopOnTokenSequences(tokenizer, stop_strings)
+    return {
+        "repetition_penalty": 1.15,
+        "no_repeat_ngram_size": 3,
+        "stopping_criteria": StoppingCriteriaList([stops]),
+    }
