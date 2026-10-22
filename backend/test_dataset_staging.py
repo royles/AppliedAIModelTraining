@@ -74,11 +74,17 @@ def test_auto_register_syncs_corpus_and_shards(tmp_path, monkeypatch):
     )
     assert reg is not None
     assert reg["collection_id"] == auto_data_collection_id(42)
+    assert reg["reference_only"] is True
     assert reg["shards_saved"] is True
     assert reg["shard_world_size"] == 2
+    assert reg["staging_root_ref"] == str(artifact.resolve())
     coll_root = tmp_path / "collections" / auto_data_collection_id(42)
-    cache = shard_cache_dir(coll_root, cfg, "causal_lm")
-    assert (cache / "corpus.json").is_file()
-    assert (cache / "shard_0.json").is_file()
-    assert (cache / "shard_1.json").is_file()
+    coll_cache = shard_cache_dir(coll_root, cfg, "causal_lm")
+    assert not (coll_cache / "corpus.json").is_file()
+    job_cache = shard_cache_dir(artifact, cfg, "causal_lm")
+    assert (job_cache / "corpus.json").is_file()
+    assert (job_cache / "shard_0.json").is_file()
+    assert (job_cache / "shard_1.json").is_file()
+    assert train_config.get("data_staging_root_ref") == str(artifact.resolve())
+    assert train_config.get("dataset_corpus_ref") == str(job_cache / "corpus.json")
     assert train_config.get("data_collection_id") == auto_data_collection_id(42)

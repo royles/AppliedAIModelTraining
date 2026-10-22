@@ -14,7 +14,9 @@ type CollectionRow = {
 };
 
 type StageResult = {
-  access_mode: "local" | "remote";
+      access_mode: "local" | "remote" | "reference";
+      reference_only?: boolean;
+      staging_root_ref?: string;
   local_path: string;
   corpus_local_path?: string | null;
   cache_local_path?: string;
@@ -130,10 +132,10 @@ export function DataStagingPanel() {
       <header className="main-panel-header">
         <h2>Data</h2>
         <p className="hint">
-          Shared data collections can be reused across many training runs. Local sources (files,
-          Hugging Face, inline text) can be pre-loaded into a collection directory.{" "}
-          <strong>Iceberg and S3 Parquet</strong> stay remote — register the collection here; runs
-          read from the catalog or bucket without copying the corpus locally.
+          Shared data collections track datasets for reuse across runs. Training jobs register
+          <strong> references</strong> to corpus and shard paths when data already exists on disk
+          (no duplicate copies). Use pre-load here to materialize once when needed.{" "}
+          <strong>Iceberg and S3 Parquet</strong> stay remote — only URI references are stored.
         </p>
       </header>
 
@@ -242,10 +244,24 @@ export function DataStagingPanel() {
             <dl className="data-staging-paths data-staging-result">
               <div>
                 <dt>Access</dt>
-                <dd>{lastResult.access_mode === "remote" ? "Remote (no local copy)" : "Local corpus"}</dd>
+                <dd>
+                  {lastResult.access_mode === "remote"
+                    ? "Remote (no local copy)"
+                    : lastResult.reference_only || lastResult.access_mode === "reference"
+                      ? "Reference (reuse existing files)"
+                      : "Local corpus"}
+                </dd>
               </div>
+              {(lastResult.staging_root_ref || lastResult.reference_only) && (
+                <div>
+                  <dt>Reuse root (corpus + shards)</dt>
+                  <dd>
+                    <code>{lastResult.staging_root_ref ?? "—"}</code>
+                  </dd>
+                </div>
+              )}
               <div>
-                <dt>Collection local path</dt>
+                <dt>Collection registry path</dt>
                 <dd>
                   <code>{lastResult.local_path}</code>
                 </dd>

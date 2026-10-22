@@ -62,6 +62,45 @@ def local_path_fields(
     }
 
 
+def materialization_at_staging_root(
+    staging_root: str | Path,
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+) -> dict[str, Any] | None:
+    """Corpus (+ optional shards) already on disk under a staging root (no copy)."""
+    root = str(Path(staging_root).resolve())
+    cache = shard_cache_dir(root, dataset_cfg, task_type)
+    if not (cache / _CORPUS_FILE).is_file():
+        return None
+    corpus_examples: int | None = None
+    try:
+        texts, _ = _read_corpus(cache / _CORPUS_FILE)
+        corpus_examples = len(texts)
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    shard_world_size = _shard_world_size_on_disk(cache)
+    return {
+        "staging_root_ref": root,
+        "cache_local_path": str(cache),
+        "corpus_local_path": str(cache / _CORPUS_FILE),
+        "corpus_examples": corpus_examples,
+        "shard_world_size": shard_world_size,
+        "shards_on_disk": shard_world_size is not None,
+    }
+
+
+def _first_materialization(
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+    staging_roots: list[str],
+) -> dict[str, Any] | None:
+    for root in staging_roots:
+        hit = materialization_at_staging_root(root, dataset_cfg, task_type)
+        if hit is not None:
+            return hit
+    return None
+
+
 def _read_collection_meta(path: Path) -> dict[str, Any] | None:
     meta_file = path / _COLLECTION_META
     if not meta_file.is_file():
@@ -244,11 +283,14 @@ def stage_data_collection(
         "cache_key": cache_key,
         "task_type": task_type,
         "access_mode": "local",
+        "reference_only": False,
         "remote_uri": None,
         "dataset_summary": _dataset_summary(dataset_cfg),
         "corpus_examples": len(texts),
         "shard_world_size": int(shard_meta["world_size"]) if shard_meta else None,
         "staged_at": now,
+        "staging_root_ref": paths["local_path"],
+        "collection_registry_local_path": paths["local_path"],
         **paths,
     }
     meta["last_staged"] = last_staged
@@ -315,16 +357,32 @@ def find_collection_for_dataset(
                     "remote_uri": staged.get("remote_uri") or remote_data_uri(dataset_cfg),
                     "cache_key": cache_key,
                 }
+            ref_root = staged.get("staging_root_ref")
+            if isinstance(ref_root, str) and ref_root.strip():
+                live = materialization_at_staging_root(ref_root, dataset_cfg, task_type)
+                if live is not None:
+                    return {
+                        "collection_id": collection_id,
+                        "name": (meta or {}).get("name") or collection_id,
+                        "local_path": str(root.resolve()),
+                        "access_mode": staged.get("access_mode") or "reference",
+                        "reference_only": bool(staged.get("reference_only", True)),
+                        "cache_key": cache_key,
+                        **live,
+                    }
         cache = root / ".dataset_shards" / cache_key
         corpus = cache / _CORPUS_FILE
         if not corpus.is_file():
             return None
         paths = local_path_fields(root, dataset_cfg, task_type)
+        live = materialization_at_staging_root(root, dataset_cfg, task_type) or {}
         return {
             "collection_id": collection_id,
             "name": (meta or {}).get("name") or collection_id,
             "access_mode": "local",
+            "reference_only": False,
             **paths,
+            **live,
             "cache_key": cache_key,
         }
 
@@ -341,6 +399,9 @@ def find_collection_for_dataset(
 
 
 def shared_dataset_dirs_from_config(train_config: dict[str, Any]) -> list[str] | None:
+    ref = train_config.get("data_staging_root_ref")
+    if isinstance(ref, str) and ref.strip():
+        return [ref.strip()]
     raw = train_config.get("shared_dataset_dirs")
     if isinstance(raw, list):
         dirs = [str(d).strip() for d in raw if str(d).strip()]
@@ -385,9 +446,14 @@ def attach_shared_collection_to_train_config(
         train_config.pop("shared_dataset_dirs", None)
         return train_config
 
-    local_path = hit["local_path"]
+    reuse_root = hit.get("staging_root_ref") or hit.get("local_path")
     train_config["dataset_access_mode"] = "local"
-    train_config["shared_dataset_dirs"] = [local_path]
+    train_config["data_staging_root_ref"] = reuse_root
+    train_config["shared_dataset_dirs"] = [reuse_root]
+    if hit.get("cache_local_path"):
+        train_config["dataset_cache_ref"] = hit["cache_local_path"]
+    if hit.get("corpus_local_path"):
+        train_config["dataset_corpus_ref"] = hit["corpus_local_path"]
     return train_config
 
 
@@ -495,35 +561,42 @@ def _shard_world_size_on_disk(cache: Path) -> int | None:
     return world_size
 
 
-def _update_collection_last_staged(
+def _persist_collection_dataset_record(
     collection_id: str,
     *,
     dataset_cfg: dict[str, Any],
     task_type: str,
-    job_id: int,
-    corpus_examples: int | None,
-    shard_world_size: int | None,
+    job_id: int | None,
+    materialization: dict[str, Any],
+    access_mode: str,
+    reference_only: bool,
 ) -> dict[str, Any]:
     root = collection_dir(collection_id)
     meta = _read_collection_meta(root)
     if meta is None:
         raise ValueError(f"Data collection not found: {collection_id}")
-    staging_root = str(root)
-    paths = local_path_fields(staging_root, dataset_cfg, task_type)
+    registry_path = str(root)
     now = datetime.now(timezone.utc).isoformat()
+    shard_world_size = materialization.get("shard_world_size")
     last_staged = {
         "cache_key": _cache_key(dataset_cfg, task_type),
         "task_type": task_type,
-        "access_mode": "local",
-        "remote_uri": None,
+        "access_mode": access_mode,
+        "reference_only": reference_only,
+        "remote_uri": materialization.get("remote_uri"),
         "dataset_summary": _dataset_summary(dataset_cfg),
-        "corpus_examples": corpus_examples,
+        "corpus_examples": materialization.get("corpus_examples"),
         "shard_world_size": shard_world_size,
+        "shards_on_disk": materialization.get("shards_on_disk")
+        or (shard_world_size is not None and shard_world_size > 1),
         "staged_at": now,
-        "auto_registered": True,
+        "collection_registry_local_path": registry_path,
+        "local_path": registry_path,
+        "staging_root_ref": materialization.get("staging_root_ref"),
+        "cache_local_path": materialization.get("cache_local_path"),
+        "corpus_local_path": materialization.get("corpus_local_path"),
+        "auto_registered": job_id is not None,
         "registered_from_job_id": job_id,
-        "shards_saved": shard_world_size is not None and shard_world_size > 1,
-        **paths,
     }
     meta["last_staged"] = last_staged
     meta["updated_at"] = now
@@ -536,6 +609,8 @@ def _link_train_config_to_collection(
     collection_id: str,
     collection_root: str,
     dataset_cfg: dict[str, Any],
+    *,
+    materialization: dict[str, Any] | None = None,
 ) -> None:
     train_config["data_collection_id"] = collection_id
     train_config["data_collection_local_path"] = collection_root
@@ -545,9 +620,17 @@ def _link_train_config_to_collection(
         if uri:
             train_config["dataset_remote_uri"] = uri
         train_config.pop("shared_dataset_dirs", None)
+        train_config.pop("data_staging_root_ref", None)
         return
-    train_config["dataset_access_mode"] = "local"
-    train_config["shared_dataset_dirs"] = [collection_root]
+    reuse_root = (materialization or {}).get("staging_root_ref") or collection_root
+    train_config["dataset_access_mode"] = "reference" if materialization else "local"
+    train_config["data_staging_root_ref"] = reuse_root
+    train_config["shared_dataset_dirs"] = [reuse_root]
+    if materialization:
+        if materialization.get("cache_local_path"):
+            train_config["dataset_cache_ref"] = materialization["cache_local_path"]
+        if materialization.get("corpus_local_path"):
+            train_config["dataset_corpus_ref"] = materialization["corpus_local_path"]
 
 
 def register_job_dataset_in_data_collection(
@@ -558,9 +641,10 @@ def register_job_dataset_in_data_collection(
     train_config: dict[str, Any],
 ) -> dict[str, Any] | None:
     """
-    After a run loads (and optionally shards) data, register it under Data for reuse.
+    Register dataset under Data for reuse without copying bytes when possible.
 
-    Worker shard files are copied into the collection cache when present on the job artifact.
+    Stores references (staging root, corpus path, shard cache path) to existing
+    on-disk materialization — typically the job artifact or an earlier shared root.
     """
     dataset_cfg = train_config.get("dataset")
     if not isinstance(dataset_cfg, dict):
@@ -569,7 +653,6 @@ def register_job_dataset_in_data_collection(
     task_type = str(train_config.get("task_type") or "causal_lm")
     collection_id = ensure_auto_data_collection(project_id=project_id, project_name=project_name)
     collection_root = str(collection_dir(collection_id))
-    dest_cache = shard_cache_dir(collection_root, dataset_cfg, task_type)
 
     if is_remote_dataset(dataset_cfg):
         result = stage_data_collection(
@@ -580,6 +663,7 @@ def register_job_dataset_in_data_collection(
         )
         result["auto_registered"] = True
         result["registered_from_job_id"] = job_id
+        result["reference_only"] = True
         _link_train_config_to_collection(train_config, collection_id, collection_root, dataset_cfg)
         return result
 
@@ -588,78 +672,83 @@ def register_job_dataset_in_data_collection(
     train_workers = int(train_config.get("ray_train_workers_scheduled") or 0)
     shards_prepared = bool(train_config.get("dataset_shards_prepared"))
 
-    synced = False
-    for root in [artifact_dir, *shared_dirs]:
-        src = _cache_with_corpus(root, dataset_cfg, task_type)
-        if src is not None and src.resolve() != dest_cache.resolve():
-            synced = _sync_shard_cache(src, dest_cache) or synced
+    search_roots: list[str] = []
+    prior = find_collection_for_dataset(dataset_cfg, task_type, preferred_collection_id=collection_id)
+    if prior and prior.get("staging_root_ref"):
+        search_roots.append(str(prior["staging_root_ref"]))
+    for root in [*shared_dirs, artifact_dir, collection_root]:
+        if root and root not in search_roots:
+            search_roots.append(root)
 
-    if shards_prepared and artifact_dir:
-        job_cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
-        if (job_cache / _CORPUS_FILE).is_file() and job_cache.resolve() != dest_cache.resolve():
-            synced = _sync_shard_cache(job_cache, dest_cache) or synced
+    materialized = _first_materialization(dataset_cfg, task_type, search_roots)
 
-    if not (dest_cache / _CORPUS_FILE).is_file():
-        ray_ws: int | None = None
-        if shards_prepared and train_workers > 1:
-            ray_ws = train_workers
-        result = stage_data_collection(
-            collection_id=collection_id,
-            dataset=dataset_cfg,
+    if materialized is not None:
+        reference_only = materialized["staging_root_ref"] != collection_root
+        last_staged = _persist_collection_dataset_record(
+            collection_id,
+            dataset_cfg=dataset_cfg,
             task_type=task_type,
-            ray_train_workers=ray_ws,
+            job_id=job_id,
+            materialization=materialized,
+            access_mode="reference" if reference_only else "local",
+            reference_only=reference_only,
         )
-        result["auto_registered"] = True
-        result["registered_from_job_id"] = job_id
-        _link_train_config_to_collection(train_config, collection_id, collection_root, dataset_cfg)
-        return result
+        _link_train_config_to_collection(
+            train_config,
+            collection_id,
+            collection_root,
+            dataset_cfg,
+            materialization=materialized,
+        )
+        logger.info(
+            "Auto-registered job dataset by reference job=%s collection=%s reuse_root=%s shards=%s",
+            job_id,
+            collection_id,
+            materialized["staging_root_ref"],
+            materialized.get("shard_world_size"),
+        )
+        return {
+            "collection_id": collection_id,
+            "auto_registered": True,
+            "registered_from_job_id": job_id,
+            "access_mode": "reference" if reference_only else "local",
+            "reference_only": reference_only,
+            "local_path": collection_root,
+            **materialized,
+            "shards_saved": materialized.get("shards_on_disk"),
+            "last_staged": last_staged,
+        }
 
-    corpus_examples: int | None = None
-    try:
-        texts, _ = _read_corpus(dest_cache / _CORPUS_FILE)
-        corpus_examples = len(texts)
-    except (OSError, ValueError, json.JSONDecodeError):
-        pass
-
-    shard_world_size = _shard_world_size_on_disk(dest_cache)
-    if shard_world_size is None and shards_prepared and train_workers > 1 and artifact_dir:
-        job_cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
-        if _shard_world_size_on_disk(job_cache) == train_workers:
-            _sync_shard_cache(job_cache, dest_cache)
-            shard_world_size = train_workers
-
-    paths = local_path_fields(collection_root, dataset_cfg, task_type)
-    last_staged = _update_collection_last_staged(
+    ray_ws: int | None = None
+    if shards_prepared and train_workers > 1:
+        ray_ws = train_workers
+    result = stage_data_collection(
+        collection_id=collection_id,
+        dataset=dataset_cfg,
+        task_type=task_type,
+        ray_train_workers=ray_ws,
+    )
+    mat = materialization_at_staging_root(collection_root, dataset_cfg, task_type) or {}
+    _persist_collection_dataset_record(
         collection_id,
         dataset_cfg=dataset_cfg,
         task_type=task_type,
         job_id=job_id,
-        corpus_examples=corpus_examples,
-        shard_world_size=shard_world_size,
+        materialization=mat,
+        access_mode="local",
+        reference_only=False,
     )
-
-    _link_train_config_to_collection(train_config, collection_id, collection_root, dataset_cfg)
-
-    logger.info(
-        "Auto-registered job dataset job=%s collection=%s corpus=%s shards=%s path=%s",
-        job_id,
+    result["auto_registered"] = True
+    result["registered_from_job_id"] = job_id
+    result["reference_only"] = False
+    _link_train_config_to_collection(
+        train_config,
         collection_id,
-        corpus_examples,
-        shard_world_size,
-        paths["corpus_local_path"],
+        collection_root,
+        dataset_cfg,
+        materialization=mat,
     )
-    return {
-        "collection_id": collection_id,
-        "auto_registered": True,
-        "registered_from_job_id": job_id,
-        "access_mode": "local",
-        **paths,
-        "corpus_examples": corpus_examples,
-        "shard_world_size": shard_world_size,
-        "shards_saved": shard_world_size is not None and shard_world_size > 1,
-        "last_staged": last_staged,
-        "synced_from_job_cache": synced,
-    }
+    return result
 
 
 # —— Legacy project paths (same layout as collections, under project_{id}) ——

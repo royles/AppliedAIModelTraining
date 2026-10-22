@@ -422,6 +422,23 @@ def run_training_job(job_id: int) -> None:
                         f"(remote: {reg.get('remote_uri')})",
                     ),
                 )
+            elif reg.get("reference_only"):
+                shard_note = (
+                    f", shards at {reg.get('cache_local_path')}"
+                    if reg.get("shards_saved")
+                    else ""
+                )
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "train",
+                        "Registered dataset under Data (reference, no copy) → "
+                        f"corpus {reg.get('corpus_local_path')}{shard_note}; "
+                        f"reuse root {reg.get('staging_root_ref')}; registry {reg.get('local_path')}",
+                    ),
+                )
             else:
                 shard_note = (
                     f", {reg.get('shard_world_size')} worker shard(s) at {reg.get('cache_local_path')}"
