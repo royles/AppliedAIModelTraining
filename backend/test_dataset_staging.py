@@ -3,9 +3,13 @@
 from pathlib import Path
 
 from app.training.dataset_config import is_remote_dataset
+from app.training.dataset_sharding import prepare_dataset_shards_on_driver, shard_cache_dir
 from app.training.dataset_staging import (
+    auto_data_collection_id,
     create_data_collection,
+    ensure_auto_data_collection,
     find_collection_for_dataset,
+    register_job_dataset_in_data_collection,
     stage_data_collection,
 )
 
@@ -38,3 +42,43 @@ def test_remote_collection_registers_without_corpus_file(tmp_path, monkeypatch):
     hit = find_collection_for_dataset(cfg, "causal_lm", preferred_collection_id=cid)
     assert hit is not None
     assert hit["access_mode"] == "remote"
+
+
+def test_auto_register_syncs_corpus_and_shards(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "app.training.dataset_staging.COLLECTIONS_ROOT",
+        tmp_path / "collections",
+    )
+    artifact = tmp_path / "job_9"
+    artifact.mkdir()
+    cfg = {"source": "inline", "texts": ["a", "b", "c", "d"]}
+    prepare_dataset_shards_on_driver(
+        artifact_dir=str(artifact),
+        dataset_cfg=cfg,
+        task_type="causal_lm",
+        world_size=2,
+    )
+    ensure_auto_data_collection(project_id=42, project_name="Demo")
+    train_config = {
+        "dataset": cfg,
+        "task_type": "causal_lm",
+        "artifact_dir": str(artifact),
+        "dataset_shards_prepared": True,
+        "ray_train_workers_scheduled": 2,
+    }
+    reg = register_job_dataset_in_data_collection(
+        project_id=42,
+        project_name="Demo",
+        job_id=9,
+        train_config=train_config,
+    )
+    assert reg is not None
+    assert reg["collection_id"] == auto_data_collection_id(42)
+    assert reg["shards_saved"] is True
+    assert reg["shard_world_size"] == 2
+    coll_root = tmp_path / "collections" / auto_data_collection_id(42)
+    cache = shard_cache_dir(coll_root, cfg, "causal_lm")
+    assert (cache / "corpus.json").is_file()
+    assert (cache / "shard_0.json").is_file()
+    assert (cache / "shard_1.json").is_file()
+    assert train_config.get("data_collection_id") == auto_data_collection_id(42)

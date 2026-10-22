@@ -16,7 +16,7 @@ from app.resource_hints import (
     should_apply_train_memory_savings,
 )
 from app.database import SessionLocal
-from app.models import TrainingJob, WorkerGroup
+from app.models import Experiment, TrainingJob, WorkerGroup
 from app.services.cdsw_workers import CdswRayWorkerPool, ray_driver_init_address
 from app.services.platform_settings import (
     resolved_ray_head,
@@ -400,6 +400,44 @@ def run_training_job(job_id: int) -> None:
                     train_workers=train_workers,
                 )
             )
+
+        from app.training.dataset_staging import register_job_dataset_in_data_collection
+
+        project = db.get(Experiment, job.experiment_id)
+        reg = register_job_dataset_in_data_collection(
+            project_id=job.experiment_id,
+            project_name=project.name if project else None,
+            job_id=job_id,
+            train_config=train_config,
+        )
+        if reg:
+            if reg.get("access_mode") == "remote":
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "train",
+                        f"Registered remote dataset under Data → {reg.get('local_path')} "
+                        f"(remote: {reg.get('remote_uri')})",
+                    ),
+                )
+            else:
+                shard_note = (
+                    f", {reg.get('shard_world_size')} worker shard(s) at {reg.get('cache_local_path')}"
+                    if reg.get("shards_saved")
+                    else ""
+                )
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "train",
+                        f"Registered dataset under Data → corpus {reg.get('corpus_local_path')}"
+                        f"{shard_note}; collection {reg.get('local_path')}",
+                    ),
+                )
 
         from app.services.cdsw_workers import wait_for_gcs_port
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
