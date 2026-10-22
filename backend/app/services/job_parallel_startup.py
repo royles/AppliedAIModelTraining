@@ -1,0 +1,441 @@
+"""Overlap I/O-bound dataset prep with Ray head / worker provisioning."""
+
+from __future__ import annotations
+
+import logging
+from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+from app.database import SessionLocal
+from app.models import TrainingJob, WorkerGroup
+from app.services.job_log import append_job_log
+from app.services.log_flair import framework_line
+from app.training.from_scratch import prepare_from_scratch_training
+from app.training.transformer_config import TransformerTrainingConfig
+
+logger = logging.getLogger(__name__)
+
+LogFn = Callable[[str], None]
+
+
+def _job_framework_log(job_id: int) -> LogFn:
+    def log(msg: str) -> None:
+        db = SessionLocal()
+        try:
+            append_job_log(db, job_id, "framework", msg)
+        finally:
+            db.close()
+
+    return log
+
+
+def prepare_train_config_dataset(
+    cfg: TransformerTrainingConfig,
+    train_config: dict[str, Any],
+    *,
+    job_id: int,
+    resume: bool,
+) -> dict[str, Any]:
+    """Prompt-format detection and from-scratch corpus load (I/O bound)."""
+    log = _job_framework_log(job_id)
+    tc = dict(train_config)
+
+    if cfg.task_type == "causal_lm":
+        from app.training.dataset_loader import load_training_samples
+        from app.training.lm_text_utils import resolve_prompt_format
+
+        setting = tc.get("prompt_format") or cfg.prompt_format or "auto"
+        if setting == "auto":
+            log(framework_line("train", "Loading dataset sample for prompt_format detection…"))
+            try:
+                sample_texts, _ = load_training_samples(
+                    cfg.dataset.model_dump(), task_type=cfg.task_type
+                )
+                tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not detect prompt_format: %s", exc)
+                tc["prompt_format"] = "raw_lm"
+        else:
+            tc["prompt_format"] = resolve_prompt_format(setting, None)
+
+    if cfg.init_mode == "from_scratch":
+        log(framework_line("train", "From-scratch prep (tokenizer / dataset load)…"))
+        tc = prepare_from_scratch_training(
+            cfg,
+            tc,
+            log=log,
+            skip_tokenizer_if_present=resume,
+        )
+
+    return tc
+
+
+def ensure_ray_head_parallel(
+    *,
+    job_id: int,
+    needs_cai_ray_head: bool,
+    force_restart: bool,
+    head_before: str | None,
+) -> str | None:
+    if not needs_cai_ray_head:
+        return head_before
+
+    log = _job_framework_log(job_id)
+    from app.services.ray_cai_networking import ensure_ray_head_for_workers
+    from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+
+    if force_restart:
+        log(
+            framework_line(
+                "ray",
+                "Task restart: refreshing Ray head (ray stop --force, ray start --head)…",
+            )
+        )
+    else:
+        log(framework_line("ray", "Starting Ray head for this model task…"))
+
+    def _ray_head_log(msg: str) -> None:
+        log(msg if msg.startswith("[") else framework_line("ray", msg))
+
+    head = ensure_ray_head_for_workers(
+        framework_log=_ray_head_log,
+        force_restart=force_restart,
+    )
+    bind_gcs_auth_for_address(head, required=True)
+    log(framework_line("ray", f"Ray head is up at {head} — continuing task setup"))
+    return head
+
+
+def parallel_dataset_prep_and_ray_head(
+    *,
+    job_id: int,
+    cfg: TransformerTrainingConfig,
+    train_config: dict[str, Any],
+    needs_cai_ray_head: bool,
+    force_ray_head_restart: bool,
+    head_before: str | None,
+    resume: bool,
+) -> tuple[dict[str, Any], str | None]:
+    log = _job_framework_log(job_id)
+    log(
+        framework_line(
+            "train",
+            "Parallel startup: dataset prep and Ray head (when needed) running together…",
+        )
+    )
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-start") as pool:
+        f_data = pool.submit(
+            prepare_train_config_dataset,
+            cfg,
+            train_config,
+            job_id=job_id,
+            resume=resume,
+        )
+        f_ray = pool.submit(
+            ensure_ray_head_parallel,
+            job_id=job_id,
+            needs_cai_ray_head=needs_cai_ray_head,
+            force_restart=force_ray_head_restart,
+            head_before=head_before,
+        )
+        tc = f_data.result()
+        head = f_ray.result()
+    log(framework_line("train", "Parallel startup: dataset prep and Ray head finished."))
+    return tc, head
+
+
+def prepare_dataset_shards_parallel(
+    *,
+    job_id: int,
+    artifact_dir: str,
+    train_config: dict[str, Any],
+    train_workers: int,
+) -> dict[str, Any]:
+    log = _job_framework_log(job_id)
+    patch: dict[str, Any] = {"dataset_shards_prepared": False}
+    if train_workers <= 1:
+        return patch
+
+    from app.training.dataset_sharding import prepare_dataset_shards_on_driver
+
+    dataset_cfg = train_config.get("dataset") or {
+        "source": "builtin",
+        "builtin_name": "platform_demo",
+    }
+    task_type = str(train_config.get("task_type") or "causal_lm")
+    log(
+        framework_line(
+            "train",
+            f"Loading corpus and writing {train_workers} dataset shard(s) for Ray Train…",
+        )
+    )
+    meta = prepare_dataset_shards_on_driver(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+        world_size=train_workers,
+    )
+    patch["dataset_shards_prepared"] = True
+    log(
+        framework_line(
+            "train",
+            f"Dataset sharded on driver: {meta.get('total_examples')} examples → "
+            f"{train_workers} worker shard(s)",
+        )
+    )
+    return patch
+
+
+@dataclass
+class CdswProvisionResult:
+    train_config_patch: dict[str, Any] = field(default_factory=dict)
+    cluster_wait_done: bool = False
+
+
+def provision_cdsw_workers_parallel(
+    *,
+    job_id: int,
+    head: str,
+    num_workers: int,
+    artifact_dir: str,
+    pool: Any,
+    worker_spec: dict[str, Any],
+    train_workers: int,
+    gpus_per_worker: int,
+    use_gpu: bool,
+) -> CdswProvisionResult:
+    """Probe, launch CDSW engines, wait for GCS and cluster nodes."""
+    log = _job_framework_log(job_id)
+    patch: dict[str, Any] = {
+        "expected_cdsw_worker_nodes": num_workers,
+        "ray_head_address": head,
+    }
+    result = CdswProvisionResult(train_config_patch=patch)
+
+    from app.services.cai_networking import resolve_worker_ray_head_address_with_source
+    from app.services.cdsw_workers import (
+        ray_driver_init_address,
+        wait_for_gcs_port,
+        worker_ids_to_json,
+    )
+    from app.services.ray_cai_networking import (
+        WORKER_CONNECTIVITY_PROBE_REVISION,
+        build_worker_connectivity_probe_code,
+        describe_worker_probe_failure,
+        poll_worker_connectivity_probe,
+        worker_connectivity_probe_passed,
+    )
+    from app.services.ray_cluster_watch import (
+        cluster_snapshot_for_wait,
+        log_cdsw_worker_api_status,
+        log_cdsw_worker_ids,
+        wait_for_cluster_nodes_subprocess,
+    )
+    from app.services.ray_driver_connect import ensure_ray_auth_token
+    from app.services.ray_gcs_auth import project_gcs_auth_token_path, require_ray_gcs_auth_token
+    from app.services.worker_resources import format_worker_spec_line
+    from pathlib import Path
+
+    log(
+        framework_line(
+            "worker",
+            format_worker_spec_line(worker_spec, num_workers=num_workers),
+        )
+    )
+
+    db = SessionLocal()
+    try:
+        job = db.get(TrainingJob, job_id)
+        if not job or not job.worker_group:
+            raise RuntimeError("Worker group missing during CDSW provisioning")
+        worker_group = job.worker_group
+        worker_group.head_address = head
+        db.commit()
+
+        worker_dial, worker_dial_via = resolve_worker_ray_head_address_with_source(head)
+        log(
+            framework_line(
+                "worker",
+                f"Launching {num_workers} CDSW GPU engine(s); workers dial master GCS "
+                f"{worker_dial} (Cloudera CDSW_MASTER_IP→master, session via {worker_dial_via})",
+            )
+        )
+        probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
+        Path(probe_path).unlink(missing_ok=True)
+        log(
+            framework_line(
+                "ray",
+                "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
+            )
+        )
+        probe_token = require_ray_gcs_auth_token(head)
+        log(
+            framework_line(
+                "ray",
+                f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
+                f"GCS auth token synced ({project_gcs_auth_token_path().name})",
+            )
+        )
+        pool.launch(
+            1,
+            head,
+            code=build_worker_connectivity_probe_code(
+                head, probe_path, ray_auth_token=probe_token
+            ),
+            cpu=1.0,
+            memory_gb=4.0,
+            gpus_per_worker=0,
+        )
+        probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
+        if not worker_connectivity_probe_passed(probe):
+            detail = describe_worker_probe_failure(probe, head)
+            log(framework_line("fail", detail))
+            raise RuntimeError(detail)
+        log(
+            framework_line(
+                "ray",
+                f"Worker connectivity OK: master GCS {probe.get('head')} via "
+                f"{probe.get('head_via', '?')} (nodes={probe.get('nodes', '?')}); launching GPU workers",
+            )
+        )
+        launched = pool.launch(num_workers, head)
+        worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
+        worker_group.status = "running"
+        db.commit()
+        log_cdsw_worker_ids(db, job_id, launched.worker_ids, head)
+        log_cdsw_worker_api_status(
+            db,
+            job_id,
+            pool.list_workers_safe if pool.is_remote else None,
+            launched.worker_ids,
+        )
+    finally:
+        db.close()
+
+    from app.services.cai_networking import coerce_session_driver_ray_address
+    from app.services.cdsw_workers import ray_client_address
+
+    worker_head = head
+    ray_addr = ray_driver_init_address(head) if head else None
+    if ray_addr:
+        ray_addr = coerce_session_driver_ray_address(ray_addr) or ray_addr
+    if head and ray_addr is None:
+        ray_addr = ray_client_address(head)
+    if head and worker_head and ray_addr and ray_addr != worker_head:
+        log(
+            framework_line(
+                "ray",
+                f"Driver Ray address {ray_addr} (workers join {worker_head})",
+            )
+        )
+
+    if head and ray_addr:
+        gcs_host, _, port_s = ray_addr.partition(":")
+        port = int(port_s or "6379")
+        log(
+            framework_line(
+                "ray",
+                f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
+            )
+        )
+        if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
+            msg = f"Ray GCS not reachable at {ray_addr} — check framework log for ray start --head errors"
+            log(framework_line("fail", msg))
+            raise RuntimeError(f"Ray GCS not available at {ray_addr}")
+        result.cluster_wait_done = True
+
+        gcs_wait = ray_driver_init_address(head)
+        min_cluster_nodes = 1 + num_workers
+        min_gpu = float(train_workers * max(1, gpus_per_worker)) if use_gpu else 0.0
+        auth_token = ensure_ray_auth_token()
+        if gcs_wait:
+            log(
+                framework_line(
+                    "ray",
+                    f"Waiting for {min_cluster_nodes} Ray node(s)"
+                    f"{f' and {min_gpu:g} GPU' if use_gpu else ''} while dataset prep may continue…",
+                )
+            )
+            wait_for_cluster_nodes_subprocess(
+                gcs_wait,
+                log,
+                min_alive=min_cluster_nodes,
+                min_gpu=min_gpu,
+                timeout_sec=900.0 if use_gpu else 600.0,
+                auth_token=auth_token,
+            )
+            snap = cluster_snapshot_for_wait(gcs_wait, auth_token=auth_token)
+            if use_gpu and (snap is None or snap["gpu"] < min_gpu):
+                detail = (
+                    f"Ray cluster reports {snap['gpu'] if snap else 0:g} GPU but "
+                    f"Ray Train needs {min_gpu:g} ({train_workers} rank(s) × "
+                    f"{max(1, gpus_per_worker)} GPU). "
+                    "CDSW workers must join with `ray start --block` and "
+                    "nvidia_gpu>0 (check worker logs for gpus=1, GPU profile, "
+                    "CML_ACCELERATOR_LABEL_ID)."
+                )
+                log(framework_line("fail", detail))
+                raise RuntimeError(detail)
+
+    log(framework_line("ray", "CDSW worker provisioning and cluster wait complete."))
+    return result
+
+
+def parallel_shards_and_worker_provision(
+    *,
+    job_id: int,
+    head: str,
+    num_workers: int,
+    artifact_dir: str,
+    pool: Any,
+    worker_spec: dict[str, Any],
+    train_config: dict[str, Any],
+    train_workers: int,
+    gpus_per_worker: int,
+    use_gpu: bool,
+    launch_cdsw_workers: bool,
+) -> tuple[dict[str, Any], bool]:
+    """
+    While CDSW workers join the cluster, load the corpus and write Train shards on the driver.
+    Returns (train_config patch, cluster_wait_already_done).
+    """
+    log = _job_framework_log(job_id)
+    log(
+        framework_line(
+            "train",
+            "Parallel startup: dataset sharding and CDSW worker provisioning running together…",
+        )
+    )
+    shard_patch: dict[str, Any] = {}
+    provision = CdswProvisionResult()
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-provision") as executor:
+        f_shards = executor.submit(
+            prepare_dataset_shards_parallel,
+            job_id=job_id,
+            artifact_dir=artifact_dir,
+            train_config=train_config,
+            train_workers=train_workers,
+        )
+        if launch_cdsw_workers:
+            f_prov = executor.submit(
+                provision_cdsw_workers_parallel,
+                job_id=job_id,
+                head=head,
+                num_workers=num_workers,
+                artifact_dir=artifact_dir,
+                pool=pool,
+                worker_spec=worker_spec,
+                train_workers=train_workers,
+                gpus_per_worker=gpus_per_worker,
+                use_gpu=use_gpu,
+            )
+            wait([f_shards, f_prov], return_when=ALL_COMPLETED)
+            shard_patch = f_shards.result()
+            provision = f_prov.result()
+        else:
+            shard_patch = f_shards.result()
+
+    log(framework_line("train", "Parallel startup: sharding and worker provisioning finished."))
+    return {**provision.train_config_patch, **shard_patch}, provision.cluster_wait_done

@@ -17,26 +17,16 @@ from app.resource_hints import (
 )
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
-from app.services.cdsw_workers import (
-    CdswRayWorkerPool,
-    ray_driver_init_address,
-    worker_ids_to_json,
-)
+from app.services.cdsw_workers import CdswRayWorkerPool, ray_driver_init_address
 from app.services.platform_settings import (
     resolved_ray_head,
     worker_pool_kwargs,
 )
 from app.services.job_log import append_job_log
 from app.services.log_flair import framework_banner, framework_line
-from app.services.ray_cluster_watch import (
-    log_cdsw_worker_api_status,
-    log_cdsw_worker_ids,
-)
 from app.services.model_registry import default_openai_model_id, register_trained_model
-from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
 from app.services.worker_resources import (
-    format_worker_spec_line,
     remote_driver_launch_spec,
     resolve_worker_launch_spec,
 )
@@ -243,82 +233,21 @@ def run_training_job(job_id: int) -> None:
         needs_cai_ray_head = bool(live_ip) and not (
             platform.ray_local_mode and not pool.is_remote
         )
-        if needs_cai_ray_head:
-            from app.services.ray_cai_networking import ensure_ray_head_for_workers
-            from app.services.ray_gcs_auth import bind_gcs_auth_for_address
+        from app.services.job_parallel_startup import parallel_dataset_prep_and_ray_head
 
-            if force_ray_head_restart:
-                append_job_log(
-                    db,
-                    job_id,
-                    "framework",
-                    framework_line(
-                        "ray",
-                        "Task restart: refreshing Ray head (ray stop --force, ray start --head)…",
-                    ),
-                )
-            else:
-                append_job_log(
-                    db,
-                    job_id,
-                    "framework",
-                    framework_line("ray", "Starting Ray head for this model task…"),
-                )
-
-            def _ray_head_log(msg: str) -> None:
-                append_job_log(
-                    db,
-                    job_id,
-                    "framework",
-                    msg if msg.startswith("[") else framework_line("ray", msg),
-                )
-
-            head = ensure_ray_head_for_workers(
-                framework_log=_ray_head_log,
-                force_restart=force_ray_head_restart,
+        try:
+            train_config, head = parallel_dataset_prep_and_ray_head(
+                job_id=job_id,
+                cfg=cfg,
+                train_config=train_config,
+                needs_cai_ray_head=needs_cai_ray_head,
+                force_ray_head_restart=force_ray_head_restart,
+                head_before=head,
+                resume=bool(train_config.get("resume")),
             )
-            bind_gcs_auth_for_address(head, required=True)
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line("ray", f"Ray head is up at {head} — continuing task setup"),
-            )
-
-        if cfg.task_type == "causal_lm":
-            from app.training.dataset_loader import load_training_samples
-            from app.training.lm_text_utils import resolve_prompt_format
-
-            setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
-            if setting == "auto":
-                try:
-                    sample_texts, _ = load_training_samples(
-                        cfg.dataset.model_dump(), task_type=cfg.task_type
-                    )
-                    train_config["prompt_format"] = resolve_prompt_format("auto", sample_texts)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Could not detect prompt_format: %s", exc)
-                    train_config["prompt_format"] = "raw_lm"
-            else:
-                train_config["prompt_format"] = resolve_prompt_format(setting, None)
-
-        if cfg.init_mode == "from_scratch":
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line("train", "From-scratch prep (tokenizer / dataset checks)…"),
-            )
-            try:
-                train_config = prepare_from_scratch_training(
-                    cfg,
-                    train_config,
-                    log=framework_log,
-                    skip_tokenizer_if_present=bool(train_config.get("resume")),
-                )
-            except ValueError as exc:
-                append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
-                raise
+        except ValueError as exc:
+            append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")
+            raise
 
         worker_group = WorkerGroup(
             job_id=job.id,
@@ -332,6 +261,7 @@ def run_training_job(job_id: int) -> None:
 
         low_memory_mode = bool(platform.non_distributed_low_memory_mode)
         launch_cdsw_workers = head and job.num_workers > 0 and not low_memory_mode
+        cluster_wait_done = False
 
         if low_memory_mode:
             append_job_log(
@@ -345,160 +275,7 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
 
-        if launch_cdsw_workers:
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "worker",
-                    format_worker_spec_line(worker_spec, num_workers=job.num_workers),
-                ),
-            )
-            from app.services.ray_cai_networking import (
-                build_worker_connectivity_probe_code,
-                poll_worker_connectivity_probe,
-            )
-
-            worker_group.head_address = head
-            db.commit()
-            from app.services.cai_networking import resolve_worker_ray_head_address_with_source
-
-            worker_dial, worker_dial_via = resolve_worker_ray_head_address_with_source(head)
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "worker",
-                    f"Launching {job.num_workers} CDSW GPU engine(s); workers dial master GCS "
-                    f"{worker_dial} (Cloudera CDSW_MASTER_IP→master, session via {worker_dial_via})",
-                ),
-            )
-            probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
-            Path(probe_path).unlink(missing_ok=True)
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "ray",
-                    "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
-                ),
-            )
-            from app.services.ray_cai_networking import WORKER_CONNECTIVITY_PROBE_REVISION
-            from app.services.ray_gcs_auth import project_gcs_auth_token_path, require_ray_gcs_auth_token
-
-            probe_token = require_ray_gcs_auth_token(head)
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "ray",
-                    f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
-                    f"GCS auth token synced ({project_gcs_auth_token_path().name})",
-                ),
-            )
-            pool.launch(
-                1,
-                head,
-                code=build_worker_connectivity_probe_code(
-                    head, probe_path, ray_auth_token=probe_token
-                ),
-                cpu=1.0,
-                memory_gb=4.0,
-                gpus_per_worker=0,
-            )
-            probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
-            from app.services.ray_cai_networking import (
-                describe_worker_probe_failure,
-                worker_connectivity_probe_passed,
-            )
-
-            if not worker_connectivity_probe_passed(probe):
-                detail = describe_worker_probe_failure(probe, head)
-                append_job_log(db, job_id, "framework", framework_line("fail", detail))
-                raise RuntimeError(detail)
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "ray",
-                    f"Worker connectivity OK: master GCS {probe.get('head')} via "
-                    f"{probe.get('head_via', '?')} (nodes={probe.get('nodes', '?')}); launching GPU workers",
-                ),
-            )
-            launched = pool.launch(job.num_workers, head)
-            worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
-            worker_group.status = "running"
-            db.commit()
-            log_cdsw_worker_ids(db, job_id, launched.worker_ids, head)
-            log_cdsw_worker_api_status(
-                db,
-                job_id,
-                pool.list_workers_safe if pool.is_remote else None,
-                launched.worker_ids,
-            )
-            train_config["expected_cdsw_worker_nodes"] = job.num_workers
-            train_config["ray_head_address"] = head
-
-        from app.services.cdsw_workers import wait_for_gcs_port
-        from app.training.transformer_job import resolve_ray_address, run_transformer_training
-
-        worker_head = head
-        ray_addr = ray_driver_init_address(head) if head else resolve_ray_address(None)
-        if ray_addr:
-            from app.services.cai_networking import coerce_session_driver_ray_address
-
-            ray_addr = coerce_session_driver_ray_address(ray_addr) or ray_addr
-        if head and ray_addr is None:
-            from app.services.cdsw_workers import ray_client_address
-
-            ray_addr = ray_client_address(head)
-        if head and worker_head and ray_addr and ray_addr != worker_head:
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "ray",
-                    f"Driver Ray address {ray_addr} (workers join {worker_head})",
-                ),
-            )
-
-        if head and ray_addr:
-            gcs_host, _, port_s = ray_addr.partition(":")
-            port = int(port_s or "6379")
-            append_job_log(
-                db,
-                job_id,
-                "framework",
-                framework_line(
-                    "ray",
-                    f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
-                ),
-            )
-            if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
-                append_job_log(
-                    db,
-                    job_id,
-                    "framework",
-                    framework_line(
-                        "fail",
-                        f"Ray GCS not reachable at {ray_addr} — check framework log "
-                        "for ray start --head errors",
-                    ),
-                )
-                raise RuntimeError(f"Ray GCS not available at {ray_addr}")
-        if ray_addr:
-            os.environ["RAY_ADDRESS"] = ray_addr
-
         use_gpu = gpus_per_worker > 0
-        if platform.ray_local_mode and not pool.is_remote:
-            ray_addr = None
-
         cdsw_engines = job.num_workers if launch_cdsw_workers else 0
 
         if use_gpu and not launch_cdsw_workers:
@@ -525,7 +302,7 @@ def run_training_job(job_id: int) -> None:
             cdsw_worker_engines=cdsw_engines,
             non_distributed_low_memory=low_memory_mode,
         )
-        if mem_err and ray_addr:
+        if mem_err and head:
             append_job_log(db, job_id, "framework", framework_line("fail", mem_err))
             raise RuntimeError(mem_err)
 
@@ -540,7 +317,106 @@ def run_training_job(job_id: int) -> None:
         train_config["ray_train_workers_scheduled"] = train_workers
         train_config["cdsw_worker_engines"] = cdsw_engines
 
-        if launch_cdsw_workers and head:
+        from app.services.job_parallel_startup import (
+            parallel_shards_and_worker_provision,
+            prepare_dataset_shards_parallel,
+            provision_cdsw_workers_parallel,
+        )
+
+        if launch_cdsw_workers and head and train_workers > 1:
+            patch, cluster_wait_done = parallel_shards_and_worker_provision(
+                job_id=job_id,
+                head=head,
+                num_workers=job.num_workers,
+                artifact_dir=artifact_dir,
+                pool=pool,
+                worker_spec=worker_spec,
+                train_config=train_config,
+                train_workers=train_workers,
+                gpus_per_worker=gpus_per_worker,
+                use_gpu=use_gpu,
+                launch_cdsw_workers=True,
+            )
+            train_config.update(patch)
+        elif launch_cdsw_workers and head:
+            prov = provision_cdsw_workers_parallel(
+                job_id=job_id,
+                head=head,
+                num_workers=job.num_workers,
+                artifact_dir=artifact_dir,
+                pool=pool,
+                worker_spec=worker_spec,
+                train_workers=train_workers,
+                gpus_per_worker=gpus_per_worker,
+                use_gpu=use_gpu,
+            )
+            train_config.update(prov.train_config_patch)
+            cluster_wait_done = prov.cluster_wait_done
+        elif train_workers > 1:
+            train_config.update(
+                prepare_dataset_shards_parallel(
+                    job_id=job_id,
+                    artifact_dir=artifact_dir,
+                    train_config=train_config,
+                    train_workers=train_workers,
+                )
+            )
+
+        from app.services.cdsw_workers import wait_for_gcs_port
+        from app.training.transformer_job import resolve_ray_address, run_transformer_training
+
+        worker_head = head
+        ray_addr = ray_driver_init_address(head) if head else resolve_ray_address(None)
+        if ray_addr:
+            from app.services.cai_networking import coerce_session_driver_ray_address
+
+            ray_addr = coerce_session_driver_ray_address(ray_addr) or ray_addr
+        if head and ray_addr is None:
+            from app.services.cdsw_workers import ray_client_address
+
+            ray_addr = ray_client_address(head)
+        if head and worker_head and ray_addr and ray_addr != worker_head:
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    f"Driver Ray address {ray_addr} (workers join {worker_head})",
+                ),
+            )
+
+        if not cluster_wait_done and head and ray_addr:
+            gcs_host, _, port_s = ray_addr.partition(":")
+            port = int(port_s or "6379")
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "ray",
+                    f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
+                ),
+            )
+            if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "fail",
+                        f"Ray GCS not reachable at {ray_addr} — check framework log "
+                        "for ray start --head errors",
+                    ),
+                )
+                raise RuntimeError(f"Ray GCS not available at {ray_addr}")
+        if ray_addr:
+            os.environ["RAY_ADDRESS"] = ray_addr
+
+        if platform.ray_local_mode and not pool.is_remote:
+            ray_addr = None
+
+        if not cluster_wait_done and launch_cdsw_workers and head:
             from app.services.ray_cluster_watch import (
                 cluster_snapshot_for_wait,
                 wait_for_cluster_nodes_subprocess,

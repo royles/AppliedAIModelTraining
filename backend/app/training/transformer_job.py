@@ -554,7 +554,7 @@ def run_transformer_training(
         _framework(framework_line("fail", str(exc)))
         raise
 
-    if num_workers > 1:
+    if num_workers > 1 and not train_config.get("dataset_shards_prepared"):
         from app.training.dataset_sharding import prepare_dataset_shards_on_driver
 
         dataset_cfg = train_config.get("dataset") or {
