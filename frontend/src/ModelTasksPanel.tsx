@@ -453,7 +453,7 @@ export function ModelTasksPanel(props: Props) {
                   : preview
                     ? `Preview: ${preview.examples.toLocaleString()} examples · ${preview.total_characters.toLocaleString()} characters${
                         preview.preview_capped
-                          ? ` (first ${preview.sample_limit ?? "?"} rows; set Max samples for full count)`
+                          ? ` (summary: first ${preview.sample_limit ?? 100} records — training uses full split)`
                           : ""
                       }`
                     : dataset.source !== "builtin"

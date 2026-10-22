@@ -222,7 +222,8 @@ export function DatasetConfigFields({ value, onChange }: Props) {
           <p className="hint">
             Some hubs need a config (WikiText: <code>wikitext-103-raw-v1</code>). You can also
             use <code>Salesforce/wikitext:wikitext-103-raw-v1</code> in the dataset id field.
-            Set <strong>Max samples</strong> for large sets — the full train split loads into memory.
+            Preview uses a quick ~100-record summary (non-blocking). Training loads the full split
+            unless you set <strong>Max samples</strong>.
           </p>
           <label>
             Split

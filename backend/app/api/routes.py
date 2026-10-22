@@ -226,7 +226,7 @@ def _preview_dataset_config(dataset: TrainingDatasetConfig) -> tuple[TrainingDat
     """Cap Hugging Face previews so the UI stays responsive while typing."""
     if dataset.source != "huggingface":
         return dataset, False, None
-    cap = 400
+    cap = 100
     user_max = dataset.max_samples
     effective = min(user_max, cap) if user_max is not None else cap
     capped = user_max is None or user_max > cap

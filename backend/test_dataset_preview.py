@@ -12,8 +12,8 @@ def test_hf_preview_caps_max_samples():
     )
     patched, capped, limit = _preview_dataset_config(cfg)
     assert capped is True
-    assert limit == 400
-    assert patched.max_samples == 400
+    assert limit == 100
+    assert patched.max_samples == 100
 
 
 def test_hf_preview_respects_small_user_max():
