@@ -285,6 +285,50 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  listDataCollections: () =>
+    request<
+      {
+        collection_id: string;
+        name: string;
+        description?: string | null;
+        local_path: string;
+        last_staged?: Record<string, unknown> | null;
+      }[]
+    >("/api/training/data-collections"),
+  createDataCollection: (body: { name: string; description?: string }) =>
+    request<{
+      collection_id: string;
+      name: string;
+      local_path: string;
+      description?: string | null;
+    }>("/api/training/data-collections", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getDataCollection: (collectionId: string) =>
+    request<Record<string, unknown>>(
+      `/api/training/data-collections/${encodeURIComponent(collectionId)}`,
+    ),
+  stageDataCollection: (
+    collectionId: string,
+    body: {
+      dataset: TrainingDatasetConfig;
+      task_type?: string;
+      ray_train_workers?: number;
+    },
+  ) =>
+    request<{
+      access_mode: "local" | "remote";
+      local_path: string;
+      corpus_local_path?: string | null;
+      cache_local_path?: string;
+      remote_uri?: string | null;
+      corpus_examples?: number | null;
+      last_staged?: Record<string, unknown>;
+    }>(`/api/training/data-collections/${encodeURIComponent(collectionId)}/stage`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   datasetPreview: (
     dataset: TrainingDatasetConfig,
     taskType: "causal_lm" | "sequence_classification" = "causal_lm",

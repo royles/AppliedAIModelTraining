@@ -110,9 +110,11 @@ def _train_loop(config: dict[str, Any]) -> None:
 
     model = _maybe_apply_lora(model, config)
 
-    from app.training.dataset_sharding import load_dataset_shard_for_worker
+    from app.training.dataset_sharding import load_dataset_shard_for_worker, load_training_corpus_staged
+    from app.training.dataset_staging import shared_dataset_dirs_from_config
 
     dataset_cfg = config.get("dataset") or {"source": "builtin", "builtin_name": "platform_demo"}
+    shared_dirs = shared_dataset_dirs_from_config(config)
     try:
         ctx = ray.train.get_context()
         rank_for_data = ctx.get_world_rank()
@@ -127,11 +129,15 @@ def _train_loop(config: dict[str, Any]) -> None:
             task_type=task,
             rank=rank_for_data,
             world_size=world_for_data,
+            shared_dirs=shared_dirs,
         )
     else:
-        from app.training.dataset_loader import load_training_samples
-
-        texts, label_list = load_training_samples(dataset_cfg, task_type=task)
+        texts, label_list = load_training_corpus_staged(
+            artifact_dir=artifact_dir,
+            dataset_cfg=dataset_cfg,
+            task_type=task,
+            shared_dirs=shared_dirs,
+        )
     if task == "causal_lm":
         enc = tokenizer(
             texts,
@@ -559,7 +565,9 @@ def run_transformer_training(
             prepare_dataset_shards_on_driver,
             prepared_dataset_shards_meta,
         )
+        from app.training.dataset_staging import shared_dataset_dirs_from_config
 
+        shared_dirs = shared_dataset_dirs_from_config(train_config)
         dataset_cfg = train_config.get("dataset") or {
             "source": "builtin",
             "builtin_name": "platform_demo",
@@ -572,14 +580,16 @@ def run_transformer_training(
                 dataset_cfg=dataset_cfg,
                 task_type=task_type,
                 world_size=num_workers,
+                shared_dirs=shared_dirs,
             )
             if existing is not None:
                 train_config["dataset_shards_prepared"] = True
+                root = existing.get("staging_root") or existing.get("cache_dir") or artifact_dir
                 _framework(
                     framework_line(
                         "train",
                         f"Reusing staged dataset shards: {existing.get('total_examples')} examples → "
-                        f"{num_workers} worker shard(s)",
+                        f"{num_workers} worker shard(s) at {root}",
                     )
                 )
         if not train_config.get("dataset_shards_prepared") and artifact_dir:
@@ -589,6 +599,7 @@ def run_transformer_training(
                     dataset_cfg=dataset_cfg,
                     task_type=task_type,
                     world_size=num_workers,
+                    shared_dirs=shared_dirs,
                 )
                 train_config["dataset_shards_prepared"] = True
                 _framework(

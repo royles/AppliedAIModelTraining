@@ -14,6 +14,7 @@ import { AppSidebar, type NavView } from "./components/AppSidebar";
 import { PlatformStatusBar } from "./PlatformStatusBar";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import { ModelRegistryPanel } from "./ModelRegistryPanel";
+import { DataStagingPanel } from "./DataStagingPanel";
 import { ModelTasksPanel } from "./ModelTasksPanel";
 import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { TaskCardGrid } from "./TaskCardGrid";
@@ -562,6 +563,8 @@ export default function App() {
               jobBusy={jobBusy}
             />
           </>
+        ) : nav === "data" ? (
+          <DataStagingPanel />
         ) : nav === "registry" ? (
           <ModelRegistryPanel />
         ) : nav === "framework" ? (

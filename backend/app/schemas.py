@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.training.architecture import TransformerArchitectureConfig
+from app.training.dataset_config import TrainingDatasetConfig
 from app.training.transformer_config import TransformerTrainingConfig
 
 
@@ -311,3 +312,14 @@ class RegistryModelUpdate(BaseModel):
 
 class RegistryTransitionRequest(BaseModel):
     lifecycle_state: str
+
+
+class DataCollectionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class DataCollectionStageRequest(BaseModel):
+    dataset: TrainingDatasetConfig
+    task_type: str = Field(default="causal_lm")
+    ray_train_workers: int | None = Field(default=None, ge=1, le=128)

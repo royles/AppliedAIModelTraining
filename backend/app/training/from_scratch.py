@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.training.dataset_sharding import load_training_corpus_staged
+from app.training.dataset_staging import shared_dataset_dirs_from_config
 from app.training.lm_text_utils import resolve_prompt_format
 from app.training.tokenizer_config import TokenizerBuildConfig
 from app.training.tokenizer_trainer import (
@@ -78,6 +79,7 @@ def prepare_from_scratch_training(
         artifact_dir=str(artifact_dir),
         dataset_cfg=cfg.dataset.model_dump(),
         task_type=cfg.task_type,
+        shared_dirs=shared_dataset_dirs_from_config(train_config),
     )
     setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
     train_config["prompt_format"] = resolve_prompt_format(setting, texts)

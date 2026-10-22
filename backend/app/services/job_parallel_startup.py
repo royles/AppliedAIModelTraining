@@ -43,16 +43,24 @@ def prepare_train_config_dataset(
 
     if cfg.task_type == "causal_lm":
         from app.training.dataset_sharding import load_training_corpus_staged
+        from app.training.dataset_staging import shared_dataset_dirs_from_config
         from app.training.lm_text_utils import resolve_prompt_format
 
         setting = tc.get("prompt_format") or cfg.prompt_format or "auto"
         if setting == "auto":
             artifact_dir = str(tc.get("artifact_dir") or "")
+            shared_dirs = shared_dataset_dirs_from_config(tc)
             log(
                 framework_line(
                     "train",
                     "Detecting prompt_format from corpus"
-                    + (" (reuse staged data when present)" if artifact_dir else "")
+                    + (
+                        f" (shared collection {shared_dirs[0]})"
+                        if shared_dirs
+                        else " (reuse staged data when present)"
+                        if artifact_dir
+                        else ""
+                    )
                     + "…",
                 )
             )
@@ -61,6 +69,7 @@ def prepare_train_config_dataset(
                     artifact_dir=artifact_dir or None,
                     dataset_cfg=cfg.dataset.model_dump(),
                     task_type=cfg.task_type,
+                    shared_dirs=shared_dirs,
                 )
                 tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
             except Exception as exc:  # noqa: BLE001
@@ -171,7 +180,9 @@ def prepare_dataset_shards_parallel(
         prepare_dataset_shards_on_driver,
         prepared_dataset_shards_meta,
     )
+    from app.training.dataset_staging import shared_dataset_dirs_from_config
 
+    shared_dirs = shared_dataset_dirs_from_config(train_config)
     dataset_cfg = train_config.get("dataset") or {
         "source": "builtin",
         "builtin_name": "platform_demo",
@@ -182,13 +193,15 @@ def prepare_dataset_shards_parallel(
         dataset_cfg=dataset_cfg,
         task_type=task_type,
         world_size=train_workers,
+        shared_dirs=shared_dirs,
     )
     if existing is not None:
+        root = existing.get("staging_root") or existing.get("cache_dir") or artifact_dir
         log(
             framework_line(
                 "train",
-                f"Reusing {train_workers} dataset shard(s) already staged on disk "
-                f"({existing.get('total_examples')} examples)",
+                f"Reusing {train_workers} dataset shard(s) on disk "
+                f"({existing.get('total_examples')} examples) at {root}",
             )
         )
         patch["dataset_shards_prepared"] = True
@@ -205,6 +218,7 @@ def prepare_dataset_shards_parallel(
         dataset_cfg=dataset_cfg,
         task_type=task_type,
         world_size=train_workers,
+        shared_dirs=shared_dirs,
     )
     patch["dataset_shards_prepared"] = True
     log(

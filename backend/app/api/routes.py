@@ -31,6 +31,8 @@ from app.schemas import (
     PlatformSettingsUpdate,
     ProjectRaySettingsRead,
     ProjectRaySettingsUpdate,
+    DataCollectionCreate,
+    DataCollectionStageRequest,
 )
 from app.resource_hints import memory_guidance_for_health
 from app.services.platform_status import active_jobs_summary, cached_platform_ray_status
@@ -284,6 +286,67 @@ def builtin_datasets() -> dict[str, dict[str, str]]:
 @router.get("/training/datasets/files")
 def dataset_files() -> list[dict[str, str]]:
     return list_dataset_files()
+
+
+@router.get("/training/data-collections")
+def list_data_collections_api() -> list[dict[str, Any]]:
+    from app.training.dataset_staging import list_data_collections
+
+    return list_data_collections()
+
+
+@router.post("/training/data-collections")
+def create_data_collection_api(payload: DataCollectionCreate) -> dict[str, Any]:
+    from app.training.dataset_staging import create_data_collection
+
+    try:
+        return create_data_collection(name=payload.name, description=payload.description)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/training/data-collections/{collection_id}")
+def get_data_collection_api(collection_id: str) -> dict[str, Any]:
+    from app.training.dataset_staging import describe_data_collection
+
+    try:
+        return describe_data_collection(collection_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/training/data-collections/{collection_id}/stage")
+def stage_data_collection_api(
+    collection_id: str,
+    payload: DataCollectionStageRequest,
+) -> dict[str, Any]:
+    from app.training.dataset_config import is_remote_dataset
+    from app.training.dataset_staging import stage_data_collection
+
+    if is_remote_dataset(payload.dataset.model_dump()) and payload.ray_train_workers:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Pre-sharding Ray workers applies only to locally materialized corpora. "
+                "Iceberg and S3 Parquet are read from remote at training time."
+            ),
+        )
+    try:
+        return stage_data_collection(
+            collection_id=collection_id,
+            dataset=payload.dataset,
+            task_type=payload.task_type,
+            ray_train_workers=payload.ray_train_workers,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/training/task-blueprints/draft")

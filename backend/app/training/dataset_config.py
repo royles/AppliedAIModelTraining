@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -130,3 +130,30 @@ class TrainingDatasetConfig(BaseModel):
         if self.labels is not None and len(self.labels) != len(self.texts):
             raise ValueError("dataset.labels must match dataset.texts length")
         return self
+
+
+REMOTE_DATASET_SOURCES = frozenset({"iceberg", "parquet_s3"})
+
+
+def is_remote_dataset(dataset_cfg: dict[str, Any] | TrainingDatasetConfig) -> bool:
+    if isinstance(dataset_cfg, TrainingDatasetConfig):
+        return dataset_cfg.source in REMOTE_DATASET_SOURCES
+    return str(dataset_cfg.get("source") or "") in REMOTE_DATASET_SOURCES
+
+
+def remote_data_uri(dataset_cfg: dict[str, Any] | TrainingDatasetConfig) -> str | None:
+    cfg = (
+        dataset_cfg.model_dump()
+        if isinstance(dataset_cfg, TrainingDatasetConfig)
+        else dataset_cfg
+    )
+    source = str(cfg.get("source") or "")
+    if source == "iceberg":
+        table = (cfg.get("iceberg_table") or "").strip()
+        catalog = (cfg.get("iceberg_catalog_uri") or "").strip()
+        if table and catalog:
+            return f"{catalog} · {table}"
+        return table or catalog or None
+    if source == "parquet_s3":
+        return (cfg.get("parquet_uri") or "").strip() or None
+    return None

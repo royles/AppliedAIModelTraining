@@ -6,9 +6,10 @@ import {
   SidebarIconRegistry,
   SidebarIconRuns,
   SidebarIconTasks,
+  SidebarIconData,
 } from "./SidebarNavIcons";
 
-export type NavView = "tasks" | "registry" | "framework" | "model-tasks";
+export type NavView = "tasks" | "registry" | "framework" | "model-tasks" | "data";
 
 type NavItem = {
   id: NavView;
@@ -30,6 +31,7 @@ type Props = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "tasks", label: "Runs", Icon: SidebarIconRuns },
+  { id: "data", label: "Data", Icon: SidebarIconData },
   { id: "registry", label: "Model registry", Icon: SidebarIconRegistry },
   { id: "framework", label: "Framework Configuration", Icon: SidebarIconFramework },
   { id: "model-tasks", label: "Task configurations", Icon: SidebarIconTasks },

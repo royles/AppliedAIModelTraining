@@ -165,6 +165,45 @@ def run_training_job(job_id: int) -> None:
         train_config = apply_resume_to_train_config(
             train_config, artifact_dir, resume=resume_run
         )
+
+        from app.training.dataset_staging import (
+            attach_shared_collection_to_train_config,
+            shared_dataset_dirs_from_config,
+        )
+
+        dataset_cfg = train_config.get("dataset") or cfg.dataset.model_dump()
+        train_config = attach_shared_collection_to_train_config(
+            train_config,
+            dataset_cfg=dataset_cfg,
+            task_type=str(train_config.get("task_type") or cfg.task_type),
+        )
+        if train_config.get("dataset_access_mode") == "remote":
+            remote_uri = train_config.get("dataset_remote_uri") or "remote catalog"
+            registry = train_config.get("data_collection_local_path") or ""
+            append_job_log(
+                db,
+                job_id,
+                "framework",
+                framework_line(
+                    "train",
+                    f"Dataset from remote ({remote_uri})"
+                    + (f"; collection registry {registry}" if registry else "")
+                    + " — no local corpus copy",
+                ),
+            )
+        else:
+            shared_dirs = shared_dataset_dirs_from_config(train_config)
+            if shared_dirs:
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    framework_line(
+                        "train",
+                        f"Using shared data collection on disk: {shared_dirs[0]}",
+                    ),
+                )
+
         if train_config.get("resume") and train_config.get("resume_global_step"):
             append_job_log(
                 db,
