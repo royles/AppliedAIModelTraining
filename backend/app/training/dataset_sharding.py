@@ -14,6 +14,7 @@ from app.training.dataset_loader import load_training_samples
 logger = logging.getLogger(__name__)
 
 _READY_FILE = "ready.json"
+_CORPUS_FILE = "corpus.json"
 _SHARD_WAIT_SEC = 900.0
 _SHARD_POLL_SEC = 0.25
 
@@ -34,6 +35,101 @@ def _write_shard(path: Path, texts: list[str], labels: list[int] | None) -> None
     if labels is not None:
         payload["labels"] = labels
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _read_corpus(path: Path) -> tuple[list[str], list[int] | None]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Staged corpus missing: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid staged corpus: {path}")
+    texts = data.get("texts")
+    if not isinstance(texts, list):
+        raise ValueError(f"Staged corpus texts missing in {path}")
+    labels_raw = data.get("labels")
+    labels: list[int] | None = None
+    if labels_raw is not None:
+        if not isinstance(labels_raw, list):
+            raise ValueError(f"Staged corpus labels invalid in {path}")
+        labels = [int(x) for x in labels_raw]
+    return [str(t) for t in texts], labels
+
+
+def _write_corpus(path: Path, texts: list[str], labels: list[int] | None) -> None:
+    payload: dict[str, Any] = {"texts": texts}
+    if labels is not None:
+        payload["labels"] = labels
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def load_training_corpus_staged(
+    *,
+    artifact_dir: str | None,
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+) -> tuple[list[str], list[int] | None]:
+    """
+    Load training texts once per job artifact + dataset config.
+
+    Reuses ``.dataset_shards/<key>/corpus.json`` when present so Hugging Face /
+    file loads are not repeated across prompt-format detection, tokenizer prep,
+    and driver sharding.
+    """
+    if artifact_dir:
+        cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
+        corpus_path = cache / _CORPUS_FILE
+        if corpus_path.is_file():
+            try:
+                texts, labels = _read_corpus(corpus_path)
+                logger.info(
+                    "Reusing staged training corpus examples=%s path=%s",
+                    len(texts),
+                    corpus_path,
+                )
+                return texts, labels
+            except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
+                logger.warning("Ignoring invalid staged corpus %s: %s", corpus_path, exc)
+
+    texts, labels = load_training_samples(dataset_cfg, task_type=task_type)
+    if artifact_dir:
+        try:
+            _write_corpus(
+                shard_cache_dir(artifact_dir, dataset_cfg, task_type) / _CORPUS_FILE,
+                texts,
+                labels,
+            )
+        except OSError as exc:
+            logger.warning("Could not write staged corpus under artifact_dir: %s", exc)
+    return texts, labels
+
+
+def prepared_dataset_shards_meta(
+    *,
+    artifact_dir: str,
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+    world_size: int,
+) -> dict[str, Any] | None:
+    """Return shard metadata when ready.json and all shard files exist on disk."""
+    if world_size <= 1:
+        return {"world_size": 1, "skipped": True}
+
+    cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
+    ready_path = cache / _READY_FILE
+    if not ready_path.is_file():
+        return None
+    try:
+        meta = json.loads(ready_path.read_text(encoding="utf-8"))
+        if int(meta.get("world_size", 0)) != world_size:
+            return None
+    except (json.JSONDecodeError, TypeError, ValueError, OSError):
+        return None
+
+    for rank in range(world_size):
+        if not (cache / f"shard_{rank}.json").is_file():
+            return None
+    return meta
 
 
 def _read_shard(path: Path) -> tuple[list[str], list[int] | None]:
@@ -81,23 +177,29 @@ def prepare_dataset_shards_on_driver(
     if world_size <= 1:
         return {"world_size": 1, "skipped": True}
 
+    existing = prepared_dataset_shards_meta(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+        world_size=world_size,
+    )
+    if existing is not None:
+        logger.info(
+            "Reusing dataset shards on disk world_size=%s total=%s artifact=%s",
+            world_size,
+            existing.get("total_examples"),
+            artifact_dir,
+        )
+        return existing
+
     cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
     ready_path = cache / _READY_FILE
-    if ready_path.is_file():
-        try:
-            meta = json.loads(ready_path.read_text(encoding="utf-8"))
-            if int(meta.get("world_size", 0)) == world_size:
-                logger.info(
-                    "Reusing dataset shards world_size=%s total=%s cache=%s",
-                    world_size,
-                    meta.get("total_examples"),
-                    cache,
-                )
-                return meta
-        except (json.JSONDecodeError, TypeError, ValueError):
-            pass
 
-    texts, labels = load_training_samples(dataset_cfg, task_type=task_type)
+    texts, labels = load_training_corpus_staged(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+    )
     shards = split_interleaved(texts, labels, world_size)
     for rank, (shard_texts, shard_labels) in enumerate(shards):
         _write_shard(cache / f"shard_{rank}.json", shard_texts, shard_labels)
@@ -128,7 +230,11 @@ def load_dataset_shard_for_worker(
 ) -> tuple[list[str], list[int] | None]:
     """Load this Train rank's text shard (wait for driver-prepared cache if needed)."""
     if world_size <= 1:
-        return load_training_samples(dataset_cfg, task_type=task_type)
+        return load_training_corpus_staged(
+            artifact_dir=artifact_dir,
+            dataset_cfg=dataset_cfg,
+            task_type=task_type,
+        )
 
     cache = shard_cache_dir(artifact_dir, dataset_cfg, task_type)
     ready_path = cache / _READY_FILE

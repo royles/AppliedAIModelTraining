@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
-from app.training.dataset_loader import load_training_samples
+from app.training.dataset_sharding import load_training_corpus_staged
 from app.training.lm_text_utils import resolve_prompt_format
 from app.training.tokenizer_config import TokenizerBuildConfig
 from app.training.tokenizer_trainer import (
@@ -74,7 +74,11 @@ def prepare_from_scratch_training(
                 f"vocab_size={len(tok)}."
             )
         return train_config
-    texts, _ = load_training_samples(cfg.dataset.model_dump(), task_type=cfg.task_type)
+    texts, _ = load_training_corpus_staged(
+        artifact_dir=str(artifact_dir),
+        dataset_cfg=cfg.dataset.model_dump(),
+        task_type=cfg.task_type,
+    )
     setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
     train_config["prompt_format"] = resolve_prompt_format(setting, texts)
     _log_early = log or (lambda m: logger.info(m))

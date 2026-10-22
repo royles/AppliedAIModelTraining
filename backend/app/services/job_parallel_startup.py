@@ -42,15 +42,25 @@ def prepare_train_config_dataset(
     tc = dict(train_config)
 
     if cfg.task_type == "causal_lm":
-        from app.training.dataset_loader import load_training_samples
+        from app.training.dataset_sharding import load_training_corpus_staged
         from app.training.lm_text_utils import resolve_prompt_format
 
         setting = tc.get("prompt_format") or cfg.prompt_format or "auto"
         if setting == "auto":
-            log(framework_line("train", "Loading dataset sample for prompt_format detection…"))
+            artifact_dir = str(tc.get("artifact_dir") or "")
+            log(
+                framework_line(
+                    "train",
+                    "Detecting prompt_format from corpus"
+                    + (" (reuse staged data when present)" if artifact_dir else "")
+                    + "…",
+                )
+            )
             try:
-                sample_texts, _ = load_training_samples(
-                    cfg.dataset.model_dump(), task_type=cfg.task_type
+                sample_texts, _ = load_training_corpus_staged(
+                    artifact_dir=artifact_dir or None,
+                    dataset_cfg=cfg.dataset.model_dump(),
+                    task_type=cfg.task_type,
                 )
                 tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
             except Exception as exc:  # noqa: BLE001
@@ -157,13 +167,33 @@ def prepare_dataset_shards_parallel(
     if train_workers <= 1:
         return patch
 
-    from app.training.dataset_sharding import prepare_dataset_shards_on_driver
+    from app.training.dataset_sharding import (
+        prepare_dataset_shards_on_driver,
+        prepared_dataset_shards_meta,
+    )
 
     dataset_cfg = train_config.get("dataset") or {
         "source": "builtin",
         "builtin_name": "platform_demo",
     }
     task_type = str(train_config.get("task_type") or "causal_lm")
+    existing = prepared_dataset_shards_meta(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+        world_size=train_workers,
+    )
+    if existing is not None:
+        log(
+            framework_line(
+                "train",
+                f"Reusing {train_workers} dataset shard(s) already staged on disk "
+                f"({existing.get('total_examples')} examples)",
+            )
+        )
+        patch["dataset_shards_prepared"] = True
+        return patch
+
     log(
         framework_line(
             "train",

@@ -554,8 +554,11 @@ def run_transformer_training(
         _framework(framework_line("fail", str(exc)))
         raise
 
-    if num_workers > 1 and not train_config.get("dataset_shards_prepared"):
-        from app.training.dataset_sharding import prepare_dataset_shards_on_driver
+    if num_workers > 1:
+        from app.training.dataset_sharding import (
+            prepare_dataset_shards_on_driver,
+            prepared_dataset_shards_meta,
+        )
 
         dataset_cfg = train_config.get("dataset") or {
             "source": "builtin",
@@ -563,8 +566,23 @@ def run_transformer_training(
         }
         task_type = str(train_config.get("task_type") or "causal_lm")
         artifact_dir = str(train_config.get("artifact_dir") or "")
-        train_config["dataset_shards_prepared"] = False
-        if artifact_dir:
+        if not train_config.get("dataset_shards_prepared") and artifact_dir:
+            existing = prepared_dataset_shards_meta(
+                artifact_dir=artifact_dir,
+                dataset_cfg=dataset_cfg,
+                task_type=task_type,
+                world_size=num_workers,
+            )
+            if existing is not None:
+                train_config["dataset_shards_prepared"] = True
+                _framework(
+                    framework_line(
+                        "train",
+                        f"Reusing staged dataset shards: {existing.get('total_examples')} examples → "
+                        f"{num_workers} worker shard(s)",
+                    )
+                )
+        if not train_config.get("dataset_shards_prepared") and artifact_dir:
             try:
                 meta = prepare_dataset_shards_on_driver(
                     artifact_dir=artifact_dir,
@@ -581,6 +599,7 @@ def run_transformer_training(
                     )
                 )
             except Exception as exc:  # noqa: BLE001
+                train_config["dataset_shards_prepared"] = False
                 _framework(
                     framework_line(
                         "warn",
