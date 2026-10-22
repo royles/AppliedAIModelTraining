@@ -12,7 +12,6 @@ import { api } from "./api";
 import { DatasetConfigFields } from "./DatasetConfigFields";
 import { FromScratchConfigFields } from "./FromScratchConfigFields";
 import { ModelTaskWizardStepper } from "./ModelTaskWizardStepper";
-import { PlatformSettingsPanel } from "./PlatformSettingsPanel";
 import { ValidatedNumberField } from "./ValidatedNumberField";
 import { ArchitectureGeometryStep } from "./components/ArchitectureGeometryStep";
 import { PresetWizardStep } from "./components/PresetWizardStep";
