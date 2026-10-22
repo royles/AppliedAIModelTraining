@@ -260,7 +260,7 @@ def provision_cdsw_workers_parallel(
     from app.services.cai_networking import resolve_worker_ray_head_address_with_source
     from app.services.cdsw_workers import (
         ray_driver_init_address,
-        wait_for_gcs_port,
+        wait_for_gcs_usable,
         worker_ids_to_json,
     )
     from app.services.ray_cai_networking import (
@@ -314,6 +314,19 @@ def provision_cdsw_workers_parallel(
             )
         )
         probe_token = require_ray_gcs_auth_token(head)
+
+        def _gcs_log(msg: str) -> None:
+            log(framework_line("ray", msg))
+
+        if not wait_for_gcs_usable(head, timeout_sec=180.0, framework_log=_gcs_log):
+            msg = (
+                f"Ray GCS not usable at {head} before worker probe. "
+                "Restart head on master pod IP (ray stop --force; start.py). "
+                "See Cloudera ML distributed computing — Worker Network Communication."
+            )
+            log(framework_line("fail", msg))
+            raise RuntimeError(msg)
+
         log(
             framework_line(
                 "ray",
@@ -375,16 +388,21 @@ def provision_cdsw_workers_parallel(
         )
 
     if head and ray_addr:
-        gcs_host, _, port_s = ray_addr.partition(":")
-        port = int(port_s or "6379")
+
+        def _cluster_gcs_log(msg: str) -> None:
+            log(framework_line("ray", msg))
+
         log(
             framework_line(
                 "ray",
-                f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
+                f"Waiting for Ray GCS RPC at {ray_addr} (workers join {worker_head})…",
             )
         )
-        if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
-            msg = f"Ray GCS not reachable at {ray_addr} — check framework log for ray start --head errors"
+        if not wait_for_gcs_usable(ray_addr, timeout_sec=180.0, framework_log=_cluster_gcs_log):
+            msg = (
+                f"Ray GCS not usable at {ray_addr}. "
+                "Workers must reach master via CDSW_MASTER_IP (Cloudera worker networking)."
+            )
             log(framework_line("fail", msg))
             raise RuntimeError(f"Ray GCS not available at {ray_addr}")
         result.cluster_wait_done = True

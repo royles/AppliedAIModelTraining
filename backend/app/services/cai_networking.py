@@ -2,6 +2,8 @@
 Cloudera AI Ray address resolution.
 
 Based on:
+- https://docs.cloudera.com/machine-learning/cloud/distributed-computing/ml-distributed-computing.pdf
+  (Worker Network Communication — workers dial **CML_MASTER_IP** / **CDSW_MASTER_IP** on the master)
 - https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html
 - https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html
 - https://docs.cloudera.com/machine-learning/cloud/engines/topics/ml-engine-environment-variables.html
@@ -224,4 +226,5 @@ def reconcile_live_ray_head_env() -> str | None:
             live,
         )
     os.environ["RAY_HEAD_ADDRESS"] = live
+    os.environ["RAY_ADDRESS"] = live
     return live

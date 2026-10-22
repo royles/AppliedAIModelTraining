@@ -2,6 +2,7 @@
 
 This platform follows Cloudera’s distributed-computing and engine networking model. Official references:
 
+- [Cloudera AI — Distributed Computing (PDF)](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/ml-distributed-computing.pdf) — **Worker Network Communication**: workers use **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`** to reach the master engine (Ray GCS uses port **6379** the same way as the doc’s TCP example uses port 6000).
 - [CDSW 1.10.5 — Parallel computing (PDF)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/cdsw-parallel-computing.pdf) — worker engines receive **`CDSW_MASTER_IP`** and open TCP **to the master** (example port 6000; Ray GCS uses **6379** the same way).
 - [CDSW 1.10.5 — Worker network communications (example)](https://docs.cloudera.com/cdsw/1.10.5/parallel-computing/topics/cdsw-example--worker-network-communications.html) — same pattern as the PDF socket example.
 - [Worker network communication (CML cloud)](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/topics/ml-worker-network-communication.html) — same idea on CAI: **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`**.
@@ -89,6 +90,7 @@ Framework log should show **`Ray driver GCS connect 100.100.x.x:6379; node_ip=10
 
 | Symptom | Check |
 |---------|--------|
+| `Failed to connect to GCS at address <pod-ip>:6379 within 5 seconds` / `Timed out while waiting for GCS to become available` | GCS port may be open but the head is not ready for RPC yet, or auth is stale. Wait for framework **“Ray GCS RPC/auth wait”** (not TCP alone). Run `ray stop --force`, delete `data/.ray_gcs_auth_token`, `python3 scripts/start.py`. Confirm head started with `--node-ip-address=$CDSW_IP_ADDRESS`. Workers must dial **`CDSW_MASTER_IP:6379`**, not the worker’s own IP. |
 | `No node info found matching attributes: '<ip>, /tmp/ray'` | Do not pass `_temp_dir` to `ray.init` (fixed in `ray_driver_connect`). Session-only jobs restart the head via `ray stop` + `ray start --head`. |
 | Workers OK, Train fails with `No node info found` / connect to `<pod-ip>:6379` after ~60s | Stale raylet vs GCS; `ray stop --force` and restart head; confirm `ray.init OK` in framework log. |
 | `InvalidAuthToken` on `ray.init` | Backend missing `RAY_AUTH_TOKEN`; rerun `scripts/start.py` or copy `~/.ray/auth_token` into the API env. |

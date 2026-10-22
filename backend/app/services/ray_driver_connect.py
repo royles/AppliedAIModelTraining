@@ -398,6 +398,12 @@ def init_ray_train_driver(
 
     master = master_ip_from_context(worker_head)
     os.environ["RAY_ADDRESS"] = connect
+    if not wait_for_head_gcs_ready(connect, timeout_sec=180.0, framework_log=framework_log):
+        raise RuntimeError(
+            f"Ray GCS at {connect} is not accepting clients before ray.init. "
+            "On CAI, restart the head on CDSW_IP_ADDRESS (ray stop --force; start.py) "
+            "and ensure workers use CDSW_MASTER_IP per Cloudera worker networking."
+        )
     from app.services.ray_gcs_auth import bind_gcs_auth_for_address
 
     bind_gcs_auth_for_address(connect, required=True)

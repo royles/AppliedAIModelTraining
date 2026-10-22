@@ -451,16 +451,21 @@ def run_transformer_training(
                     f"Driver Ray address {raw_ray_address} → {ray_address}",
                 )
             )
-        from app.services.cdsw_workers import wait_for_gcs_port
+        from app.services.cdsw_workers import wait_for_gcs_usable
 
-        host, _, port_s = ray_address.partition(":")
-        port = int(port_s or "6379")
-        if not wait_for_gcs_port(host, port, timeout_sec=180.0):
-            raise RuntimeError(f"Ray GCS not reachable at {ray_address} before ray.init")
+        def _ray_log(msg: str) -> None:
+            _framework(framework_line("ray", msg))
+
+        if not wait_for_gcs_usable(
+            ray_address,
+            timeout_sec=180.0,
+            framework_log=_ray_log,
+        ):
+            raise RuntimeError(
+                f"Ray GCS not usable at {ray_address} before ray.init "
+                "(head on CDSW_IP_ADDRESS; see Cloudera worker network communication)"
+            )
         if not ray.is_initialized():
-
-            def _ray_log(msg: str) -> None:
-                _framework(framework_line("ray", msg))
 
             if train_config.get("remote_driver_engine"):
                 import os

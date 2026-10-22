@@ -456,7 +456,7 @@ def run_training_job(job_id: int) -> None:
                     ),
                 )
 
-        from app.services.cdsw_workers import wait_for_gcs_port
+        from app.services.cdsw_workers import wait_for_gcs_usable
         from app.training.transformer_job import resolve_ray_address, run_transformer_training
 
         worker_head = head
@@ -481,26 +481,32 @@ def run_training_job(job_id: int) -> None:
             )
 
         if not cluster_wait_done and head and ray_addr:
-            gcs_host, _, port_s = ray_addr.partition(":")
-            port = int(port_s or "6379")
+
+            def _gcs_wait_log(msg: str) -> None:
+                append_job_log(db, job_id, "framework", framework_line("ray", msg))
+
             append_job_log(
                 db,
                 job_id,
                 "framework",
                 framework_line(
                     "ray",
-                    f"Waiting for Ray GCS on {ray_addr} (workers join {worker_head})…",
+                    f"Waiting for Ray GCS RPC at {ray_addr} (workers join {worker_head}; "
+                    "CAI: head on CDSW_IP_ADDRESS, workers dial CDSW_MASTER_IP)…",
                 ),
             )
-            if not wait_for_gcs_port(gcs_host, port, timeout_sec=180.0):
+            if not wait_for_gcs_usable(ray_addr, timeout_sec=180.0, framework_log=_gcs_wait_log):
                 append_job_log(
                     db,
                     job_id,
                     "framework",
                     framework_line(
                         "fail",
-                        f"Ray GCS not reachable at {ray_addr} — check framework log "
-                        "for ray start --head errors",
+                        f"Ray GCS not usable at {ray_addr}. On the session: "
+                        "`ray stop --force`, remove data/.ray_gcs_auth_token, "
+                        "`python3 scripts/start.py`. Confirm head uses pod IP "
+                        "(not 127.0.0.1-only). See Cloudera distributed computing / "
+                        "worker network communication docs.",
                     ),
                 )
                 raise RuntimeError(f"Ray GCS not available at {ray_addr}")

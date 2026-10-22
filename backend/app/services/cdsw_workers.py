@@ -14,7 +14,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from app.config import REPO_ROOT
 from app.resource_hints import log_worker_launch_memory
@@ -121,6 +121,45 @@ def _parse_gcs_port(address: str, default: int = 6379) -> int:
         return int(address.rsplit(":", 1)[-1])
     except ValueError:
         return default
+
+
+def wait_for_gcs_usable(
+    gcs_address: str,
+    *,
+    timeout_sec: float = 180.0,
+    framework_log: Callable[[str], None] | None = None,
+) -> bool:
+    """
+    Wait until Ray GCS accepts clients (RPC + auth), not TCP alone.
+
+    Cloudera CAI: the master session runs ``ray start --head`` on ``CDSW_IP_ADDRESS``;
+    worker engines connect to ``CDSW_MASTER_IP:<port>`` (see ml-distributed-computing.pdf).
+    TCP to :6379 can succeed while GCS is still starting or auth is stale — that yields
+    Ray log spam like "Failed to connect to GCS … within 5 seconds".
+    """
+    from app.services.cai_networking import parse_gcs_host_port
+    from app.services.ray_driver_connect import wait_for_head_gcs_ready
+
+    host, port = parse_gcs_host_port(gcs_address)
+
+    def _log(msg: str) -> None:
+        if framework_log:
+            framework_log(msg)
+
+    _log(
+        f"Ray GCS TCP check {host}:{port} "
+        "(master pod IP; workers use CDSW_MASTER_IP per Cloudera worker networking)…"
+    )
+    tcp_budget = min(90.0, timeout_sec * 0.35)
+    if not wait_for_gcs_port(host, port, timeout_sec=tcp_budget):
+        _log(f"Ray GCS TCP not open at {host}:{port} within {tcp_budget:.0f}s")
+        return False
+    _log(f"Ray GCS RPC/auth wait at {gcs_address} (avoid starting workers/driver too early)…")
+    return wait_for_head_gcs_ready(
+        gcs_address,
+        timeout_sec=timeout_sec,
+        framework_log=framework_log,
+    )
 
 
 def wait_for_gcs_port(
