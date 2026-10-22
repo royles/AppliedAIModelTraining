@@ -22,7 +22,9 @@ import {
   type ModelTaskBlueprintFile,
   type ModelTaskWizardState,
 } from "./modelTaskBlueprint";
-import { blueprintReady, buildTrainingBlueprint, type BlueprintStep, type DatasetPreview } from "./trainingBlueprint";
+import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
+import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
+import { blueprintReady, buildTrainingBlueprint, type BlueprintStep } from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
 import { WorkerSizePresetBar } from "./components/WorkerSizePresetBar";
 import type { WorkerSizePreset } from "./workerSizePresets";
@@ -180,9 +182,16 @@ export function ModelTasksPanel(props: Props) {
   } = props;
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [preview, setPreview] = useState<DatasetPreview | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [minCorpusChars, setMinCorpusChars] = useState<number | null>(null);
+  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset);
+  const minCorpusChars = useDebouncedMinCorpusChars({
+    initMode,
+    tokenizer,
+    vocabSize,
+    hiddenSize,
+    layers,
+    heads,
+    maxSteps,
+  });
   const [workerPresetId, setWorkerPresetId] = useState<string | null>("large");
 
   function applyWorkerPreset(p: WorkerSizePreset) {
@@ -289,45 +298,6 @@ export function ModelTasksPanel(props: Props) {
     api.listTaskBlueprints().then(setSavedBlueprints).catch(() => setSavedBlueprints([]));
   }, []);
 
-  useEffect(() => {
-    if (initMode !== "from_scratch") {
-      setMinCorpusChars(null);
-      return;
-    }
-    api
-      .fromScratchGuidance({
-        init_mode: "from_scratch",
-        task_type: "causal_lm",
-        architecture: {
-          family: "gpt2",
-          vocab_size: vocabSize,
-          hidden_size: hiddenSize,
-          num_hidden_layers: layers,
-          num_attention_heads: heads,
-          max_position_embeddings: 512,
-          tie_word_embeddings: true,
-        },
-        tokenizer,
-        max_steps: maxSteps,
-        dataset,
-      })
-      .then((g) => setMinCorpusChars((g.min_corpus_characters as number) ?? null))
-      .catch(() => setMinCorpusChars(null));
-  }, [initMode, tokenizer, vocabSize, hiddenSize, layers, heads, maxSteps, dataset]);
-
-  useEffect(() => {
-    api
-      .datasetPreview(dataset)
-      .then((p) => {
-        setPreview(p);
-        setPreviewError(null);
-      })
-      .catch((e) => {
-        setPreview(null);
-        setPreviewError(e instanceof Error ? e.message : String(e));
-      });
-  }, [dataset]);
-
   const blueprintSteps: BlueprintStep[] = useMemo(
     () =>
       buildTrainingBlueprint({
@@ -346,6 +316,8 @@ export function ModelTasksPanel(props: Props) {
         openaiModelId,
         paramEstimate,
         datasetPreview: preview,
+        datasetPreviewLoading: previewLoading,
+        datasetPreviewError: previewError,
         minCorpusChars,
       }),
     [
@@ -364,6 +336,8 @@ export function ModelTasksPanel(props: Props) {
       openaiModelId,
       paramEstimate,
       preview,
+      previewLoading,
+      previewError,
       minCorpusChars,
     ],
   );
@@ -468,15 +442,24 @@ export function ModelTasksPanel(props: Props) {
       case "dataset":
         return (
           <>
-            {previewError && dataset.source !== "builtin" && (
-              <p className="hint blueprint-warn">Dataset preview: {previewError}</p>
-            )}
-            {preview && (
-              <p className="hint">
-                Preview: {preview.examples.toLocaleString()} examples ·{" "}
-                {preview.total_characters.toLocaleString()} characters
-              </p>
-            )}
+            <p
+              className={`hint dataset-preview-status${previewError && dataset.source !== "builtin" ? " blueprint-warn" : ""}`}
+              aria-live="polite"
+            >
+              {previewLoading && dataset.source !== "builtin"
+                ? "Validating dataset in the background (you can keep editing)…"
+                : previewError && dataset.source !== "builtin"
+                  ? `Dataset preview: ${previewError}`
+                  : preview
+                    ? `Preview: ${preview.examples.toLocaleString()} examples · ${preview.total_characters.toLocaleString()} characters${
+                        preview.preview_capped
+                          ? ` (first ${preview.sample_limit ?? "?"} rows; set Max samples for full count)`
+                          : ""
+                      }`
+                    : dataset.source !== "builtin"
+                      ? "Fill in the fields below; preview runs automatically after you pause typing."
+                      : null}
+            </p>
             <DatasetConfigFields value={dataset} onChange={onDatasetChange} />
           </>
         );

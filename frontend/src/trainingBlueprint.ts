@@ -1,9 +1,12 @@
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
+import { datasetConfigLooksComplete } from "./datasetValidation";
 
 export type DatasetPreview = {
   examples: number;
   total_characters: number;
   source: string;
+  preview_capped?: boolean;
+  sample_limit?: number | null;
 };
 
 export type BlueprintContext = {
@@ -22,6 +25,8 @@ export type BlueprintContext = {
   openaiModelId: string;
   paramEstimate: number | null;
   datasetPreview: DatasetPreview | null;
+  datasetPreviewLoading?: boolean;
+  datasetPreviewError?: string | null;
   minCorpusChars: number | null;
 };
 
@@ -88,9 +93,14 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
         ? `${ctx.datasetPreview.examples.toLocaleString()} examples · ${corpusChars(ctx).toLocaleString()} characters (after repeat)`
         : "Load preview to measure examples and characters.",
       done: (() => {
+        const configured = datasetConfigLooksComplete(ctx.dataset);
+        if (ctx.datasetPreviewError) return false;
         if (ctx.initMode === "from_scratch" && ctx.tokenizer.mode === "train_bpe_from_dataset") {
           if (ctx.dataset.source === "builtin") return false;
-          if (!ctx.datasetPreview || ctx.datasetPreview.examples < 1) return false;
+          if (!configured) return false;
+          if (ctx.datasetPreviewLoading) return true;
+          if (!ctx.datasetPreview) return configured;
+          if (ctx.datasetPreview.examples < 1) return false;
           const min = ctx.minCorpusChars ?? 10_000;
           return corpusChars(ctx) >= min;
         }
@@ -98,12 +108,7 @@ export function buildTrainingBlueprint(ctx: BlueprintContext): BlueprintStep[] {
           return (ctx.dataset.texts?.length ?? 0) > 0;
         }
         if (ctx.dataset.source === "builtin") return true;
-        return Boolean(
-          ctx.dataset.path ||
-            ctx.dataset.hf_dataset ||
-            ctx.dataset.iceberg_table ||
-            ctx.dataset.parquet_uri,
-        );
+        return configured;
       })(),
     },
     {

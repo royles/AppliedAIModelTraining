@@ -283,10 +283,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
   datasetPreview: (dataset: TrainingDatasetConfig) =>
-    request<{ examples: number; total_characters: number; source: string }>(
-      "/api/training/dataset/preview",
-      { method: "POST", body: JSON.stringify(dataset) },
-    ),
+    request<{
+      examples: number;
+      total_characters: number;
+      source: string;
+      preview_capped?: boolean;
+      sample_limit?: number | null;
+    }>("/api/training/dataset/preview", {
+      method: "POST",
+      body: JSON.stringify(dataset),
+    }),
   estimateArchitecture: (architecture: TransformerArchitecture) =>
     request<{ estimated_parameters: number }>("/api/transformer/architecture/estimate", {
       method: "POST",

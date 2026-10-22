@@ -222,13 +222,26 @@ def from_scratch_guidance(payload: TransformerTrainingConfig) -> dict:
     return from_scratch_resource_guidance(payload)
 
 
+def _preview_dataset_config(dataset: TrainingDatasetConfig) -> tuple[TrainingDatasetConfig, bool, int | None]:
+    """Cap Hugging Face previews so the UI stays responsive while typing."""
+    if dataset.source != "huggingface":
+        return dataset, False, None
+    cap = 400
+    user_max = dataset.max_samples
+    effective = min(user_max, cap) if user_max is not None else cap
+    capped = user_max is None or user_max > cap
+    patched = dataset.model_copy(update={"max_samples": effective})
+    return patched, capped, effective
+
+
 @router.post("/training/dataset/preview")
 def dataset_preview(
     dataset: TrainingDatasetConfig,
     task_type: str = "causal_lm",
-) -> dict[str, int | str]:
+) -> dict[str, int | str | bool | None]:
+    preview_cfg, preview_capped, sample_limit = _preview_dataset_config(dataset)
     try:
-        texts, _ = load_training_samples(dataset.model_dump(), task_type=task_type)
+        texts, _ = load_training_samples(preview_cfg.model_dump(), task_type=task_type)
     except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportError as exc:
@@ -254,6 +267,8 @@ def dataset_preview(
         "examples": len(texts),
         "total_characters": total_chars,
         "source": dataset.source,
+        "preview_capped": preview_capped,
+        "sample_limit": sample_limit,
     }
 
 

@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { api } from "./api";
+import { useEffect, useMemo } from "react";
 import {
   blueprintReady,
   buildTrainingBlueprint,
   type BlueprintContext,
-  type DatasetPreview,
 } from "./trainingBlueprint";
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
+import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
+import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
 
 type Props = {
   initMode: "from_scratch" | "pretrained";
@@ -57,57 +57,16 @@ export function TrainingBlueprintChecklist(props: Props) {
     startBusy,
   } = props;
 
-  const [preview, setPreview] = useState<DatasetPreview | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [minCorpusChars, setMinCorpusChars] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (initMode !== "from_scratch") {
-      setMinCorpusChars(null);
-      return;
-    }
-    api
-      .fromScratchGuidance({
-        init_mode: "from_scratch",
-        task_type: "causal_lm",
-        architecture: {
-          family: "gpt2",
-          vocab_size: vocabSize,
-          hidden_size: hiddenSize,
-          num_hidden_layers: layers,
-          num_attention_heads: heads,
-          max_position_embeddings: 512,
-          tie_word_embeddings: true,
-        },
-        tokenizer,
-        max_steps: maxSteps,
-        max_seq_length: 256,
-        per_device_train_batch_size: 2,
-        learning_rate: 6e-4,
-        dataset,
-      })
-      .then((g) => setMinCorpusChars((g.min_corpus_characters as number) ?? null))
-      .catch(() => setMinCorpusChars(null));
-  }, [initMode, tokenizer, vocabSize, hiddenSize, layers, heads, maxSteps, dataset]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setPreviewError(null);
-    api
-      .datasetPreview(dataset)
-      .then((p) => {
-        if (!cancelled) setPreview(p);
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setPreview(null);
-          setPreviewError(e instanceof Error ? e.message : String(e));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dataset]);
+  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset);
+  const minCorpusChars = useDebouncedMinCorpusChars({
+    initMode,
+    tokenizer,
+    vocabSize,
+    hiddenSize,
+    layers,
+    heads,
+    maxSteps,
+  });
 
   const ctx: BlueprintContext = useMemo(
     () => ({
@@ -126,6 +85,8 @@ export function TrainingBlueprintChecklist(props: Props) {
       openaiModelId,
       paramEstimate,
       datasetPreview: preview,
+      datasetPreviewLoading: previewLoading,
+      datasetPreviewError: previewError,
       minCorpusChars,
     }),
     [
@@ -144,6 +105,8 @@ export function TrainingBlueprintChecklist(props: Props) {
       openaiModelId,
       paramEstimate,
       preview,
+      previewLoading,
+      previewError,
       minCorpusChars,
     ],
   );
@@ -169,6 +132,9 @@ export function TrainingBlueprintChecklist(props: Props) {
         A blueprint is the full configuration for one training task. Steps unlock top to bottom;
         click a step to jump to its fields. Confirm each step on the right when values are final.
       </p>
+      {previewLoading && dataset.source !== "builtin" && (
+        <p className="hint">Dataset preview loading…</p>
+      )}
       {previewError && dataset.source !== "builtin" && (
         <p className="hint blueprint-warn">Dataset preview: {previewError}</p>
       )}
