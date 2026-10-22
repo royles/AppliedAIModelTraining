@@ -1,12 +1,6 @@
 import { useEffect, useMemo } from "react";
-import {
-  blueprintReady,
-  buildTrainingBlueprint,
-  type BlueprintContext,
-} from "./trainingBlueprint";
+import { blueprintReady, buildTrainingBlueprint, type BlueprintContext } from "./trainingBlueprint";
 import type { TrainingDatasetConfig, TokenizerBuildConfig } from "./api";
-import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
-import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
 
 type Props = {
   initMode: "from_scratch" | "pretrained";
@@ -57,17 +51,6 @@ export function TrainingBlueprintChecklist(props: Props) {
     startBusy,
   } = props;
 
-  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset);
-  const minCorpusChars = useDebouncedMinCorpusChars({
-    initMode,
-    tokenizer,
-    vocabSize,
-    hiddenSize,
-    layers,
-    heads,
-    maxSteps,
-  });
-
   const ctx: BlueprintContext = useMemo(
     () => ({
       initMode,
@@ -84,10 +67,6 @@ export function TrainingBlueprintChecklist(props: Props) {
       jobName,
       openaiModelId,
       paramEstimate,
-      datasetPreview: preview,
-      datasetPreviewLoading: previewLoading,
-      datasetPreviewError: previewError,
-      minCorpusChars,
     }),
     [
       initMode,
@@ -104,15 +83,11 @@ export function TrainingBlueprintChecklist(props: Props) {
       jobName,
       openaiModelId,
       paramEstimate,
-      preview,
-      previewLoading,
-      previewError,
-      minCorpusChars,
     ],
   );
 
   const steps = useMemo(() => buildTrainingBlueprint(ctx), [ctx]);
-  const ready = blueprintReady(steps, confirmedStepIds, ctx);
+  const ready = blueprintReady(steps, confirmedStepIds);
 
   useEffect(() => {
     onStepsChange?.(steps);
@@ -129,15 +104,9 @@ export function TrainingBlueprintChecklist(props: Props) {
         </span>
       </header>
       <p className="hint">
-        A blueprint is the full configuration for one training task. Steps unlock top to bottom;
-        click a step to jump to its fields. Confirm each step on the right when values are final.
+        A blueprint is the full configuration for one training task. Dataset loading runs when the job
+        starts. Confirm each step when values are final.
       </p>
-      {previewLoading && dataset.source !== "builtin" && (
-        <p className="hint">Dataset preview loading…</p>
-      )}
-      {previewError && dataset.source !== "builtin" && (
-        <p className="hint blueprint-warn">Dataset preview: {previewError}</p>
-      )}
       <ol className="blueprint-steps">
         {steps.map((step) => {
           const confirmed = confirmedStepIds.has(step.id);

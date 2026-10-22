@@ -23,15 +23,12 @@ import {
   type ModelTaskBlueprintFile,
   type ModelTaskWizardState,
 } from "./modelTaskBlueprint";
-import { useDebouncedDatasetPreview } from "./hooks/useDebouncedDatasetPreview";
-import { useDebouncedMinCorpusChars } from "./hooks/useDebouncedMinCorpusChars";
-import { DatasetPreviewBanner } from "./components/DatasetPreviewBanner";
+import { DatasetConfigNotice } from "./components/DatasetConfigNotice";
 import {
-  blueprintReady,
   buildTrainingBlueprint,
-  corpusMeetsMinimum,
   type BlueprintContext,
   type BlueprintStep,
+  wizardSettingsValid,
 } from "./trainingBlueprint";
 import { MODEL_TASK_WIZARD_STEPS } from "./wizardSteps";
 import { ModelTaskTrainingOptions } from "./components/ModelTaskTrainingOptions";
@@ -197,16 +194,6 @@ export function ModelTasksPanel(props: Props) {
   } = props;
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const { preview, previewError, previewLoading } = useDebouncedDatasetPreview(dataset, 650, taskType);
-  const minCorpusChars = useDebouncedMinCorpusChars({
-    initMode,
-    tokenizer,
-    vocabSize,
-    hiddenSize,
-    layers,
-    heads,
-    maxSteps,
-  });
   const [workerPresetId, setWorkerPresetId] = useState<string | null>("large");
 
   function applyWorkerPreset(p: WorkerSizePreset) {
@@ -331,10 +318,6 @@ export function ModelTasksPanel(props: Props) {
       jobName,
       openaiModelId,
       paramEstimate,
-      datasetPreview: preview,
-      datasetPreviewLoading: previewLoading,
-      datasetPreviewError: previewError,
-      minCorpusChars,
     }),
     [
       initMode,
@@ -351,10 +334,6 @@ export function ModelTasksPanel(props: Props) {
       jobName,
       openaiModelId,
       paramEstimate,
-      preview,
-      previewLoading,
-      previewError,
-      minCorpusChars,
     ],
   );
 
@@ -370,8 +349,7 @@ export function ModelTasksPanel(props: Props) {
 
   const currentStep = MODEL_TASK_WIZARD_STEPS[currentStepIndex];
   const currentBlueprintStep = stepById.get(currentStep.id);
-  const ready = blueprintReady(blueprintSteps, undefined, blueprintContext);
-  const corpusOk = corpusMeetsMinimum(blueprintContext);
+  const ready = wizardSettingsValid(blueprintContext);
   const isLastStep = currentStepIndex >= MODEL_TASK_WIZARD_STEPS.length - 1;
 
   const stepDescription = currentBlueprintStep?.description;
@@ -476,17 +454,6 @@ export function ModelTasksPanel(props: Props) {
       case "tokenizer":
         return (
           <>
-            {previewLoading && dataset.source !== "builtin" && (
-              <p className="hint dataset-preview-status" aria-live="polite">
-                Dataset preview still running in the background — you can continue; Start run
-                checks corpus size when preview finishes.
-              </p>
-            )}
-            {!previewLoading && previewError && dataset.source !== "builtin" && (
-              <p className="hint blueprint-warn" aria-live="polite">
-                Dataset preview: {previewError}
-              </p>
-            )}
             <FromScratchConfigFields
               section="tokenizer"
               initMode={initMode}
@@ -746,13 +713,7 @@ export function ModelTasksPanel(props: Props) {
         onSelectIndex={setCurrentStepIndex}
       />
 
-      <DatasetPreviewBanner
-        dataset={dataset}
-        preview={preview}
-        previewLoading={previewLoading}
-        previewError={previewError}
-        minCorpusChars={minCorpusChars}
-      />
+      <DatasetConfigNotice dataset={dataset} />
 
       <div className="model-task-wizard-body">
         <WizardStepCard
@@ -790,10 +751,8 @@ export function ModelTasksPanel(props: Props) {
               {startBusy ? "Starting…" : "Start job"}
             </button>
           )}
-          {isLastStep && !corpusOk && initMode === "from_scratch" && !ready && (
-            <p className="hint blueprint-warn">
-              Waiting for dataset preview to confirm BPE corpus size (or add more text).
-            </p>
+          {isLastStep && !ready && (
+            <p className="hint">Fill required fields on earlier steps to enable Start job.</p>
           )}
         </footer>
       </div>
