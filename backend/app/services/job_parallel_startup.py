@@ -12,6 +12,7 @@ from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.job_log import append_job_log
 from app.services.log_flair import framework_line, task_done_line, task_start_line
+from app.services.task_heartbeat import provisioning_heartbeat
 from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
 
@@ -95,12 +96,13 @@ def prepare_train_config_dataset(
 
     if cfg.init_mode == "from_scratch":
         t0 = _log_phase_start(log, "train", "From-scratch tokenizer & corpus")
-        tc = prepare_from_scratch_training(
-            cfg,
-            tc,
-            log=log,
-            skip_tokenizer_if_present=resume,
-        )
+        with provisioning_heartbeat(log, "From-scratch prep"):
+            tc = prepare_from_scratch_training(
+                cfg,
+                tc,
+                log=log,
+                skip_tokenizer_if_present=resume,
+            )
         _log_phase_done(log, t0, "From-scratch prep")
 
     return tc
@@ -131,10 +133,11 @@ def ensure_ray_head_parallel(
         log(line)
         logger.info("%s", line)
 
-    head = ensure_ray_head_for_workers(
-        framework_log=_ray_head_log,
-        force_restart=force_restart,
-    )
+    with provisioning_heartbeat(log, "Ray cluster setup"):
+        head = ensure_ray_head_for_workers(
+            framework_log=_ray_head_log,
+            force_restart=force_restart,
+        )
     bind_gcs_auth_for_address(head, required=True)
     _log_phase_done(log, t0, "Ray cluster setup", detail=head or "")
     return head
@@ -149,26 +152,41 @@ def parallel_dataset_prep_and_ray_head(
     force_ray_head_restart: bool,
     head_before: str | None,
     resume: bool,
+    skip_ray_head_setup: bool = False,
 ) -> tuple[dict[str, Any], str | None]:
     log = _job_framework_log(job_id)
     log(framework_line("info", "Parallel: dataset prep + Ray head"))
-    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-start") as pool:
-        f_data = pool.submit(
-            prepare_train_config_dataset,
-            cfg,
-            train_config,
-            job_id=job_id,
-            resume=resume,
-        )
-        f_ray = pool.submit(
-            ensure_ray_head_parallel,
-            job_id=job_id,
-            needs_cai_ray_head=needs_cai_ray_head,
-            force_restart=force_ray_head_restart,
-            head_before=head_before,
-        )
-        tc = f_data.result()
-        head = f_ray.result()
+    with provisioning_heartbeat(log, "Dataset prep + Ray head"):
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-start") as pool:
+            f_data = pool.submit(
+                prepare_train_config_dataset,
+                cfg,
+                train_config,
+                job_id=job_id,
+                resume=resume,
+            )
+            if skip_ray_head_setup and head_before and needs_cai_ray_head:
+                log(
+                    framework_line(
+                        "ray",
+                        f"Ray head at {head_before} (full restart done — skipping parallel re-check)",
+                    )
+                )
+
+                def _return_head() -> str | None:
+                    return head_before
+
+                f_ray = pool.submit(_return_head)
+            else:
+                f_ray = pool.submit(
+                    ensure_ray_head_parallel,
+                    job_id=job_id,
+                    needs_cai_ray_head=needs_cai_ray_head,
+                    force_restart=force_ray_head_restart,
+                    head_before=head_before,
+                )
+            tc = f_data.result()
+            head = f_ray.result()
     log(framework_line("done", "Parallel: dataset prep + Ray head"))
     return tc, head
 
@@ -217,13 +235,14 @@ def prepare_dataset_shards_parallel(
         return patch
 
     t0 = _log_phase_start(log, "train", "Dataset download & sharding")
-    meta = prepare_dataset_shards_on_driver(
-        artifact_dir=artifact_dir,
-        dataset_cfg=dataset_cfg,
-        task_type=task_type,
-        world_size=train_workers,
-        shared_dirs=shared_dirs,
-    )
+    with provisioning_heartbeat(log, "Dataset download & sharding"):
+        meta = prepare_dataset_shards_on_driver(
+            artifact_dir=artifact_dir,
+            dataset_cfg=dataset_cfg,
+            task_type=task_type,
+            world_size=train_workers,
+            shared_dirs=shared_dirs,
+        )
     patch["dataset_shards_prepared"] = True
     _log_phase_done(
         log,
@@ -476,32 +495,34 @@ def parallel_shards_and_worker_provision(
     shard_patch: dict[str, Any] = {}
     provision = CdswProvisionResult()
 
-    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-provision") as executor:
-        f_shards = executor.submit(
-            prepare_dataset_shards_parallel,
-            job_id=job_id,
-            artifact_dir=artifact_dir,
-            train_config=train_config,
-            train_workers=train_workers,
-        )
-        if launch_cdsw_workers:
-            f_prov = executor.submit(
-                provision_cdsw_workers_parallel,
+    with provisioning_heartbeat(log, "Dataset sharding + worker provisioning"):
+        with provisioning_heartbeat(log, "Dataset sharding + worker provisioning"):
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-provision") as executor:
+            f_shards = executor.submit(
+                prepare_dataset_shards_parallel,
                 job_id=job_id,
-                head=head,
-                num_workers=num_workers,
                 artifact_dir=artifact_dir,
-                pool=pool,
-                worker_spec=worker_spec,
+                train_config=train_config,
                 train_workers=train_workers,
-                gpus_per_worker=gpus_per_worker,
-                use_gpu=use_gpu,
             )
-            wait([f_shards, f_prov], return_when=ALL_COMPLETED)
-            shard_patch = f_shards.result()
-            provision = f_prov.result()
-        else:
-            shard_patch = f_shards.result()
+            if launch_cdsw_workers:
+                f_prov = executor.submit(
+                    provision_cdsw_workers_parallel,
+                    job_id=job_id,
+                    head=head,
+                    num_workers=num_workers,
+                    artifact_dir=artifact_dir,
+                    pool=pool,
+                    worker_spec=worker_spec,
+                    train_workers=train_workers,
+                    gpus_per_worker=gpus_per_worker,
+                    use_gpu=use_gpu,
+                )
+                wait([f_shards, f_prov], return_when=ALL_COMPLETED)
+                shard_patch = f_shards.result()
+                provision = f_prov.result()
+            else:
+                shard_patch = f_shards.result()
 
     log(framework_line("done", "Parallel: sharding + worker provisioning"))
     return {**provision.train_config_patch, **shard_patch}, provision.cluster_wait_done

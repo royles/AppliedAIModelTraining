@@ -38,6 +38,10 @@ def task_start_line(kind: str, label: str) -> str:
     return framework_line(kind, f"{label} — started")
 
 
+def heartbeat_line(label: str, elapsed_sec: int) -> str:
+    return framework_line("info", f"{label} — still running ({elapsed_sec}s)")
+
+
 def task_done_line(label: str, *, seconds: float | None = None, detail: str = "") -> str:
     """Long-running phase — finish with optional detail and elapsed seconds."""
     msg = label if not detail else f"{label} — {detail}"

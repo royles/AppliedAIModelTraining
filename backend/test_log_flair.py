@@ -1,6 +1,11 @@
 """ASCII log banner alignment."""
 
-from app.services.log_flair import framework_banner, task_done_line, task_start_line
+from app.services.log_flair import (
+    framework_banner,
+    heartbeat_line,
+    task_done_line,
+    task_start_line,
+)
 
 
 def test_framework_banner_rows_equal_width() -> None:
@@ -14,6 +19,10 @@ def test_framework_banner_rows_equal_width() -> None:
         assert len(lines) == 3
         widths = [len(line) for line in lines]
         assert widths[0] == widths[1] == widths[2], (title, widths, lines)
+
+
+def test_heartbeat_line() -> None:
+    assert "still running (45s)" in heartbeat_line("BPE tokenizer", 45)
 
 
 def test_task_phase_lines() -> None:

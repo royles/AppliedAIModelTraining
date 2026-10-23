@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any, Callable
+
+from app.services.log_flair import task_done_line, task_start_line
+from app.services.task_heartbeat import provisioning_heartbeat
 
 from app.training.dataset_sharding import load_training_corpus_staged
 from app.training.dataset_staging import shared_dataset_dirs_from_config
@@ -75,11 +79,21 @@ def prepare_from_scratch_training(
                 f"vocab_size={len(tok)}."
             )
         return train_config
-    texts, _ = load_training_corpus_staged(
-        artifact_dir=str(artifact_dir),
-        dataset_cfg=cfg.dataset.model_dump(),
-        task_type=cfg.task_type,
-        shared_dirs=shared_dataset_dirs_from_config(train_config),
+    t_corpus = time.monotonic()
+    _log(task_start_line("train", "Corpus load (from-scratch)"))
+    with provisioning_heartbeat(log, "Corpus load"):
+        texts, _ = load_training_corpus_staged(
+            artifact_dir=str(artifact_dir),
+            dataset_cfg=cfg.dataset.model_dump(),
+            task_type=cfg.task_type,
+            shared_dirs=shared_dataset_dirs_from_config(train_config),
+        )
+    _log(
+        task_done_line(
+            "Corpus load",
+            seconds=time.monotonic() - t_corpus,
+            detail=f"{len(texts)} samples",
+        )
     )
     setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
     train_config["prompt_format"] = resolve_prompt_format(setting, texts)
@@ -109,15 +123,26 @@ def prepare_from_scratch_training(
         total_chars = validate_corpus_for_bpe(
             texts, tok_cfg.vocab_size, tok_cfg.min_corpus_chars
         )
+        t_bpe = time.monotonic()
         _log(
-            f"Training BPE tokenizer on {len(texts)} examples ({total_chars:,} characters), "
-            f"target vocab_size={tok_cfg.vocab_size}."
+            task_start_line(
+                "train",
+                f"BPE tokenizer ({len(texts)} ex, {total_chars:,} chars, vocab={tok_cfg.vocab_size})",
+            )
         )
-        tokenizer = train_gpt2_bpe_tokenizer(
-            texts,
-            vocab_size=tok_cfg.vocab_size,
-            save_dir=artifact_dir / "tokenizer",
-            min_frequency=tok_cfg.min_frequency,
+        with provisioning_heartbeat(log, "BPE tokenizer"):
+            tokenizer = train_gpt2_bpe_tokenizer(
+                texts,
+                vocab_size=tok_cfg.vocab_size,
+                save_dir=artifact_dir / "tokenizer",
+                min_frequency=tok_cfg.min_frequency,
+            )
+        _log(
+            task_done_line(
+                "BPE tokenizer",
+                seconds=time.monotonic() - t_bpe,
+                detail=f"vocab={len(tokenizer)}",
+            )
         )
         actual_vocab = len(tokenizer)
         arch_dict["vocab_size"] = actual_vocab

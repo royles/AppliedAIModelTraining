@@ -29,6 +29,19 @@ logger = logging.getLogger(__name__)
 
 LogFn = Callable[[str], None]
 
+# After ``restart_co_located_ray_head``, skip long GCS RPC poll loops in parallel startup.
+_HEAD_RESTART_GRACE_SEC = 180.0
+_last_head_restart_at: float = 0.0
+
+
+def mark_ray_head_restarted() -> None:
+    global _last_head_restart_at
+    _last_head_restart_at = time.monotonic()
+
+
+def ray_head_in_restart_grace_period() -> bool:
+    return (time.monotonic() - _last_head_restart_at) < _HEAD_RESTART_GRACE_SEC
+
 # Bump when worker probe semantics change (visible in probe JSON + framework logs).
 WORKER_CONNECTIVITY_PROBE_REVISION = "2026-10-20c"
 
@@ -116,10 +129,19 @@ def ensure_ray_head_for_workers(
         require_ray_gcs_auth_token(gcs)
         return gcs
 
+    if (
+        not force_restart
+        and ray_head_in_restart_grace_period()
+        and gcs_tcp_reachable(host, timeout_sec=2.0)
+    ):
+        _finalize_head()
+        _log(f"Ray head at {gcs} (recent restart — skipped RPC wait)")
+        return gcs
+
     if force_restart:
         _log("Ensuring fresh Ray head on master pod IP (ray stop --force)…")
         restart_co_located_ray_head(framework_log=framework_log)
-    elif _rpc_ready(60.0):
+    elif _rpc_ready(15.0):
         _finalize_head()
         _log(f"Ray head already healthy at {gcs} (no restart)")
         return gcs

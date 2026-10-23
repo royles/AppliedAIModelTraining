@@ -284,6 +284,7 @@ def run_training_job(job_id: int) -> None:
         needs_cai_ray_head = bool(live_ip) and not (
             platform.ray_local_mode and not pool.is_remote
         )
+        skip_ray_head_setup = False
         if force_ray_head_restart and needs_cai_ray_head:
             from app.services.ray_cluster_restart import full_ray_cluster_restart
 
@@ -296,6 +297,11 @@ def run_training_job(job_id: int) -> None:
                 )
             )
             force_ray_head_restart = False
+            skip_ray_head_setup = True
+            if live_ip:
+                from app.services.cai_networking import format_ray_head
+
+                head = format_ray_head(live_ip)
         from app.services.job_parallel_startup import parallel_dataset_prep_and_ray_head
 
         try:
@@ -307,6 +313,7 @@ def run_training_job(job_id: int) -> None:
                 force_ray_head_restart=force_ray_head_restart,
                 head_before=head,
                 resume=bool(train_config.get("resume")),
+                skip_ray_head_setup=skip_ray_head_setup,
             )
         except ValueError as exc:
             append_job_log(db, job_id, "framework", f"From-scratch prep failed: {exc}")

@@ -273,6 +273,9 @@ def restart_co_located_ray_head(
             f"ray status: {detail}"
         )
     _log(f"Ray head active at {gcs}")
+    from app.services.ray_cai_networking import mark_ray_head_restarted
+
+    mark_ray_head_restarted()
     return gcs
 
 

@@ -68,12 +68,19 @@ def full_ray_cluster_restart(*, framework_log: LogFn | None = None) -> str | Non
     from app.services.log_flair import task_done_line, task_start_line
     from app.services.ray_cai_networking import ensure_ray_head_for_workers
 
+    from app.services.task_heartbeat import provisioning_heartbeat
+
     with _cluster_restart_lock:
         t0 = time.monotonic()
         start = task_start_line("ray", "Ray cluster full restart")
         _log(start)
         logger.info("Ray cluster full restart")
-        head = ensure_ray_head_for_workers(framework_log=_log, force_restart=True)
+
+        def _hb_log(msg: str) -> None:
+            _log(msg)
+
+        with provisioning_heartbeat(_hb_log if framework_log else None, "Ray cluster full restart"):
+            head = ensure_ray_head_for_workers(framework_log=_log, force_restart=True)
         _log(
             task_done_line(
                 "Ray cluster full restart",
