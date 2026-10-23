@@ -3,6 +3,7 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 
@@ -25,11 +26,9 @@ def _make_engine():
     connect_args = {"check_same_thread": False, "timeout": 60} if url.startswith("sqlite") else {}
     kwargs: dict = {"connect_args": connect_args, "pool_pre_ping": True}
     if url.startswith("sqlite"):
-        # SQLite is single-writer; a large QueuePool + long-lived job sessions starves /api polls.
-        kwargs["pool_size"] = 5
-        kwargs["max_overflow"] = 5
-        kwargs["pool_timeout"] = 30
-        kwargs["pool_recycle"] = 300
+        # No QueuePool: checked-out connections during streaming inference / Ray waits
+        # must not exhaust the pool (SQLite is single-writer; WAL + busy_timeout handle contention).
+        kwargs["poolclass"] = NullPool
     engine = create_engine(settings.database_url, **kwargs)
     if url.startswith("sqlite"):
 

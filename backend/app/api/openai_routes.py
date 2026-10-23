@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, session_scope
 from app.inference.engine import chat_complete, chat_complete_stream
 from app.inference.schemas_openai import (
     ChatCompletionChoice,
@@ -82,8 +82,10 @@ def _sse_chunk(chunk: ChatCompletionStreamChunk) -> str:
 
 
 @router.post("/chat/completions")
-def create_chat_completion(payload: ChatCompletionRequest, db: Session = Depends(get_db)):
-    record = _resolve_serving_model(db, payload.model)
+def create_chat_completion(payload: ChatCompletionRequest):
+    with session_scope() as db:
+        record = _resolve_serving_model(db, payload.model)
+        artifact_path = record.artifact_path
     messages = [m.model_dump() for m in payload.messages]
     max_tokens = payload.max_tokens or 256
 
@@ -95,7 +97,7 @@ def create_chat_completion(payload: ChatCompletionRequest, db: Session = Depends
             first = True
             try:
                 for piece in chat_complete_stream(
-                    record.artifact_path,
+                    artifact_path,
                     messages,
                     temperature=payload.temperature,
                     max_tokens=max_tokens,
@@ -148,7 +150,7 @@ def create_chat_completion(payload: ChatCompletionRequest, db: Session = Depends
 
     try:
         text, usage = chat_complete(
-            record.artifact_path,
+            artifact_path,
             messages,
             temperature=payload.temperature,
             max_tokens=max_tokens,
