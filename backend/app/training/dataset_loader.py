@@ -10,6 +10,13 @@ from typing import Any, Callable
 ProgressCallback = Callable[[int, int | None], None]
 
 from app.config import REPO_ROOT
+from app.training.corpus_staging import (
+    append_corpus_jsonl_line,
+    corpus_stage_mode,
+    in_memory_row_cap,
+    large_file_stage_bytes,
+    write_corpus_meta,
+)
 from app.training.dataset_config import TrainingDatasetConfig
 from app.training.text_normalize import normalize_training_text
 
@@ -246,6 +253,162 @@ def _load_huggingface_capped(
     return _collect_hf_rows(
         cfg, ds, limit=limit, progress_cb=progress_cb, progress_every=progress_every
     )
+
+
+def should_stage_corpus_on_disk(
+    dataset_cfg: dict[str, Any] | TrainingDatasetConfig,
+    *,
+    task_type: str,
+) -> bool:
+    """Large Hugging Face / file datasets must stream to disk on the driver session."""
+    cfg = (
+        dataset_cfg
+        if isinstance(dataset_cfg, TrainingDatasetConfig)
+        else TrainingDatasetConfig.model_validate(dataset_cfg)
+    )
+    mode = corpus_stage_mode()
+    if mode == "memory":
+        return False
+    if mode == "always":
+        return True
+    cap = in_memory_row_cap()
+    if cfg.source == "huggingface":
+        if cfg.max_samples is None:
+            return True
+        return int(cfg.max_samples) > cap
+    if cfg.source in ("jsonl_file", "text_file"):
+        try:
+            path = _resolve_dataset_path(cfg.path or "")
+        except (ValueError, FileNotFoundError):
+            return False
+        if path.stat().st_size >= large_file_stage_bytes():
+            return True
+    if cfg.source == "inline" and cfg.texts and len(cfg.texts) > cap:
+        return True
+    return False
+
+
+def _prepare_row_for_causal_lm(text: str, *, source: str) -> list[str]:
+    from app.training.lm_text_utils import prepare_causal_lm_texts
+
+    return prepare_causal_lm_texts([text], source=source)
+
+
+def stream_dataset_to_corpus_jsonl(
+    dataset_cfg: dict[str, Any] | TrainingDatasetConfig,
+    *,
+    task_type: str,
+    jsonl_path: Path,
+    meta_path: Path,
+    progress_cb: ProgressCallback | None = None,
+    progress_every: int | None = None,
+) -> int:
+    """
+    Download / read dataset rows once, append training examples to ``jsonl_path``.
+
+    Returns total example count written (after causal-LM chunking when applicable).
+    """
+    cfg = (
+        dataset_cfg
+        if isinstance(dataset_cfg, TrainingDatasetConfig)
+        else TrainingDatasetConfig.model_validate(dataset_cfg)
+    )
+    every = progress_every if progress_every is not None else _progress_every()
+    if jsonl_path.is_file():
+        jsonl_path.unlink()
+    rows_read = 0
+    examples_written = 0
+    limit = cfg.max_samples
+
+    def _emit_prepared(texts: list[str], label: int | None = None) -> None:
+        nonlocal examples_written
+        for t in texts:
+            append_corpus_jsonl_line(jsonl_path, t, label=label)
+            examples_written += 1
+
+    if cfg.source == "huggingface":
+        ds = _open_hf_split(cfg, streaming=True)
+        for i, row in enumerate(ds):
+            if limit is not None and i >= limit:
+                break
+            if cfg.hf_text_column not in row:
+                raise ValueError(f"HF column '{cfg.hf_text_column}' not in dataset row")
+            raw = str(row[cfg.hf_text_column])
+            label = int(row[cfg.hf_label_column]) if cfg.hf_label_column else None
+            rows_read += 1
+            if task_type == "causal_lm":
+                _emit_prepared(_prepare_row_for_causal_lm(raw, source=cfg.source), label)
+            else:
+                _emit_prepared([raw], label)
+            if progress_cb and rows_read % every == 0:
+                progress_cb(rows_read, limit)
+        if progress_cb and rows_read:
+            progress_cb(rows_read, limit)
+    elif cfg.source == "jsonl_file":
+        path = _resolve_dataset_path(cfg.path or "")
+        with path.open(encoding="utf-8") as fp:
+            for line_no, raw in enumerate(fp, start=1):
+                if limit is not None and rows_read >= limit:
+                    break
+                raw = raw.strip()
+                if not raw:
+                    continue
+                row = json.loads(raw)
+                if cfg.text_field not in row:
+                    raise ValueError(f"JSONL line {line_no} missing field '{cfg.text_field}'")
+                text = str(row[cfg.text_field])
+                label = int(row[cfg.label_field]) if cfg.label_field else None
+                rows_read += 1
+                if task_type == "causal_lm":
+                    _emit_prepared(_prepare_row_for_causal_lm(text, source=cfg.source), label)
+                else:
+                    _emit_prepared([text], label)
+                if progress_cb and rows_read % every == 0:
+                    progress_cb(rows_read, limit)
+    elif cfg.source == "text_file":
+        path = _resolve_dataset_path(cfg.path or "")
+        raw = path.read_text(encoding="utf-8")
+        blocks = _load_text_file(path, task_type=task_type)
+        for block in blocks:
+            if limit is not None and rows_read >= limit:
+                break
+            rows_read += 1
+            if task_type == "causal_lm":
+                _emit_prepared(_prepare_row_for_causal_lm(block, source=cfg.source))
+            else:
+                _emit_prepared([block])
+            if progress_cb and rows_read % every == 0:
+                progress_cb(rows_read, limit)
+    elif cfg.source == "inline":
+        for text in cfg.texts:
+            if limit is not None and rows_read >= limit:
+                break
+            rows_read += 1
+            if task_type == "causal_lm":
+                _emit_prepared(_prepare_row_for_causal_lm(str(text), source=cfg.source))
+            else:
+                _emit_prepared([str(text)])
+    elif cfg.source == "builtin":
+        for text in _builtin_texts(cfg.builtin_name, task_type):
+            rows_read += 1
+            _emit_prepared([text])
+    else:
+        raise ValueError(
+            f"Disk staging not implemented for dataset source={cfg.source!r}; "
+            "use max_samples or a smaller dataset on the session."
+        )
+
+    if examples_written == 0:
+        raise ValueError("Dataset produced zero training examples")
+
+    write_corpus_meta(meta_path, total_examples=examples_written, source=cfg.source)
+    logger.info(
+        "Staged corpus on disk rows_read=%s examples=%s path=%s",
+        rows_read,
+        examples_written,
+        jsonl_path,
+    )
+    return examples_written
 
 
 def _progress_every() -> int:

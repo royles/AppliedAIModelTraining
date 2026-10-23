@@ -11,14 +11,21 @@ from app.services.log_flair import task_done_line, task_start_line
 from app.services.download_progress import DownloadProgressState
 from app.services.task_heartbeat import provisioning_heartbeat
 
-from app.training.dataset_sharding import load_training_corpus_staged
+from app.training.corpus_staging import iter_corpus_jsonl_sample
+from app.training.dataset_sharding import (
+    load_training_corpus_staged,
+    resolve_staged_corpus_jsonl,
+    staged_corpus_ref,
+)
 from app.training.dataset_staging import shared_dataset_dirs_from_config
 from app.training.lm_text_utils import resolve_prompt_format
 from app.training.tokenizer_config import TokenizerBuildConfig
 from app.training.tokenizer_trainer import (
     recommended_min_corpus_chars,
     train_gpt2_bpe_tokenizer,
+    train_gpt2_bpe_tokenizer_from_jsonl,
     validate_corpus_for_bpe,
+    validate_corpus_jsonl_for_bpe,
 )
 from app.training.transformer_config import TransformerTrainingConfig
 
@@ -89,23 +96,49 @@ def prepare_from_scratch_training(
     t_corpus = time.monotonic()
     _log(task_start_line("train", "Corpus load (from-scratch)"))
     dl_progress = DownloadProgressState()
+    dataset_dict = cfg.dataset.model_dump()
+    shared_dirs = shared_dataset_dirs_from_config(train_config)
     with provisioning_heartbeat(log, "Corpus load", download_progress=dl_progress):
         texts, _ = load_training_corpus_staged(
             artifact_dir=str(artifact_dir),
-            dataset_cfg=cfg.dataset.model_dump(),
+            dataset_cfg=dataset_dict,
             task_type=cfg.task_type,
-            shared_dirs=shared_dataset_dirs_from_config(train_config),
+            shared_dirs=shared_dirs,
             download_progress=dl_progress,
         )
+    corpus_jsonl = resolve_staged_corpus_jsonl(
+        artifact_dir=str(artifact_dir),
+        dataset_cfg=dataset_dict,
+        task_type=cfg.task_type,
+        shared_dirs=shared_dirs,
+    )
+    staged = staged_corpus_ref(
+        artifact_dir=str(artifact_dir),
+        dataset_cfg=dataset_dict,
+        task_type=cfg.task_type,
+        shared_dirs=shared_dirs,
+    )
+    example_count = staged.example_count if staged else len(texts)
     _log(
         task_done_line(
             "Corpus load",
             seconds=time.monotonic() - t_corpus,
-            detail=f"{len(texts)} samples",
+            detail=(
+                f"{example_count:,} examples on disk"
+                if corpus_jsonl is not None
+                else f"{example_count:,} samples"
+            ),
         )
     )
     setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
-    train_config["prompt_format"] = resolve_prompt_format(setting, texts)
+    if setting == "auto" and corpus_jsonl is not None:
+        pf_sample = iter_corpus_jsonl_sample(corpus_jsonl, 512)
+        train_config["prompt_format"] = resolve_prompt_format(setting, pf_sample)
+    else:
+        train_config["prompt_format"] = resolve_prompt_format(
+            setting,
+            texts if texts else None,
+        )
     _log(
         f"Training prompt format: {train_config['prompt_format']} "
         "(chat API uses matching inference template)."
@@ -123,23 +156,39 @@ def prepare_from_scratch_training(
                 "Built-in demo data is too small for training a tokenizer from scratch. "
                 "Choose inline text, a file under data/datasets/, or a Hugging Face dataset."
             )
-        total_chars = validate_corpus_for_bpe(
-            texts, tok_cfg.vocab_size, tok_cfg.min_corpus_chars
-        )
+        if corpus_jsonl is not None:
+            ex_count, total_chars = validate_corpus_jsonl_for_bpe(
+                corpus_jsonl,
+                tok_cfg.vocab_size,
+                tok_cfg.min_corpus_chars,
+            )
+        else:
+            ex_count = len(texts)
+            total_chars = validate_corpus_for_bpe(
+                texts, tok_cfg.vocab_size, tok_cfg.min_corpus_chars
+            )
         t_bpe = time.monotonic()
         _log(
             task_start_line(
                 "train",
-                f"BPE tokenizer ({len(texts)} ex, {total_chars:,} chars, vocab={tok_cfg.vocab_size})",
+                f"BPE tokenizer ({ex_count:,} ex, {total_chars:,} chars, vocab={tok_cfg.vocab_size})",
             )
         )
         with provisioning_heartbeat(log, "BPE tokenizer"):
-            tokenizer = train_gpt2_bpe_tokenizer(
-                texts,
-                vocab_size=tok_cfg.vocab_size,
-                save_dir=artifact_dir / "tokenizer",
-                min_frequency=tok_cfg.min_frequency,
-            )
+            if corpus_jsonl is not None:
+                tokenizer = train_gpt2_bpe_tokenizer_from_jsonl(
+                    corpus_jsonl,
+                    vocab_size=tok_cfg.vocab_size,
+                    save_dir=artifact_dir / "tokenizer",
+                    min_frequency=tok_cfg.min_frequency,
+                )
+            else:
+                tokenizer = train_gpt2_bpe_tokenizer(
+                    texts,
+                    vocab_size=tok_cfg.vocab_size,
+                    save_dir=artifact_dir / "tokenizer",
+                    min_frequency=tok_cfg.min_frequency,
+                )
         _log(
             task_done_line(
                 "BPE tokenizer",

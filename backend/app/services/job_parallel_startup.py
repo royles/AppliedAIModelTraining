@@ -65,7 +65,7 @@ def prepare_train_config_dataset(
     tc = dict(train_config)
 
     if cfg.task_type == "causal_lm":
-        from app.training.dataset_sharding import load_training_corpus_staged
+        from app.training.dataset_sharding import load_prompt_format_probe_sample
         from app.training.dataset_staging import shared_dataset_dirs_from_config
         from app.training.lm_text_utils import resolve_prompt_format
 
@@ -73,30 +73,25 @@ def prepare_train_config_dataset(
         if setting == "auto":
             artifact_dir = str(tc.get("artifact_dir") or "")
             shared_dirs = shared_dataset_dirs_from_config(tc)
-            t0 = _log_phase_start(log, "train", "Dataset load (corpus)")
-            dl_progress = DownloadProgressState()
+            t0 = _log_phase_start(log, "train", "Prompt format probe")
             try:
-                with provisioning_heartbeat(
-                    log, "Dataset load", download_progress=dl_progress
-                ):
-                    sample_texts, _ = load_training_corpus_staged(
-                        artifact_dir=artifact_dir or None,
-                        dataset_cfg=cfg.dataset.model_dump(),
-                        task_type=cfg.task_type,
-                        shared_dirs=shared_dirs,
-                        download_progress=dl_progress,
-                    )
+                sample_texts = load_prompt_format_probe_sample(
+                    cfg.dataset.model_dump(),
+                    task_type=cfg.task_type,
+                    artifact_dir=artifact_dir or None,
+                    shared_dirs=shared_dirs,
+                )
                 tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
                 _log_phase_done(
                     log,
                     t0,
-                    "Dataset load",
-                    detail=f"{len(sample_texts)} samples",
+                    "Prompt format probe",
+                    detail=f"{len(sample_texts)} sample rows",
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Could not detect prompt_format: %s", exc)
                 tc["prompt_format"] = "raw_lm"
-                _log_phase_done(log, t0, "Dataset load", detail="failed, using raw_lm")
+                _log_phase_done(log, t0, "Prompt format probe", detail="failed, using raw_lm")
         else:
             tc["prompt_format"] = resolve_prompt_format(setting, None)
 
@@ -160,7 +155,46 @@ def parallel_dataset_prep_and_ray_head(
     resume: bool,
     skip_ray_head_setup: bool = False,
 ) -> tuple[dict[str, Any], str | None]:
+    from app.training.dataset_loader import should_stage_corpus_on_disk
+
     log = _job_framework_log(job_id)
+    stage_on_disk = should_stage_corpus_on_disk(
+        cfg.dataset.model_dump(),
+        task_type=cfg.task_type,
+    )
+    if stage_on_disk:
+        log(
+            framework_line(
+                "train",
+                "Large dataset: staging to job artifact disk first (keeps API memory stable); "
+                "set PLATFORM_CORPUS_STAGE_MODE=memory to load into RAM instead.",
+            )
+        )
+        tc = prepare_train_config_dataset(
+            cfg,
+            train_config,
+            job_id=job_id,
+            resume=resume,
+        )
+        head = head_before
+        if needs_cai_ray_head and not (skip_ray_head_setup and head_before):
+            head = ensure_ray_head_parallel(
+                job_id=job_id,
+                needs_cai_ray_head=needs_cai_ray_head,
+                force_restart=force_ray_head_restart,
+                head_before=head_before,
+            )
+        elif skip_ray_head_setup and head_before and needs_cai_ray_head:
+            log(
+                framework_line(
+                    "ray",
+                    f"Ray head at {head_before} (full restart done — skipping parallel re-check)",
+                )
+            )
+            head = head_before
+        log(framework_line("done", "Dataset prep + Ray head"))
+        return tc, head
+
     log(framework_line("info", "Parallel: dataset prep + Ray head"))
     with provisioning_heartbeat(log, "Dataset prep + Ray head"):
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-start") as pool:

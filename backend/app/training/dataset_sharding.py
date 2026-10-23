@@ -10,8 +10,23 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from app.services.download_progress import DownloadProgressState
-from app.training.dataset_loader import ProgressCallback, load_training_samples
+from app.training.corpus_staging import (
+    CORPUS_JSONL,
+    CORPUS_META,
+    PROMPT_FORMAT_PROBE_ROWS,
+    StagedCorpusRef,
+    iter_corpus_jsonl,
+    iter_corpus_jsonl_sample,
+    iter_shard_jsonl,
+    read_corpus_meta,
+)
 from app.training.dataset_config import is_remote_dataset
+from app.training.dataset_loader import (
+    ProgressCallback,
+    load_training_samples,
+    should_stage_corpus_on_disk,
+    stream_dataset_to_corpus_jsonl,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +96,87 @@ def _shared_staging_roots(
     return roots
 
 
+def resolve_staged_corpus_jsonl(
+    *,
+    artifact_dir: str | None,
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+    shared_dirs: Sequence[str] | None = None,
+) -> Path | None:
+    for root in _shared_staging_roots(artifact_dir, shared_dirs):
+        cache = shard_cache_dir(root, dataset_cfg, task_type)
+        jsonl = cache / CORPUS_JSONL
+        meta = cache / CORPUS_META
+        if jsonl.is_file() and meta.is_file() and read_corpus_meta(meta):
+            return jsonl
+    return None
+
+
+def staged_corpus_ref(
+    *,
+    artifact_dir: str | None,
+    dataset_cfg: dict[str, Any],
+    task_type: str,
+    shared_dirs: Sequence[str] | None = None,
+) -> StagedCorpusRef | None:
+    for root in _shared_staging_roots(artifact_dir, shared_dirs):
+        cache = shard_cache_dir(root, dataset_cfg, task_type)
+        jsonl = cache / CORPUS_JSONL
+        meta_path = cache / CORPUS_META
+        if jsonl.is_file() and meta_path.is_file():
+            meta = read_corpus_meta(meta_path)
+            if meta:
+                count = int(meta.get("total_examples") or 0)
+                return StagedCorpusRef(
+                    texts=[],
+                    labels=None,
+                    jsonl_path=jsonl,
+                    example_count=count,
+                    on_disk_only=True,
+                )
+        corpus_path = cache / _CORPUS_FILE
+        if corpus_path.is_file():
+            try:
+                texts, labels = _read_corpus(corpus_path)
+                return StagedCorpusRef(
+                    texts=texts,
+                    labels=labels,
+                    jsonl_path=None,
+                    example_count=len(texts),
+                    on_disk_only=False,
+                )
+            except (json.JSONDecodeError, TypeError, ValueError, OSError):
+                continue
+    return None
+
+
+def load_prompt_format_probe_sample(
+    dataset_cfg: dict[str, Any],
+    *,
+    task_type: str,
+    artifact_dir: str | None = None,
+    shared_dirs: Sequence[str] | None = None,
+) -> list[str]:
+    """Never load full multi-million-row corpora for ``prompt_format=auto``."""
+    jsonl = resolve_staged_corpus_jsonl(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+        shared_dirs=shared_dirs,
+    )
+    if jsonl is not None:
+        return iter_corpus_jsonl_sample(jsonl, PROMPT_FORMAT_PROBE_ROWS)
+
+    from app.training.dataset_config import TrainingDatasetConfig
+
+    cfg = TrainingDatasetConfig.model_validate(dataset_cfg)
+    probe = cfg.model_copy(deep=True)
+    if probe.max_samples is None or probe.max_samples > PROMPT_FORMAT_PROBE_ROWS:
+        probe.max_samples = PROMPT_FORMAT_PROBE_ROWS
+    texts, _ = load_training_samples(probe, task_type=task_type)
+    return texts
+
+
 def load_training_corpus_staged(
     *,
     artifact_dir: str | None,
@@ -101,20 +197,25 @@ def load_training_corpus_staged(
     if is_remote_dataset(dataset_cfg):
         return load_training_samples(dataset_cfg, task_type=task_type)
 
-    for root in _shared_staging_roots(artifact_dir, shared_dirs):
-        cache = shard_cache_dir(root, dataset_cfg, task_type)
-        corpus_path = cache / _CORPUS_FILE
-        if corpus_path.is_file():
-            try:
-                texts, labels = _read_corpus(corpus_path)
-                logger.info(
-                    "Reusing staged training corpus examples=%s path=%s",
-                    len(texts),
-                    corpus_path,
-                )
-                return texts, labels
-            except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
-                logger.warning("Ignoring invalid staged corpus %s: %s", corpus_path, exc)
+    existing = staged_corpus_ref(
+        artifact_dir=artifact_dir,
+        dataset_cfg=dataset_cfg,
+        task_type=task_type,
+        shared_dirs=shared_dirs,
+    )
+    if existing is not None:
+        if existing.on_disk_only:
+            logger.info(
+                "Reusing disk-staged corpus examples=%s path=%s",
+                existing.example_count,
+                existing.jsonl_path,
+            )
+            return [], None
+        logger.info(
+            "Reusing staged training corpus examples=%s",
+            existing.example_count,
+        )
+        return existing.texts, existing.labels
 
     source = str(dataset_cfg.get("source") or "unknown")
     logger.info("Dataset download/load — started (source=%s)", source)
@@ -126,6 +227,32 @@ def load_training_corpus_staged(
         def progress_cb(count: int, limit: int | None) -> None:
             download_progress.update_rows(count, limit)
 
+    write_root = artifact_dir or (shared_dirs[0] if shared_dirs else None)
+    cache = shard_cache_dir(write_root, dataset_cfg, task_type) if write_root else None
+
+    if should_stage_corpus_on_disk(dataset_cfg, task_type=task_type):
+        if not cache:
+            raise ValueError("artifact_dir required to stage large datasets on disk")
+        jsonl_path = cache / CORPUS_JSONL
+        meta_path = cache / CORPUS_META
+        logger.info(
+            "Staging large dataset to disk (session RAM cap avoided): %s",
+            jsonl_path,
+        )
+        count = stream_dataset_to_corpus_jsonl(
+            dataset_cfg,
+            task_type=task_type,
+            jsonl_path=jsonl_path,
+            meta_path=meta_path,
+            progress_cb=progress_cb,
+        )
+        logger.info(
+            "Dataset download/load — done (%s examples on disk, %.0fs)",
+            count,
+            time.perf_counter() - t0,
+        )
+        return [], None
+
     texts, labels = load_training_samples(
         dataset_cfg,
         task_type=task_type,
@@ -136,14 +263,9 @@ def load_training_corpus_staged(
         len(texts),
         time.perf_counter() - t0,
     )
-    write_root = artifact_dir or (shared_dirs[0] if shared_dirs else None)
-    if write_root:
+    if write_root and cache:
         try:
-            _write_corpus(
-                shard_cache_dir(write_root, dataset_cfg, task_type) / _CORPUS_FILE,
-                texts,
-                labels,
-            )
+            _write_corpus(cache / _CORPUS_FILE, texts, labels)
         except OSError as exc:
             logger.warning("Could not write staged corpus under %s: %s", write_root, exc)
     return texts, labels
@@ -167,7 +289,9 @@ def _prepared_shards_in_root(
         return None
 
     for rank in range(world_size):
-        if not (cache / f"shard_{rank}.json").is_file():
+        json_shard = cache / f"shard_{rank}.json"
+        jsonl_shard = cache / f"shard_{rank}.jsonl"
+        if not json_shard.is_file() and not jsonl_shard.is_file():
             return None
     return {**meta, "cache_dir": str(cache), "staging_root": str(Path(root).resolve())}
 
@@ -192,6 +316,10 @@ def prepared_dataset_shards_meta(
 
 
 def _read_shard(path: Path) -> tuple[list[str], list[int] | None]:
+    jsonl_path = path.with_suffix(".jsonl")
+    if jsonl_path.is_file():
+        texts = list(iter_shard_jsonl(jsonl_path))
+        return texts, None
     if not path.is_file():
         raise FileNotFoundError(f"Dataset shard missing: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -207,6 +335,32 @@ def _read_shard(path: Path) -> tuple[list[str], list[int] | None]:
             raise ValueError(f"Shard labels invalid in {path}")
         labels = [int(x) for x in labels_raw]
     return [str(t) for t in texts], labels
+
+
+def _write_shards_from_corpus_jsonl(
+    corpus_jsonl: Path,
+    cache: Path,
+    world_size: int,
+) -> tuple[int, list[int]]:
+    """Stream interleaved shard JSONL files without holding the full corpus in RAM."""
+    handles: list[Any] = []
+    for rank in range(world_size):
+        shard_path = cache / f"shard_{rank}.jsonl"
+        if shard_path.is_file():
+            shard_path.unlink()
+        handles.append(shard_path.open("w", encoding="utf-8"))
+    counts = [0] * world_size
+    total = 0
+    try:
+        for idx, text in enumerate(iter_corpus_jsonl(corpus_jsonl)):
+            rank = idx % world_size
+            handles[rank].write(json.dumps({"text": text}, ensure_ascii=False) + "\n")
+            counts[rank] += 1
+            total += 1
+    finally:
+        for fp in handles:
+            fp.close()
+    return total, counts
 
 
 def split_interleaved(
@@ -258,7 +412,7 @@ def prepare_dataset_shards_on_driver(
     if shared_dirs:
         for root in shared_dirs:
             cache = shard_cache_dir(root, dataset_cfg, task_type)
-            if (cache / _CORPUS_FILE).is_file():
+            if (cache / _CORPUS_FILE).is_file() or (cache / CORPUS_JSONL).is_file():
                 write_root = root
                 break
 
@@ -272,20 +426,31 @@ def prepare_dataset_shards_on_driver(
         shared_dirs=shared_dirs,
         download_progress=download_progress,
     )
-    shards = split_interleaved(texts, labels, world_size)
-    for rank, (shard_texts, shard_labels) in enumerate(shards):
-        _write_shard(cache / f"shard_{rank}.json", shard_texts, shard_labels)
-
-    meta = {
-        "world_size": world_size,
-        "total_examples": len(texts),
-        "examples_per_shard": [len(s[0]) for s in shards],
-        "cache_dir": str(cache),
-    }
+    corpus_jsonl = cache / CORPUS_JSONL
+    if corpus_jsonl.is_file() and not texts:
+        total, per_shard = _write_shards_from_corpus_jsonl(corpus_jsonl, cache, world_size)
+        meta = {
+            "world_size": world_size,
+            "total_examples": total,
+            "examples_per_shard": per_shard,
+            "cache_dir": str(cache),
+            "shard_format": "jsonl",
+        }
+    else:
+        shards = split_interleaved(texts, labels, world_size)
+        for rank, (shard_texts, shard_labels) in enumerate(shards):
+            _write_shard(cache / f"shard_{rank}.json", shard_texts, shard_labels)
+        meta = {
+            "world_size": world_size,
+            "total_examples": len(texts),
+            "examples_per_shard": [len(s[0]) for s in shards],
+            "cache_dir": str(cache),
+            "shard_format": "json",
+        }
     ready_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     logger.info(
         "Prepared dataset shards total=%s world_size=%s per_shard=%s",
-        len(texts),
+        meta["total_examples"],
         world_size,
         meta["examples_per_shard"],
     )
@@ -316,6 +481,23 @@ def load_dataset_shard_for_worker(
 ) -> tuple[list[str], list[int] | None]:
     """Load this Train rank's text shard (wait for driver-prepared cache if needed)."""
     if world_size <= 1:
+        ref = staged_corpus_ref(
+            artifact_dir=artifact_dir,
+            dataset_cfg=dataset_cfg,
+            task_type=task_type,
+            shared_dirs=shared_dirs,
+        )
+        if ref is not None and ref.on_disk_only and ref.jsonl_path is not None:
+            from app.training.corpus_staging import corpus_stage_mode
+
+            if corpus_stage_mode() == "memory":
+                texts = list(iter_corpus_jsonl(ref.jsonl_path))
+                return texts, None
+            raise ValueError(
+                "Corpus is staged on disk under the job artifact (.dataset_shards/…/corpus.jsonl). "
+                "Use multiple Ray Train workers so shards load per rank, or set "
+                "PLATFORM_CORPUS_STAGE_MODE=memory to load the full corpus into RAM for single-worker runs."
+            )
         return load_training_corpus_staged(
             artifact_dir=artifact_dir,
             dataset_cfg=dataset_cfg,
@@ -325,9 +507,10 @@ def load_dataset_shard_for_worker(
 
     cache = _resolve_shard_cache_dir(artifact_dir, dataset_cfg, task_type, shared_dirs)
     ready_path = cache / _READY_FILE
-    shard_path = cache / f"shard_{rank}.json"
+    shard_json = cache / f"shard_{rank}.json"
+    shard_jsonl = cache / f"shard_{rank}.jsonl"
     deadline = time.monotonic() + _SHARD_WAIT_SEC
-    while not shard_path.is_file() or not ready_path.is_file():
+    while (not shard_json.is_file() and not shard_jsonl.is_file()) or not ready_path.is_file():
         if time.monotonic() > deadline:
             raise TimeoutError(
                 f"Timed out waiting for dataset shard rank={rank} under {cache}. "
@@ -335,7 +518,7 @@ def load_dataset_shard_for_worker(
             )
         time.sleep(_SHARD_POLL_SEC)
 
-    texts, labels = _read_shard(shard_path)
+    texts, labels = _read_shard(shard_json)
     logger.info(
         "Worker rank=%s loaded shard examples=%s (world_size=%s)",
         rank,
