@@ -84,16 +84,16 @@ def platform_ray_status() -> dict[str, Any]:
             return out
 
         from app.services.ray_cluster_watch import ray_status_cluster_snapshot
-        from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, ray_gcs_status_ok
+        from app.services.ray_gcs_auth import verified_gcs_auth_token
 
-        token = load_gcs_auth_token_from_disk()
-        reachable = ray_gcs_status_ok(gcs, token, timeout_sec=12.0)
-        out["gcs_reachable"] = reachable
-        if not reachable:
+        token = verified_gcs_auth_token(gcs, timeout_sec=10.0)
+        out["gcs_reachable"] = token is not None
+        if not token:
             out["state"] = "deferred"
             out["detail"] = (
-                "GCS port open but ray status failed (head starting, stale auth, or wrong IP). "
-                "Try: ray stop --force; rm data/.ray_gcs_auth_token; restart start.py"
+                "GCS port open but auth/RPC not ready (stale token, head starting, or head down). "
+                "Run: ray stop --force; rm -f data/.ray_gcs_auth_token; python3 scripts/start.py. "
+                "Workers join via CDSW_MASTER_IP:6379 per Cloudera worker networking."
             )
             return out
 

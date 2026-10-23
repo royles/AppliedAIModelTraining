@@ -634,6 +634,35 @@ def _ray_head_options():
     return ray_start_include_dashboard, state_api_reachable, ray_head_dashboard_cli_args
 
 
+def bootstrap_cai_ray_env() -> None:
+    """
+    Align Ray env with the live master pod IP and drop stale GCS auth when the head is down.
+
+    Cloudera worker engines join ``CDSW_MASTER_IP:6379`` (see ml-distributed-computing.pdf).
+    A cached ``data/.ray_gcs_auth_token`` from a prior session/head causes ``InvalidAuthToken``
+    if the API probes GCS before ``ray start --head`` during model provisioning.
+    """
+    if not is_cai_session():
+        return
+    backend = REPO_ROOT / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from app.services.cai_networking import (
+        gcs_tcp_reachable,
+        master_engine_ip,
+        reconcile_live_ray_head_env,
+        resolve_ray_gcs_port,
+    )
+    from app.services.ray_gcs_auth import invalidate_stored_gcs_auth_tokens
+
+    reconcile_live_ray_head_env()
+    ip = master_engine_ip()
+    port = resolve_ray_gcs_port()
+    if not ip or not gcs_tcp_reachable(ip, port, timeout_sec=1.5):
+        invalidate_stored_gcs_auth_tokens()
+        os.environ.pop("RAY_AUTH_TOKEN", None)
+
+
 def start_ray_head() -> None:
     ip = cai_session_ip()
     if not ip:

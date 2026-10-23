@@ -14,7 +14,6 @@ from app.config import REPO_ROOT, effective_cors_origins, get_settings
 from app.database import SessionLocal, init_db
 from app.services.job_lifecycle import reconcile_stale_jobs
 from app.services.model_registry import backfill_registry_entries
-from app.services.ray_driver_connect import apply_ray_auth_from_session
 from app.services.ray_gcs_auth import sync_ray_gcs_auth_token
 from app.services.cai_networking import (
     apply_master_session_ray_driver_env,
@@ -32,10 +31,17 @@ configure_platform_logging()
 async def lifespan(_app: FastAPI):
     (REPO_ROOT / "data").mkdir(parents=True, exist_ok=True)
     init_db()
-    apply_ray_auth_from_session()
     live_head = reconcile_live_ray_head_env()
     if live_head:
-        sync_ray_gcs_auth_token(live_head, required=False)
+        from app.services.cai_networking import gcs_tcp_reachable, parse_gcs_host_port
+        from app.services.ray_gcs_auth import invalidate_stored_gcs_auth_tokens
+
+        host, port = parse_gcs_host_port(live_head)
+        if gcs_tcp_reachable(host, port, timeout_sec=1.5):
+            sync_ray_gcs_auth_token(live_head, required=False)
+        else:
+            invalidate_stored_gcs_auth_tokens()
+            os.environ.pop("RAY_AUTH_TOKEN", None)
     driver_ray = apply_master_session_ray_driver_env()
     if live_head:
         logging.getLogger(__name__).info("CAI live Ray head (workers): %s", live_head)

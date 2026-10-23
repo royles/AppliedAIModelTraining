@@ -1,5 +1,15 @@
 # Cloudera AI (CAI) Ray networking
 
+**Stability contract (do not regress):**
+
+1. **Master** — `ray start --head` on **`CDSW_IP_ADDRESS:6379`** (not loopback-only for worker joins).
+2. **Workers** — `ray start --block --address=<CDSW_MASTER_IP>:6379` (Cloudera worker→master TCP; see PDF below).
+3. **Session driver / Train** — `ray.init` to **`CDSW_IP_ADDRESS:6379`** with **`_node_ip_address`** + verified **`RAY_AUTH_TOKEN`** (Ray 2.59+).
+4. **Auth** — Never probe GCS with a token read only from disk; use `verified_gcs_auth_token()` / `sync_ray_gcs_auth_token()`. After session reschedule or `ray stop`, delete **`data/.ray_gcs_auth_token`**.
+5. **HTTP/API** — **`127.0.0.1`** only; health checks use **`ray status`**, not repeated `ray.init`.
+
+Implementation lives in `app/services/cai_networking.py`, `ray_cai_networking.py`, `ray_driver_connect.py`, `ray_gcs_auth.py`, `cdsw_workers.py`. Avoid drive-by changes; extend tests in `test_ray_cai_networking.py`, `test_ray_gcs_auth.py`, `test_verified_gcs_auth.py`.
+
 This platform follows Cloudera’s distributed-computing and engine networking model. Official references:
 
 - [Cloudera AI — Distributed Computing (PDF)](https://docs.cloudera.com/machine-learning/cloud/distributed-computing/ml-distributed-computing.pdf) — **Worker Network Communication**: workers use **`CML_MASTER_IP`** / **`CDSW_MASTER_IP`** to reach the master engine (Ray GCS uses port **6379** the same way as the doc’s TCP example uses port 6000).

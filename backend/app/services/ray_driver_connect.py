@@ -30,19 +30,16 @@ def _ray_cli(*args: str) -> list[str]:
 
 def ensure_ray_auth_token(gcs_address: str | None = None) -> str | None:
     """Load or refresh Ray GCS auth token (Ray 2.59+; local only, no external IdP)."""
-    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, sync_ray_gcs_auth_token
+    from app.services.ray_gcs_auth import verified_gcs_auth_token
 
     gcs = (
         (gcs_address or "").strip()
         or os.environ.get("RAY_ADDRESS", "").strip()
         or os.environ.get("RAY_HEAD_ADDRESS", "").strip()
     )
-    if gcs:
-        token = sync_ray_gcs_auth_token(gcs, required=False)
-        if token:
-            return token
-    load_gcs_auth_token_from_disk()
-    return os.environ.get("RAY_AUTH_TOKEN", "").strip() or None
+    if not gcs:
+        return None
+    return verified_gcs_auth_token(gcs)
 
 
 def apply_ray_auth_from_session(gcs_address: str | None = None) -> bool:

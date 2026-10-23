@@ -41,22 +41,17 @@ def test_platform_ray_status_uses_ray_status_not_subprocess_init(monkeypatch):
         return_value=True,
     ):
         with patch(
-            "app.services.ray_gcs_auth.load_gcs_auth_token_from_disk",
+            "app.services.ray_gcs_auth.verified_gcs_auth_token",
             return_value="tok",
         ):
             with patch(
-                "app.services.ray_gcs_auth.ray_gcs_status_ok",
-                side_effect=_track("ray_gcs_status_ok"),
+                "app.services.ray_cluster_watch.ray_status_cluster_snapshot",
+                side_effect=_track("ray_status_cluster_snapshot"),
             ):
                 with patch(
-                    "app.services.ray_cluster_watch.ray_status_cluster_snapshot",
-                    side_effect=_track("ray_status_cluster_snapshot"),
+                    "app.services.ray_driver_connect.gcs_client_ready",
+                    side_effect=AssertionError("health must not call gcs_client_ready"),
                 ):
-                    with patch(
-                        "app.services.ray_driver_connect.gcs_client_ready",
-                        side_effect=AssertionError("health must not call gcs_client_ready"),
-                    ):
-                        out = platform_status.platform_ray_status()
+                    out = platform_status.platform_ray_status()
     assert out["state"] == "online"
-    assert "ray_gcs_status_ok" in calls
     assert "ray_status_cluster_snapshot" in calls

@@ -142,6 +142,15 @@ def load_gcs_auth_token_from_disk() -> str | None:
     return None
 
 
+def _status_output_indicates_bad_auth(combined: str) -> bool:
+    text = combined.lower()
+    return (
+        "invalidauthtoken" in text
+        or "authentication token is missing or incorrect" in text
+        or "authentication token" in text
+    )
+
+
 def ray_gcs_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 25.0) -> bool:
     """True when ``ray status`` succeeds against GCS with the given token (if any)."""
     env = os.environ.copy()
@@ -161,12 +170,33 @@ def ray_gcs_status_ok(gcs_address: str, token: str | None, timeout_sec: float = 
         )
     except (subprocess.TimeoutExpired, OSError):
         return False
+    combined = f"{proc.stdout or ''}\n{proc.stderr or ''}"
+    if _status_output_indicates_bad_auth(combined):
+        invalidate_stored_gcs_auth_tokens()
+        return False
     if proc.returncode != 0:
         return False
-    combined = f"{proc.stdout or ''}\n{proc.stderr or ''}".lower()
-    if "invalidauthtoken" in combined or "authentication token" in combined:
-        return False
     return True
+
+
+def verified_gcs_auth_token(
+    gcs_address: str,
+    *,
+    timeout_sec: float = 8.0,
+) -> str | None:
+    """
+    Token safe to pass to GCS clients (health poll, workers).
+
+    Never returns a stale disk/env token — syncs from the live head when needed.
+    """
+    gcs_address = (gcs_address or "").strip()
+    if not gcs_address:
+        return None
+    _invalidate_if_wrong_head(gcs_address)
+    env_token = os.environ.get("RAY_AUTH_TOKEN", "").strip()
+    if env_token and ray_gcs_status_ok(gcs_address, env_token, timeout_sec=timeout_sec):
+        return env_token
+    return sync_ray_gcs_auth_token(gcs_address, required=False)
 
 
 def _fetch_token_from_head_cli(gcs_address: str, *, generate_if_missing: bool) -> tuple[str | None, str]:

@@ -208,6 +208,10 @@ def main() -> int:
         f"=== API {BIND_HOST}:{backend_port} + UX {BIND_HOST}:{ux_port} "
         f"(CDSW_APP_PORT={ux_port if is_cai_session() else 'n/a'}) ==="
     )
+    if is_cai_session():
+        from common import bootstrap_cai_ray_env
+
+        bootstrap_cai_ray_env()
     ensure_api_running(backend_port)
     if not wait_for_urls([api_health_url(backend_port)], attempts=60):
         print(
