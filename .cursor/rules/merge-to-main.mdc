@@ -1,0 +1,14 @@
+---
+description: Git workflow — land changes on main directly
+alwaysApply: true
+---
+
+# Merge and push to `main`
+
+When this agent finishes verified work on this repository:
+
+1. **Commit** on a `cursor/<topic>-a60f` branch if the cloud workflow requires it, then **merge into `main`** (fast-forward or merge commit as appropriate).
+2. **`git push origin main`** so CAI and other consumers can `git pull origin main` immediately.
+3. Do **not** leave fixes only on a feature branch or open PR without also updating `main`, unless the user explicitly asks for a PR-only or no-push workflow.
+
+If a PR was opened for tracking, merge or fast-forward `main` to include the same commits and push `main` anyway.
