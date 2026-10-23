@@ -46,7 +46,7 @@ def test_restart_propagates_shutdown_wait_error(monkeypatch):
     db = MagicMock()
     db.get.return_value = job
 
-    def _fail(**_kwargs):
+    def _fail(_job, **_kwargs):
         raise RuntimeError("Previous run is still shutting down")
 
     monkeypatch.setattr(job_lifecycle, "prepare_job_for_rerun", _fail)
