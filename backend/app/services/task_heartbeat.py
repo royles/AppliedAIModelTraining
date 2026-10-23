@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -14,7 +15,13 @@ logger = logging.getLogger(__name__)
 
 LogFn = Callable[[str], None]
 
-DEFAULT_HEARTBEAT_INTERVAL_SEC = 30.0
+
+def _heartbeat_interval_sec() -> float:
+    raw = os.environ.get("PLATFORM_PROVISION_HEARTBEAT_SEC", "30").strip()
+    try:
+        return max(10.0, float(raw))
+    except ValueError:
+        return 30.0
 
 
 @contextmanager
@@ -22,14 +29,15 @@ def provisioning_heartbeat(
     log: LogFn | None,
     label: str,
     *,
-    interval_sec: float = DEFAULT_HEARTBEAT_INTERVAL_SEC,
+    interval_sec: float | None = None,
 ) -> Iterator[None]:
     """
     Emit ``[..] {label} — still running (Ns)`` every ``interval_sec`` until the block exits.
 
     Safe when ``log`` is None (console-only jobs / tests).
     """
-    if not log or interval_sec <= 0:
+    every = interval_sec if interval_sec is not None else _heartbeat_interval_sec()
+    if not log or every <= 0:
         yield
         return
 
@@ -37,7 +45,7 @@ def provisioning_heartbeat(
     started = time.monotonic()
 
     def _beat() -> None:
-        while not stop.wait(interval_sec):
+        while not stop.wait(every):
             elapsed = int(time.monotonic() - started)
             line = heartbeat_line(label, elapsed)
             try:
