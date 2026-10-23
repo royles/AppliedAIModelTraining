@@ -518,14 +518,14 @@ def run_training_job(job_id: int) -> None:
                 db,
                 job_id,
                 "framework",
-                framework_line(
-                    "ray",
-                    f"Waiting for Ray GCS RPC at {ray_addr} (workers join {worker_head}; "
-                    "CAI: head on CDSW_IP_ADDRESS, workers dial CDSW_MASTER_IP)…",
-                ),
+                framework_line("ray", "Ray GCS RPC wait — started"),
             )
+            logger.info("job %s: Ray GCS RPC wait — started", job_id)
             _release_job_db(db)
             db = None
+            import time as _time
+
+            _gcs_t0 = _time.monotonic()
             if not wait_for_gcs_usable(ray_addr, timeout_sec=180.0, framework_log=_gcs_wait_log):
                 append_job_log_isolated(
                     job_id,
@@ -540,6 +540,18 @@ def run_training_job(job_id: int) -> None:
                     ),
                 )
                 raise RuntimeError(f"Ray GCS not available at {ray_addr}")
+            from app.services.log_flair import task_done_line
+
+            append_job_log_isolated(
+                job_id,
+                "framework",
+                task_done_line(
+                    "Ray GCS RPC wait",
+                    seconds=_time.monotonic() - _gcs_t0,
+                    detail=ray_addr or "",
+                ),
+            )
+            logger.info("job %s: Ray GCS RPC wait — done", job_id)
             db, job = _require_job_db(db, job_id)
         if ray_addr:
             os.environ["RAY_ADDRESS"] = ray_addr
@@ -559,9 +571,23 @@ def run_training_job(job_id: int) -> None:
             min_gpu = float(train_workers * max(1, gpus_per_worker)) if use_gpu else 0.0
             auth_token = ensure_ray_auth_token()
             if gcs_wait:
+                from app.services.log_flair import task_start_line, task_done_line
+                import time as _time
+
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    task_start_line(
+                        "ray",
+                        f"Ray worker join (≥{min_cluster_nodes} nodes)",
+                    ),
+                )
+                logger.info("job %s: Ray worker join — started", job_id)
                 _release_job_db(db)
                 db = None
-                wait_for_cluster_nodes_subprocess(
+                _join_t0 = _time.monotonic()
+                final_n = wait_for_cluster_nodes_subprocess(
                     gcs_wait,
                     lambda msg: append_job_log_isolated(job_id, "framework", msg),
                     min_alive=min_cluster_nodes,
@@ -571,6 +597,20 @@ def run_training_job(job_id: int) -> None:
                 )
                 db, job = _require_job_db(db, job_id)
                 snap = cluster_snapshot_for_wait(gcs_wait, auth_token=auth_token)
+                node_detail = f"{final_n} node(s)"
+                if snap:
+                    node_detail += f", {snap.get('gpu', 0):g} GPU"
+                append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    task_done_line(
+                        "Ray worker join",
+                        seconds=_time.monotonic() - _join_t0,
+                        detail=node_detail,
+                    ),
+                )
+                logger.info("job %s: Ray worker join — %s", job_id, node_detail)
                 if use_gpu and (snap is None or snap["gpu"] < min_gpu):
                     detail = (
                         f"Ray cluster reports {snap['gpu'] if snap else 0:g} GPU but "

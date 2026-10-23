@@ -114,7 +114,15 @@ def load_training_corpus_staged(
             except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
                 logger.warning("Ignoring invalid staged corpus %s: %s", corpus_path, exc)
 
+    source = str(dataset_cfg.get("source") or "unknown")
+    logger.info("Dataset download/load — started (source=%s)", source)
+    t0 = time.perf_counter()
     texts, labels = load_training_samples(dataset_cfg, task_type=task_type)
+    logger.info(
+        "Dataset download/load — done (%s samples, %.0fs)",
+        len(texts),
+        time.perf_counter() - t0,
+    )
     write_root = artifact_dir or (shared_dirs[0] if shared_dirs else None)
     if write_root:
         try:

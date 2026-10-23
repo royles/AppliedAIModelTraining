@@ -33,6 +33,19 @@ def framework_line(kind: str, message: str) -> str:
     return f"[{tag(kind)}] {message}"
 
 
+def task_start_line(kind: str, label: str) -> str:
+    """Long-running phase — start (framework + console)."""
+    return framework_line(kind, f"{label} — started")
+
+
+def task_done_line(label: str, *, seconds: float | None = None, detail: str = "") -> str:
+    """Long-running phase — finish with optional detail and elapsed seconds."""
+    msg = label if not detail else f"{label} — {detail}"
+    if seconds is not None:
+        msg = f"{msg} ({seconds:.0f}s)"
+    return framework_line("done", msg)
+
+
 def training_line(kind: str, message: str) -> str:
     return f"  {tag(kind)} {message}"
 

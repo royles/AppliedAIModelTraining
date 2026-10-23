@@ -1,6 +1,6 @@
 """ASCII log banner alignment."""
 
-from app.services.log_flair import framework_banner
+from app.services.log_flair import framework_banner, task_done_line, task_start_line
 
 
 def test_framework_banner_rows_equal_width() -> None:
@@ -14,6 +14,13 @@ def test_framework_banner_rows_equal_width() -> None:
         assert len(lines) == 3
         widths = [len(line) for line in lines]
         assert widths[0] == widths[1] == widths[2], (title, widths, lines)
+
+
+def test_task_phase_lines() -> None:
+    assert "started" in task_start_line("train", "Dataset sharding")
+    done = task_done_line("Dataset sharding", seconds=12.0, detail="100 ex → 4 shards")
+    assert "12s" in done or "(12" in done
+    assert "100 ex" in done
 
 
 def test_framework_banner_box_chars_aligned() -> None:

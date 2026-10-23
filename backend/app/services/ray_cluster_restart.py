@@ -63,14 +63,24 @@ def full_ray_cluster_restart(*, framework_log: LogFn | None = None) -> str | Non
             framework_log(line)
         logger.info(msg)
 
+    import time
+
+    from app.services.log_flair import task_done_line, task_start_line
     from app.services.ray_cai_networking import ensure_ray_head_for_workers
 
     with _cluster_restart_lock:
-        _log(
-            "Full Ray cluster restart (ray stop --force, ray start --head on master pod IP)…"
-        )
+        t0 = time.monotonic()
+        start = task_start_line("ray", "Ray cluster full restart")
+        _log(start)
+        logger.info("Ray cluster full restart")
         head = ensure_ray_head_for_workers(framework_log=_log, force_restart=True)
-        _log(f"Ray cluster ready at {head}")
+        _log(
+            task_done_line(
+                "Ray cluster full restart",
+                seconds=time.monotonic() - t0,
+                detail=head or "",
+            )
+        )
         return head
 
 

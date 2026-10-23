@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -10,7 +11,7 @@ from typing import Any, Callable
 from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.job_log import append_job_log
-from app.services.log_flair import framework_line
+from app.services.log_flair import framework_line, task_done_line, task_start_line
 from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
 
@@ -28,6 +29,26 @@ def _job_framework_log(job_id: int) -> LogFn:
             db.close()
 
     return log
+
+
+def _log_phase_start(log: LogFn, kind: str, label: str) -> float:
+    line = task_start_line(kind, label)
+    log(line)
+    logger.info("%s", label)
+    return time.monotonic()
+
+
+def _log_phase_done(
+    log: LogFn,
+    t0: float,
+    label: str,
+    *,
+    detail: str = "",
+) -> None:
+    elapsed = time.monotonic() - t0
+    line = task_done_line(label, seconds=elapsed, detail=detail)
+    log(line)
+    logger.info("%s — %s (%.0fs)", label, detail or "done", elapsed)
 
 
 def prepare_train_config_dataset(
@@ -50,20 +71,7 @@ def prepare_train_config_dataset(
         if setting == "auto":
             artifact_dir = str(tc.get("artifact_dir") or "")
             shared_dirs = shared_dataset_dirs_from_config(tc)
-            log(
-                framework_line(
-                    "train",
-                    "Detecting prompt_format from corpus"
-                    + (
-                        f" (shared collection {shared_dirs[0]})"
-                        if shared_dirs
-                        else " (reuse staged data when present)"
-                        if artifact_dir
-                        else ""
-                    )
-                    + "…",
-                )
-            )
+            t0 = _log_phase_start(log, "train", "Dataset load (corpus)")
             try:
                 sample_texts, _ = load_training_corpus_staged(
                     artifact_dir=artifact_dir or None,
@@ -72,20 +80,28 @@ def prepare_train_config_dataset(
                     shared_dirs=shared_dirs,
                 )
                 tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
+                _log_phase_done(
+                    log,
+                    t0,
+                    "Dataset load",
+                    detail=f"{len(sample_texts)} samples",
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Could not detect prompt_format: %s", exc)
                 tc["prompt_format"] = "raw_lm"
+                _log_phase_done(log, t0, "Dataset load", detail="failed, using raw_lm")
         else:
             tc["prompt_format"] = resolve_prompt_format(setting, None)
 
     if cfg.init_mode == "from_scratch":
-        log(framework_line("train", "From-scratch prep (tokenizer / dataset load)…"))
+        t0 = _log_phase_start(log, "train", "From-scratch tokenizer & corpus")
         tc = prepare_from_scratch_training(
             cfg,
             tc,
             log=log,
             skip_tokenizer_if_present=resume,
         )
+        _log_phase_done(log, t0, "From-scratch prep")
 
     return tc
 
@@ -104,25 +120,23 @@ def ensure_ray_head_parallel(
     from app.services.ray_cai_networking import ensure_ray_head_for_workers
     from app.services.ray_gcs_auth import bind_gcs_auth_for_address
 
-    if force_restart:
-        log(
-            framework_line(
-                "ray",
-                "Task restart: refreshing Ray head (ray stop --force, ray start --head)…",
-            )
-        )
-    else:
-        log(framework_line("ray", "Starting Ray head for this model task…"))
+    t0 = _log_phase_start(
+        log,
+        "ray",
+        "Ray cluster setup" + (" (full restart)" if force_restart else ""),
+    )
 
     def _ray_head_log(msg: str) -> None:
-        log(msg if msg.startswith("[") else framework_line("ray", msg))
+        line = msg if msg.startswith("[") else framework_line("ray", msg)
+        log(line)
+        logger.info("%s", line)
 
     head = ensure_ray_head_for_workers(
         framework_log=_ray_head_log,
         force_restart=force_restart,
     )
     bind_gcs_auth_for_address(head, required=True)
-    log(framework_line("ray", f"Ray head is up at {head} — continuing task setup"))
+    _log_phase_done(log, t0, "Ray cluster setup", detail=head or "")
     return head
 
 
@@ -137,12 +151,7 @@ def parallel_dataset_prep_and_ray_head(
     resume: bool,
 ) -> tuple[dict[str, Any], str | None]:
     log = _job_framework_log(job_id)
-    log(
-        framework_line(
-            "train",
-            "Parallel startup: dataset prep and Ray head (when needed) running together…",
-        )
-    )
+    log(framework_line("info", "Parallel: dataset prep + Ray head"))
     with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-start") as pool:
         f_data = pool.submit(
             prepare_train_config_dataset,
@@ -160,7 +169,7 @@ def parallel_dataset_prep_and_ray_head(
         )
         tc = f_data.result()
         head = f_ray.result()
-    log(framework_line("train", "Parallel startup: dataset prep and Ray head finished."))
+    log(framework_line("done", "Parallel: dataset prep + Ray head"))
     return tc, head
 
 
@@ -207,12 +216,7 @@ def prepare_dataset_shards_parallel(
         patch["dataset_shards_prepared"] = True
         return patch
 
-    log(
-        framework_line(
-            "train",
-            f"Loading corpus and writing {train_workers} dataset shard(s) for Ray Train…",
-        )
-    )
+    t0 = _log_phase_start(log, "train", "Dataset download & sharding")
     meta = prepare_dataset_shards_on_driver(
         artifact_dir=artifact_dir,
         dataset_cfg=dataset_cfg,
@@ -221,12 +225,11 @@ def prepare_dataset_shards_parallel(
         shared_dirs=shared_dirs,
     )
     patch["dataset_shards_prepared"] = True
-    log(
-        framework_line(
-            "train",
-            f"Dataset sharded on driver: {meta.get('total_examples')} examples → "
-            f"{train_workers} worker shard(s)",
-        )
+    _log_phase_done(
+        log,
+        t0,
+        "Dataset sharding",
+        detail=f"{meta.get('total_examples')} ex → {train_workers} shards",
     )
     return patch
 
@@ -399,12 +402,7 @@ def provision_cdsw_workers_parallel(
         def _cluster_gcs_log(msg: str) -> None:
             log(framework_line("ray", msg))
 
-        log(
-            framework_line(
-                "ray",
-                f"Waiting for Ray GCS RPC at {ray_addr} (workers join {worker_head})…",
-            )
-        )
+        t_gcs = _log_phase_start(log, "ray", "Ray GCS RPC wait")
         if not wait_for_gcs_usable(ray_addr, timeout_sec=180.0, framework_log=_cluster_gcs_log):
             msg = (
                 f"Ray GCS not usable at {ray_addr}. "
@@ -412,6 +410,7 @@ def provision_cdsw_workers_parallel(
             )
             log(framework_line("fail", msg))
             raise RuntimeError(f"Ray GCS not available at {ray_addr}")
+        _log_phase_done(log, t_gcs, "Ray GCS RPC wait", detail=ray_addr)
         result.cluster_wait_done = True
 
         gcs_wait = ray_driver_init_address(head)
@@ -419,14 +418,13 @@ def provision_cdsw_workers_parallel(
         min_gpu = float(train_workers * max(1, gpus_per_worker)) if use_gpu else 0.0
         auth_token = ensure_ray_auth_token()
         if gcs_wait:
-            log(
-                framework_line(
-                    "ray",
-                    f"Waiting for {min_cluster_nodes} Ray node(s)"
-                    f"{f' and {min_gpu:g} GPU' if use_gpu else ''} while dataset prep may continue…",
-                )
+            gpu_note = f", need {min_gpu:g} GPU" if use_gpu else ""
+            t_nodes = _log_phase_start(
+                log,
+                "ray",
+                f"Ray worker join (≥{min_cluster_nodes} nodes{gpu_note})",
             )
-            wait_for_cluster_nodes_subprocess(
+            final_n = wait_for_cluster_nodes_subprocess(
                 gcs_wait,
                 log,
                 min_alive=min_cluster_nodes,
@@ -435,6 +433,10 @@ def provision_cdsw_workers_parallel(
                 auth_token=auth_token,
             )
             snap = cluster_snapshot_for_wait(gcs_wait, auth_token=auth_token)
+            node_detail = f"{final_n} node(s)"
+            if snap:
+                node_detail += f", {snap.get('gpu', 0):g} GPU"
+            _log_phase_done(log, t_nodes, "Ray worker join", detail=node_detail)
             if use_gpu and (snap is None or snap["gpu"] < min_gpu):
                 detail = (
                     f"Ray cluster reports {snap['gpu'] if snap else 0:g} GPU but "
@@ -447,7 +449,7 @@ def provision_cdsw_workers_parallel(
                 log(framework_line("fail", detail))
                 raise RuntimeError(detail)
 
-    log(framework_line("ray", "CDSW worker provisioning and cluster wait complete."))
+    log(framework_line("done", "CDSW workers provisioned"))
     return result
 
 
@@ -470,12 +472,7 @@ def parallel_shards_and_worker_provision(
     Returns (train_config patch, cluster_wait_already_done).
     """
     log = _job_framework_log(job_id)
-    log(
-        framework_line(
-            "train",
-            "Parallel startup: dataset sharding and CDSW worker provisioning running together…",
-        )
-    )
+    log(framework_line("info", "Parallel: dataset sharding + worker provisioning"))
     shard_patch: dict[str, Any] = {}
     provision = CdswProvisionResult()
 
@@ -506,5 +503,5 @@ def parallel_shards_and_worker_provision(
         else:
             shard_patch = f_shards.result()
 
-    log(framework_line("train", "Parallel startup: sharding and worker provisioning finished."))
+    log(framework_line("done", "Parallel: sharding + worker provisioning"))
     return {**provision.train_config_patch, **shard_patch}, provision.cluster_wait_done
