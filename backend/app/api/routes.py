@@ -615,7 +615,7 @@ def create_job(payload: TrainingJobCreate, db: Session = Depends(get_db)) -> Tra
             save_job_blueprint(job.id, payload.task_blueprint)
         except OSError as exc:
             logger.warning("Could not write task_blueprint.json for job %s: %s", job.id, exc)
-    enqueue_training_job(job.id, force_ray_head_restart=True)
+    enqueue_training_job(job.id)
     return _job_to_read(db, job)
 
 

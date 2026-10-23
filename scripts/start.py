@@ -158,7 +158,7 @@ def main() -> int:
     if is_cai_session():
         os.environ["RAY_LOCAL_MODE"] = "false"
         print_cai_memory_hints()
-        boot_flag = os.environ.get("PLATFORM_RAY_START_AT_BOOT", "1").strip().lower()
+        boot_flag = os.environ.get("PLATFORM_RAY_START_AT_BOOT", "0").strip().lower()
         if boot_flag in ("0", "false", "no"):
             print(
                 "Ray head deferred until the first model task starts "

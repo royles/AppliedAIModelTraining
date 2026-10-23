@@ -503,14 +503,10 @@ class CdswRayWorkerPool:
             self._client.stop_workers(*numeric)
 
     def stop_all(self) -> None:
+        """Stop only workers this pool launched — never ``stop_workers()`` with no ids (whole workspace)."""
         if self._launched:
             self.stop_ids(self._launched.worker_ids)
             self._launched = None
-        if self._client is not None:
-            try:
-                self._client.stop_workers()
-            except Exception:  # noqa: BLE001
-                logger.exception("Failed to stop all workers")
 
 
 def _extract_worker_ids(raw: Any) -> list[str]:

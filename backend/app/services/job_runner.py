@@ -877,7 +877,7 @@ def enqueue_training_job(
     job_id: int,
     *,
     resume: bool = False,
-    force_ray_head_restart: bool = True,
+    force_ray_head_restart: bool = False,
 ) -> None:
     with _job_thread_lock:
         existing = _job_threads.get(job_id)

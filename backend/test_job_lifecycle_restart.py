@@ -33,8 +33,8 @@ def test_restart_calls_prepare_before_enqueue(monkeypatch):
     job_lifecycle.restart_training_job(db, 7, resume=False)
 
     prepare.assert_called_once()
-    assert prepare.call_args.kwargs["restart_cluster"] is True
-    enqueue.assert_called_once_with(7, resume=False, force_ray_head_restart=False)
+    assert prepare.call_args.kwargs["restart_cluster"] is False
+    enqueue.assert_called_once_with(7, resume=False, force_ray_head_restart=True)
 
 
 def test_restart_propagates_shutdown_wait_error(monkeypatch):

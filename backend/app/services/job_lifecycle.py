@@ -65,10 +65,12 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
         append_job_log(db, job_id, "framework", message)
 
     try:
+        # Stop this job’s workers and wait for the training thread only — Ray restart runs
+        # in the background training thread so the API stays responsive (CAI session).
         prepare_job_for_rerun(
             job,
             framework_log=_framework_log,
-            restart_cluster=True,
+            restart_cluster=False,
         )
     except RuntimeError as exc:
         raise RuntimeError(str(exc)) from exc
@@ -106,6 +108,6 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
             framework_line("queue", "Job restart: same parameters, fresh training run"),
         )
 
-    enqueue_training_job(job_id, resume=resume, force_ray_head_restart=False)
+    enqueue_training_job(job_id, resume=resume, force_ray_head_restart=True)
     db.refresh(job)
     return job

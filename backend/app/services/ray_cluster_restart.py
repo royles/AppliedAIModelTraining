@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from typing import Callable
+
+_cluster_restart_lock = threading.Lock()
 
 from app.models import TrainingJob
 from app.services.cai_networking import master_engine_ip
@@ -37,11 +40,10 @@ def stop_cdsw_workers_for_job(job: TrainingJob) -> None:
     if client is None:
         return
     numeric = [int(w) for w in parsed if str(w).isdigit()]
+    if not numeric:
+        return
     try:
-        if numeric:
-            client.stop_workers(*numeric)
-        else:
-            client.stop_workers()
+        client.stop_workers(*numeric)
     except Exception:  # noqa: BLE001
         logger.exception("Failed to stop CDSW workers for job %s", job.id)
 
@@ -63,10 +65,13 @@ def full_ray_cluster_restart(*, framework_log: LogFn | None = None) -> str | Non
 
     from app.services.ray_cai_networking import ensure_ray_head_for_workers
 
-    _log("Full Ray cluster restart (stop workers’ GCS head, ray stop --force, ray start --head)…")
-    head = ensure_ray_head_for_workers(framework_log=_log, force_restart=True)
-    _log(f"Ray cluster ready at {head}")
-    return head
+    with _cluster_restart_lock:
+        _log(
+            "Full Ray cluster restart (ray stop --force, ray start --head on master pod IP)…"
+        )
+        head = ensure_ray_head_for_workers(framework_log=_log, force_restart=True)
+        _log(f"Ray cluster ready at {head}")
+        return head
 
 
 def wait_for_job_thread_to_finish(job_id: int, *, timeout_sec: float = _WAIT_FOR_THREAD_SEC) -> bool:
