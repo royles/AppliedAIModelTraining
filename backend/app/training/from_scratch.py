@@ -80,6 +80,12 @@ def prepare_from_scratch_training(
                 f"vocab_size={len(tok)}."
             )
         return train_config
+
+    def _log(msg: str) -> None:
+        logger.info(msg)
+        if log:
+            log(msg)
+
     t_corpus = time.monotonic()
     _log(task_start_line("train", "Corpus load (from-scratch)"))
     dl_progress = DownloadProgressState()
@@ -100,16 +106,10 @@ def prepare_from_scratch_training(
     )
     setting = train_config.get("prompt_format") or cfg.prompt_format or "auto"
     train_config["prompt_format"] = resolve_prompt_format(setting, texts)
-    _log_early = log or (lambda m: logger.info(m))
-    _log_early(
+    _log(
         f"Training prompt format: {train_config['prompt_format']} "
         "(chat API uses matching inference template)."
     )
-
-    def _log(msg: str) -> None:
-        logger.info(msg)
-        if log:
-            log(msg)
 
     arch = train_config.get("architecture")
     if isinstance(arch, dict):
