@@ -114,6 +114,14 @@ export function TaskDetailView({
   }, [job.id]);
 
   useEffect(() => {
+    if (job.status === "queued") {
+      setLogs(null);
+      lastSerialTextRef.current = "";
+      scrollStickRef.current = true;
+    }
+  }, [job.id, job.status]);
+
+  useEffect(() => {
     if (!logs || !serialLogText) return;
     if (serialLogText !== lastSerialTextRef.current) {
       if (scrollStickRef.current) {

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
 from app.models import TrainingJob
-from app.services.job_log import append_job_log
+from app.services.job_log import append_job_log, clear_job_run_logs
 from app.services.job_runner import enqueue_training_job, job_is_running
 from app.services.log_flair import framework_line
 from app.services.job_progress import read_progress
@@ -78,6 +78,8 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
     artifact_dir = (REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve()
     progress = read_progress(artifact_dir) if resume else None
     will_resume = bool(resume and progress and int(progress.get("global_step") or 0) > 0)
+
+    clear_job_run_logs(db, job_id)
 
     job.status = "queued"
     job.error_message = None

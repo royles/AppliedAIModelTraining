@@ -36,6 +36,27 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def invalidate_job_logs_cache(job_id: int) -> None:
+    with _job_logs_cache_lock:
+        _job_logs_cache.pop(job_id, None)
+
+
+def clear_job_run_logs(db: Session, job_id: int) -> None:
+    """Remove framework + training log files for a fresh run (UX log panel)."""
+    job = db.get(TrainingJob, job_id)
+    if not job:
+        return
+    job.log_json = None
+    db.commit()
+    path = training_log_path(job_id)
+    if path.is_file():
+        try:
+            path.unlink()
+        except OSError:
+            path.write_text("", encoding="utf-8")
+    invalidate_job_logs_cache(job_id)
+
+
 def append_job_log(db: Session, job_id: int, channel: LogChannel, message: str) -> None:
     job = db.get(TrainingJob, job_id)
     if not job:
