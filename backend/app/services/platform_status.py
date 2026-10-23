@@ -23,7 +23,8 @@ ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
 
 _ray_status_cache: dict[str, Any] = {}
 _ray_status_cache_lock = threading.Lock()
-_RAY_STATUS_CACHE_TTL_SEC = 6.0
+_RAY_STATUS_CACHE_TTL_OK_SEC = 12.0
+_RAY_STATUS_CACHE_TTL_DEFERRED_SEC = 45.0
 
 
 def active_jobs_summary(db: Session) -> dict[str, Any]:
@@ -44,7 +45,14 @@ def active_jobs_summary(db: Session) -> dict[str, Any]:
 
 
 def platform_ray_status() -> dict[str, Any]:
-    """Ray GCS reachability without ray.init in the API process."""
+    """
+    Ray GCS reachability for /api/health without ``ray.init`` in the API process.
+
+    Cloudera CAI: GCS listens on ``CDSW_IP_ADDRESS:6379`` after ``ray start --head``.
+    TCP can be open while RPC/auth is not ready — probing with ``ray.init`` every UI
+    poll causes log spam (``Failed to connect to GCS … within 5 seconds``). Use
+    ``ray status`` only here; full RPC waits belong in job provisioning.
+    """
     head = ray_worker_head_address()
     gcs = ray_driver_gcs_address(head) if head else None
     if not gcs:
@@ -57,41 +65,53 @@ def platform_ray_status() -> dict[str, Any]:
         "gpu_capacity": None,
         "state": "unknown",
     }
-    if not gcs:
-        out["state"] = "not_configured"
-        return out
+    try:
+        if not gcs:
+            out["state"] = "not_configured"
+            return out
 
-    if not cdsw_workers.cdsw_available():
-        out["state"] = "local"
-        return out
+        if not cdsw_workers.cdsw_available():
+            out["state"] = "local"
+            return out
 
-    host, port = parse_gcs_host_port(gcs)
-    if not gcs_tcp_reachable(host, port, timeout_sec=1.5):
+        host, port = parse_gcs_host_port(gcs)
+        if not gcs_tcp_reachable(host, port, timeout_sec=1.5):
+            out["state"] = "deferred"
+            out["detail"] = (
+                "Ray head not listening on master pod IP yet (head starts with model tasks). "
+                "See docs/CAI_RAY_NETWORKING.md"
+            )
+            return out
+
+        from app.services.ray_cluster_watch import ray_status_cluster_snapshot
+        from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk, ray_gcs_status_ok
+
+        token = load_gcs_auth_token_from_disk()
+        reachable = ray_gcs_status_ok(gcs, token, timeout_sec=12.0)
+        out["gcs_reachable"] = reachable
+        if not reachable:
+            out["state"] = "deferred"
+            out["detail"] = (
+                "GCS port open but ray status failed (head starting, stale auth, or wrong IP). "
+                "Try: ray stop --force; rm data/.ray_gcs_auth_token; restart start.py"
+            )
+            return out
+
+        snap = ray_status_cluster_snapshot(gcs, auth_token=token, timeout_sec=12.0)
+        if snap is None:
+            out["state"] = "reachable"
+            return out
+
+        alive = int(snap.get("alive", 0))
+        gpu = float(snap.get("gpu", 0.0))
+        out["alive_nodes"] = alive
+        out["gpu_capacity"] = gpu
+        out["state"] = "online" if alive >= 1 else "reachable"
+        return out
+    except Exception as exc:  # noqa: BLE001
         out["state"] = "deferred"
+        out["detail"] = f"platform_ray_status: {exc}"
         return out
-
-    from app.services.ray_gcs_auth import load_gcs_auth_token_from_disk
-    from app.services.ray_cluster_watch import ray_status_cluster_snapshot
-    from app.services.ray_driver_connect import gcs_client_ready
-
-    token = load_gcs_auth_token_from_disk()
-    reachable = gcs_client_ready(gcs, auth_token=token, rpc_timeout_sec=4.0)
-    out["gcs_reachable"] = reachable
-    if not reachable:
-        out["state"] = "deferred"
-        return out
-
-    snap = ray_status_cluster_snapshot(gcs, auth_token=token, timeout_sec=6.0)
-    if snap is None:
-        out["state"] = "reachable"
-        return out
-
-    alive = int(snap.get("alive", 0))
-    gpu = float(snap.get("gpu", 0.0))
-    out["alive_nodes"] = alive
-    out["gpu_capacity"] = gpu
-    out["state"] = "online" if alive >= 1 else "reachable"
-    return out
 
 
 def cached_platform_ray_status(*, active_job_count: int = 0) -> dict[str, Any]:
@@ -117,7 +137,12 @@ def cached_platform_ray_status(*, active_job_count: int = 0) -> dict[str, Any]:
         if expires > now and _ray_status_cache.get("value") is not None:
             return dict(_ray_status_cache["value"])
     value = platform_ray_status()
+    ttl = (
+        _RAY_STATUS_CACHE_TTL_OK_SEC
+        if value.get("gcs_reachable")
+        else _RAY_STATUS_CACHE_TTL_DEFERRED_SEC
+    )
     with _ray_status_cache_lock:
         _ray_status_cache["value"] = value
-        _ray_status_cache["expires"] = now + _RAY_STATUS_CACHE_TTL_SEC
+        _ray_status_cache["expires"] = now + ttl
     return dict(value)

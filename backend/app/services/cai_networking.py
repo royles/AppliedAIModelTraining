@@ -225,6 +225,9 @@ def reconcile_live_ray_head_env() -> str | None:
             stale,
             live,
         )
+        from app.services.ray_gcs_auth import invalidate_stored_gcs_auth_tokens
+
+        invalidate_stored_gcs_auth_tokens()
     os.environ["RAY_HEAD_ADDRESS"] = live
     os.environ["RAY_ADDRESS"] = live
     return live

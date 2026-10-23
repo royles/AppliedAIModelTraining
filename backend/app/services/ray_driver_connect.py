@@ -158,11 +158,13 @@ def gcs_client_ready(
     from app.services.ray_gcs_auth import ray_gcs_status_ok
 
     token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip() or None
+    if ray_gcs_status_ok(gcs_address, token, timeout_sec=min(25.0, rpc_timeout_sec)):
+        return True
     if ray_cluster_snapshot_subprocess(
         gcs_address, auth_token=token, timeout_sec=rpc_timeout_sec
     ) is not None:
         return True
-    return ray_gcs_status_ok(gcs_address, token)
+    return False
 
 
 def wait_for_head_gcs_ready(
