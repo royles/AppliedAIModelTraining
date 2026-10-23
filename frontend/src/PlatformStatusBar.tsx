@@ -6,6 +6,7 @@ import {
   tasksIndicator,
   type IndicatorTone,
 } from "./platformStatus";
+import { UI_POLL_INTERVAL_MS } from "./pollIntervals";
 
 type Props = {
   jobs: TrainingJob[];
@@ -79,7 +80,7 @@ export function PlatformStatusBar({ jobs, onOpenTask }: Props) {
     }
 
     poll();
-    const id = window.setInterval(poll, 8000);
+    const id = window.setInterval(poll, UI_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(id);

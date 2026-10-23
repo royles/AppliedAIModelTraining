@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type RegistryLifecycleInfo, type RegistryModel } from "./api";
 import { ModelRegistryChat } from "./ModelRegistryChat";
+import { UI_POLL_INTERVAL_MS } from "./pollIntervals";
 
 const STATE_CLASS: Record<string, string> = {
   trained: "trained",
@@ -68,7 +69,7 @@ export function ModelRegistryPanel() {
 
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 8000);
+    const id = window.setInterval(load, UI_POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [load]);
 

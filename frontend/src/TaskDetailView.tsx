@@ -6,6 +6,7 @@ import { canRunJob, canStopJob } from "./jobActions";
 import { formatLogLines, mergeSerialJobLogs } from "./logFormat";
 import { RayClusterMap } from "./RayClusterMap";
 import { rayStatusFingerprint } from "./rayStatusFields";
+import { UI_POLL_INTERVAL_MS } from "./pollIntervals";
 
 type Props = {
   job: TrainingJob;
@@ -87,11 +88,7 @@ export function TaskDetailView({
 
     const schedule = () => {
       if (cancelled) return;
-      const active =
-        job.status === "running" ||
-        job.status === "provisioning" ||
-        job.status === "queued";
-      const pollMs = active ? 3000 : 15000;
+      const pollMs = UI_POLL_INTERVAL_MS;
       timer = window.setTimeout(async () => {
         await loadLogs();
         schedule();

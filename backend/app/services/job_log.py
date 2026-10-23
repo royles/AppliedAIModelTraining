@@ -25,8 +25,8 @@ from app.services.ray_cluster_topology import (
 LogChannel = Literal["framework", "training"]
 
 _MAX_STORED_LINES = 400
-_ACTIVE_LOG_CACHE_SEC = 2.5
-_IDLE_LOG_CACHE_SEC = 20.0
+_ACTIVE_LOG_CACHE_SEC = 28.0
+_IDLE_LOG_CACHE_SEC = 30.0
 _job_logs_cache: dict[int, tuple[float, str, dict[str, Any]]] = {}
 _job_logs_cache_lock = threading.Lock()
 _ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})

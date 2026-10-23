@@ -23,6 +23,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { JobRestartDialog } from "./components/JobRestartDialog";
 import { defaultResumeForRun, isJobActive } from "./jobActions";
 import { trainingJobListFieldsEqual } from "./jobUtils";
+import { UI_POLL_INTERVAL_MS } from "./pollIntervals";
 import {
   DEFAULT_DATASET,
   DEFAULT_HEADS,
@@ -154,7 +155,7 @@ export default function App() {
 
   useEffect(() => {
     refresh();
-    const id = window.setInterval(refresh, 4000);
+    const id = window.setInterval(refresh, UI_POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [refresh]);
 
