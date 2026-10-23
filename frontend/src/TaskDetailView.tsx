@@ -56,7 +56,13 @@ export function TaskDetailView({
     return formatLogLines(mergeSerialJobLogs(logs.framework, logs.training));
   }, [logs]);
 
+  const logsInFlightRef = useRef(false);
+
   const loadLogs = useCallback(async () => {
+    if (logsInFlightRef.current) {
+      return;
+    }
+    logsInFlightRef.current = true;
     try {
       scrollStickRef.current = !serialLogRef.current || isNearBottom(serialLogRef.current);
       const [data, freshJob] = await Promise.all([
@@ -70,15 +76,37 @@ export function TaskDetailView({
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      logsInFlightRef.current = false;
     }
   }, [job.id]);
 
   useEffect(() => {
-    loadLogs();
-    const pollMs =
-      job.status === "running" || job.status === "provisioning" ? 2000 : 5000;
-    const id = window.setInterval(loadLogs, pollMs);
-    return () => window.clearInterval(id);
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const schedule = () => {
+      if (cancelled) return;
+      const active =
+        job.status === "running" ||
+        job.status === "provisioning" ||
+        job.status === "queued";
+      const pollMs = active ? 3000 : 15000;
+      timer = window.setTimeout(async () => {
+        await loadLogs();
+        schedule();
+      }, pollMs);
+    };
+
+    void loadLogs();
+    schedule();
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+    };
   }, [loadLogs, job.status]);
 
   const rayStatusKey = logs ? rayStatusFingerprint(logs.ray_status) : "";

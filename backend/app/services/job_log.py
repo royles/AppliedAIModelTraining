@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -23,6 +25,11 @@ from app.services.ray_cluster_topology import (
 LogChannel = Literal["framework", "training"]
 
 _MAX_STORED_LINES = 400
+_ACTIVE_LOG_CACHE_SEC = 2.5
+_IDLE_LOG_CACHE_SEC = 20.0
+_job_logs_cache: dict[int, tuple[float, str, dict[str, Any]]] = {}
+_job_logs_cache_lock = threading.Lock()
+_ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
 
 
 def _now_iso() -> str:
@@ -98,10 +105,38 @@ def ray_status_snapshot() -> dict[str, Any]:
         return {"initialized": False, "runtime": "ray_not_installed"}
 
 
+def _job_logs_cache_key(job: TrainingJob, job_id: int) -> str:
+    training_path = training_log_path(job_id)
+    training_mtime = ""
+    if training_path.is_file():
+        try:
+            training_mtime = str(int(training_path.stat().st_mtime))
+        except OSError:
+            training_mtime = ""
+    return "|".join(
+        (
+            job.status,
+            str(job.updated_at or ""),
+            job.log_json or "",
+            job.metrics_json or "",
+            job.ray_address or "",
+            training_mtime,
+        )
+    )
+
+
 def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
     job = db.get(TrainingJob, job_id)
     if not job:
         return {}
+
+    cache_key = _job_logs_cache_key(job, job_id)
+    ttl = _ACTIVE_LOG_CACHE_SEC if job.status in _ACTIVE_JOB_STATUSES else _IDLE_LOG_CACHE_SEC
+    now = time.monotonic()
+    with _job_logs_cache_lock:
+        entry = _job_logs_cache.get(job_id)
+        if entry and entry[0] > now and entry[1] == cache_key:
+            return dict(entry[2])
     framework: list[dict[str, str]] = []
     if job.log_json:
         try:
@@ -203,7 +238,7 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
                 "Live cluster map below connects to the job Ray address each refresh."
             )
 
-    return {
+    payload = {
         "job_id": job_id,
         "status": job.status,
         "ray_address": job.ray_address,
@@ -212,3 +247,6 @@ def build_job_logs(db: Session, job_id: int) -> dict[str, Any]:
         "ray_status": ray_status,
         "metrics": json.loads(job.metrics_json) if job.metrics_json else None,
     }
+    with _job_logs_cache_lock:
+        _job_logs_cache[job_id] = (now + ttl, cache_key, dict(payload))
+    return payload

@@ -25,27 +25,44 @@ def test_topology_skips_ray_init_when_gcs_tcp_down(monkeypatch):
     assert topo["summary"]["alive_nodes"] == 0
 
 
-def test_topology_uses_ray_status_when_not_active_job(monkeypatch):
+def test_topology_skips_live_probes_for_succeeded_job(monkeypatch):
     monkeypatch.setattr(
         "app.services.ray_cluster_topology._gcs_reachable",
         lambda *_a, **_k: True,
     )
     with patch(
         "app.services.ray_gcs_auth.verified_gcs_auth_token",
-        return_value="tok",
+        side_effect=AssertionError("no GCS probes for finished jobs"),
     ):
-        with patch(
-            "app.services.ray_cluster_watch.ray_status_cluster_snapshot",
-            return_value={"alive": 2.0, "gpu": 1.0, "cpu": 8.0},
-        ):
-            with patch(
-                "app.services.ray_cluster_watch.ray_cluster_topology_subprocess",
-                side_effect=AssertionError("subprocess init only for active jobs"),
-            ):
-                with patch("ray.init", side_effect=AssertionError("no in-process init")):
-                    topo = build_ray_cluster_topology(
-                        ray_address="100.100.191.24:6379",
-                        job_status="succeeded",
-                    )
-    assert topo["summary"]["alive_nodes"] == 2
-    assert topo["summary"]["total_gpu"] == 1.0
+        topo = build_ray_cluster_topology(
+            ray_address="100.100.191.24:6379",
+            job_status="succeeded",
+        )
+    assert topo["summary"]["alive_nodes"] == 0
+    assert "finished tasks" in (topo.get("note") or "")
+
+
+def test_topology_skips_gcs_probes_for_stopped_job(monkeypatch):
+    calls: list[str] = []
+
+    def _track(name: str):
+        def _inner(*_a, **_k):
+            calls.append(name)
+            return "tok"
+
+        return _inner
+
+    monkeypatch.setattr(
+        "app.services.ray_cluster_topology._gcs_reachable",
+        lambda *_a, **_k: True,
+    )
+    with patch(
+        "app.services.ray_gcs_auth.verified_gcs_auth_token",
+        side_effect=_track("verified_gcs_auth_token"),
+    ):
+        topo = build_ray_cluster_topology(
+            ray_address="100.100.191.31:6379",
+            job_status="stopped",
+        )
+    assert "verified_gcs_auth_token" not in calls
+    assert "finished tasks" in (topo.get("note") or "")

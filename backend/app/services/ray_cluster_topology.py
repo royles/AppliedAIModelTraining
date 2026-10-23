@@ -15,6 +15,7 @@ from app.services.cai_networking import (
 )
 
 _ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
+_FINISHED_JOB_STATUSES = frozenset({"failed", "stopped", "succeeded", "cancelled"})
 _topology_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 _topology_cache_lock = threading.Lock()
 _TOPOLOGY_CACHE_TTL_ACTIVE_SEC = 15.0
@@ -446,6 +447,23 @@ def build_ray_cluster_topology(
     cached = _topology_cache_get(cache_key, job_status=job_status)
     if cached is not None:
         return cached
+
+    if job_status in _FINISHED_JOB_STATUSES:
+        topology = _static_topology_shell(
+            driver_gcs=driver_gcs,
+            ray_address=ray_address,
+            master_ip=master_ip,
+            job_status=job_status,
+            expected_worker_nodes=expected_worker_nodes,
+            cdsw_worker_ids=cdsw_worker_ids,
+            gcs_ok=gcs_ok,
+            note=(
+                "Cluster map is not refreshed for finished tasks (avoids Ray/GCS load on the session). "
+                "Run the task again to see a live map while provisioning or running."
+            ),
+        )
+        _topology_cache_put(cache_key, topology, job_status=job_status)
+        return topology
 
     if not gcs_ok:
         topology = _static_topology_shell(
