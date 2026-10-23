@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import os
 import sys
 from pathlib import Path
 
@@ -73,7 +72,26 @@ from common import (
     venv_python,
     wait_for_urls,
 )
+from _paths import strip_jupyter_kernel_argv
 from install import build_frontend, main as install_main
+
+
+def _argv_for_platform_start() -> list[str]:
+    """Platform CLI args with Jupyter kernel connection flags removed."""
+    return strip_jupyter_kernel_argv(list(sys.argv[1:]))
+
+
+def _run_install_subcommand(*, rebuild_ui: bool) -> int:
+    """``install.py`` only understands ``--rebuild-ui``; do not pass ``start.py`` flags."""
+    saved_argv = list(sys.argv)
+    try:
+        install_tail: list[str] = []
+        if rebuild_ui:
+            install_tail.append("--rebuild-ui")
+        sys.argv = [saved_argv[0], *install_tail]
+        return install_main()
+    finally:
+        sys.argv = saved_argv
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,7 +107,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run npm run build into frontend/dist (also with --install)",
     )
-    return parser.parse_args()
+    args, unknown = parser.parse_known_args(_argv_for_platform_start())
+    if unknown:
+        print(f"Ignoring unknown arguments: {' '.join(unknown)}", file=sys.stderr)
+    return args
 
 
 def main() -> int:
@@ -127,7 +148,7 @@ def main() -> int:
             import os as _os
 
             _os.environ["PLATFORM_UI_REBUILD"] = "1"
-        code = install_main()
+        code = _run_install_subcommand(rebuild_ui=bool(args.rebuild_ui))
         if code != 0:
             return code
         code = ensure_runtime_ready()

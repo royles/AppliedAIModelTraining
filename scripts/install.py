@@ -37,6 +37,7 @@ def _ensure_scripts_on_syspath() -> None:
 
 _ensure_scripts_on_syspath()
 
+from _paths import strip_jupyter_kernel_argv
 from common import (
     REPO_ROOT,
     cd_repo,
@@ -124,7 +125,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Always run npm run build (refresh frontend/dist)",
     )
-    return parser.parse_args()
+    args, unknown = parser.parse_known_args(strip_jupyter_kernel_argv(sys.argv[1:]))
+    if unknown:
+        print(f"Ignoring unknown arguments: {' '.join(unknown)}", file=sys.stderr)
+    return args
 
 
 def main() -> int:

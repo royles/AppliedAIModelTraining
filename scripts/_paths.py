@@ -55,3 +55,29 @@ def _scripts_dir_candidates() -> list[Path]:
         add(cwd)
 
     return out
+
+
+def strip_jupyter_kernel_argv(argv: list[str]) -> list[str]:
+    """
+    Drop ipykernel/Jupyter ``-f`` / ``--connection-file`` pairs from a CLI argv slice.
+
+    CAI Applications sometimes pass these even when ``sys.argv[0]`` is ``scripts/start.py``.
+    """
+    cleaned: list[str] = []
+    skip_next = False
+    for arg in argv:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in ("-f", "--connection-file"):
+            skip_next = True
+            continue
+        if arg.startswith("-f") and len(arg) > 2:
+            continue
+        norm = arg.replace("\\", "/")
+        if "kernel-" in arg and arg.endswith(".json") and (
+            "/jupyter/" in norm or "/runtime/" in norm
+        ):
+            continue
+        cleaned.append(arg)
+    return cleaned
