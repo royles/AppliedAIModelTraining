@@ -22,7 +22,7 @@ from app.services.platform_settings import (
     resolved_ray_head,
     worker_pool_kwargs,
 )
-from app.services.job_log import append_job_log
+from app.services.job_log import append_job_log, append_job_log_isolated
 from app.services.log_flair import framework_banner, framework_line
 from app.services.model_registry import default_openai_model_id, register_trained_model
 from app.training.transformer_config import TransformerTrainingConfig
@@ -122,8 +122,23 @@ def resolve_job_config(job: TrainingJob) -> TransformerTrainingConfig:
     )
 
 
+def _release_job_db(db: Session | None) -> None:
+    if db is not None:
+        db.close()
+
+
+def _require_job_db(db: Session | None, job_id: int) -> tuple[Session, TrainingJob]:
+    session = db if db is not None else SessionLocal()
+    job = session.get(TrainingJob, job_id)
+    if not job:
+        if db is None:
+            session.close()
+        raise RuntimeError(f"Training job {job_id} not found")
+    return session, job
+
+
 def run_training_job(job_id: int) -> None:
-    db = SessionLocal()
+    db: Session | None = SessionLocal()
     pool: CdswRayWorkerPool | None = None
     try:
         job = db.get(TrainingJob, job_id)
@@ -216,9 +231,6 @@ def run_training_job(job_id: int) -> None:
                 ),
             )
 
-        def framework_log(msg: str) -> None:
-            append_job_log(db, job_id, "framework", msg)
-
         from app.services.project_ray_settings import ensure_project_ray_settings
 
         platform = ensure_project_ray_settings(db, job.experiment_id)
@@ -297,6 +309,10 @@ def run_training_job(job_id: int) -> None:
         db.add(worker_group)
         db.commit()
         db.refresh(worker_group)
+
+        # Release the pool slot before parallel Ray/dataset work (can run many minutes).
+        _release_job_db(db)
+        db = None
 
         low_memory_mode = bool(platform.non_distributed_low_memory_mode)
         launch_cdsw_workers = head and job.num_workers > 0 and not low_memory_mode
@@ -403,6 +419,7 @@ def run_training_job(job_id: int) -> None:
 
         from app.training.dataset_staging import register_job_dataset_in_data_collection
 
+        db, job = _require_job_db(db, job_id)
         project = db.get(Experiment, job.experiment_id)
         reg = register_job_dataset_in_data_collection(
             project_id=job.experiment_id,
@@ -483,7 +500,7 @@ def run_training_job(job_id: int) -> None:
         if not cluster_wait_done and head and ray_addr:
 
             def _gcs_wait_log(msg: str) -> None:
-                append_job_log(db, job_id, "framework", framework_line("ray", msg))
+                append_job_log_isolated(job_id, "framework", framework_line("ray", msg))
 
             append_job_log(
                 db,
@@ -495,9 +512,10 @@ def run_training_job(job_id: int) -> None:
                     "CAI: head on CDSW_IP_ADDRESS, workers dial CDSW_MASTER_IP)…",
                 ),
             )
+            _release_job_db(db)
+            db = None
             if not wait_for_gcs_usable(ray_addr, timeout_sec=180.0, framework_log=_gcs_wait_log):
-                append_job_log(
-                    db,
+                append_job_log_isolated(
                     job_id,
                     "framework",
                     framework_line(
@@ -510,6 +528,7 @@ def run_training_job(job_id: int) -> None:
                     ),
                 )
                 raise RuntimeError(f"Ray GCS not available at {ray_addr}")
+            db, job = _require_job_db(db, job_id)
         if ray_addr:
             os.environ["RAY_ADDRESS"] = ray_addr
 
@@ -528,14 +547,17 @@ def run_training_job(job_id: int) -> None:
             min_gpu = float(train_workers * max(1, gpus_per_worker)) if use_gpu else 0.0
             auth_token = ensure_ray_auth_token()
             if gcs_wait:
+                _release_job_db(db)
+                db = None
                 wait_for_cluster_nodes_subprocess(
                     gcs_wait,
-                    lambda msg: append_job_log(db, job_id, "framework", msg),
+                    lambda msg: append_job_log_isolated(job_id, "framework", msg),
                     min_alive=min_cluster_nodes,
                     min_gpu=min_gpu,
                     timeout_sec=900.0 if use_gpu else 600.0,
                     auth_token=auth_token,
                 )
+                db, job = _require_job_db(db, job_id)
                 snap = cluster_snapshot_for_wait(gcs_wait, auth_token=auth_token)
                 if use_gpu and (snap is None or snap["gpu"] < min_gpu):
                     detail = (
@@ -688,11 +710,10 @@ def run_training_job(job_id: int) -> None:
             )
 
             def _poll_log(msg: str) -> None:
-                append_job_log(db, job_id, "framework", framework_line("ray", msg))
+                append_job_log_isolated(job_id, "framework", framework_line("ray", msg))
 
             def _remote_poll(elapsed: float, has_result_file: bool) -> None:
-                append_job_log(
-                    db,
+                append_job_log_isolated(
                     job_id,
                     "framework",
                     framework_line(
@@ -703,6 +724,8 @@ def run_training_job(job_id: int) -> None:
                     ),
                 )
 
+            _release_job_db(db)
+            db = None
             try:
                 outcome = poll_remote_driver_result(
                     artifact_dir,
@@ -711,6 +734,7 @@ def run_training_job(job_id: int) -> None:
             except TimeoutError as exc:
                 _poll_log(str(exc))
                 raise
+            db, job = _require_job_db(db, job_id)
             if outcome.get("status") != "succeeded":
                 err = outcome.get("error") or "Remote Ray Train driver failed"
                 tb = outcome.get("traceback")
@@ -731,12 +755,15 @@ def run_training_job(job_id: int) -> None:
                         "Set PLATFORM_USE_REMOTE_TRAIN_DRIVER=1 for a CDSW driver engine.",
                     ),
                 )
+            _release_job_db(db)
+            db = None
             result = run_transformer_training(
                 ray_address=ray_addr,
                 num_workers=train_workers,
                 use_gpu=use_gpu,
                 train_config=train_config,
             )
+            db, job = _require_job_db(db, job_id)
         append_job_log(
             db,
             job_id,
@@ -774,6 +801,7 @@ def run_training_job(job_id: int) -> None:
                 training_metrics=metrics,
             )
     except JobCancelledError:
+        db, job = _require_job_db(db, job_id)
         append_job_log(
             db,
             job_id,
@@ -787,6 +815,7 @@ def run_training_job(job_id: int) -> None:
             job_row.worker_group.status = "stopped"
             db.commit()
     except Exception as exc:  # noqa: BLE001
+        db, _job = _require_job_db(db, job_id)
         if is_training_job_cancel_requested(job_id):
             append_job_log(
                 db,
@@ -829,7 +858,7 @@ def run_training_job(job_id: int) -> None:
                     pool.stop_all()
                 except Exception:  # noqa: BLE001
                     pass
-        db.close()
+        _release_job_db(db)
 
 
 def enqueue_training_job(

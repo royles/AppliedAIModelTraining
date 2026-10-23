@@ -293,70 +293,77 @@ def provision_cdsw_workers_parallel(
         job = db.get(TrainingJob, job_id)
         if not job or not job.worker_group:
             raise RuntimeError("Worker group missing during CDSW provisioning")
-        worker_group = job.worker_group
-        worker_group.head_address = head
+        job.worker_group.head_address = head
         db.commit()
+    finally:
+        db.close()
 
-        worker_dial, worker_dial_via = resolve_worker_ray_head_address_with_source(head)
-        log(
-            framework_line(
-                "worker",
-                f"Launching {num_workers} CDSW GPU engine(s); workers dial master GCS "
-                f"{worker_dial} (Cloudera CDSW_MASTER_IP→master, session via {worker_dial_via})",
-            )
+    worker_dial, worker_dial_via = resolve_worker_ray_head_address_with_source(head)
+    log(
+        framework_line(
+            "worker",
+            f"Launching {num_workers} CDSW GPU engine(s); workers dial master GCS "
+            f"{worker_dial} (Cloudera CDSW_MASTER_IP→master, session via {worker_dial_via})",
         )
-        probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
-        Path(probe_path).unlink(missing_ok=True)
-        log(
-            framework_line(
-                "ray",
-                "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
-            )
+    )
+    probe_path = str(Path(artifact_dir) / "ray_worker_probe.json")
+    Path(probe_path).unlink(missing_ok=True)
+    log(
+        framework_line(
+            "ray",
+            "Running CDSW worker→master connectivity probe (TCP + ray.init)…",
         )
-        probe_token = require_ray_gcs_auth_token(head)
+    )
+    probe_token = require_ray_gcs_auth_token(head)
 
-        def _gcs_log(msg: str) -> None:
-            log(framework_line("ray", msg))
+    def _gcs_log(msg: str) -> None:
+        log(framework_line("ray", msg))
 
-        if not wait_for_gcs_usable(head, timeout_sec=180.0, framework_log=_gcs_log):
-            msg = (
-                f"Ray GCS not usable at {head} before worker probe. "
-                "Restart head on master pod IP (ray stop --force; start.py). "
-                "See Cloudera ML distributed computing — Worker Network Communication."
-            )
-            log(framework_line("fail", msg))
-            raise RuntimeError(msg)
+    if not wait_for_gcs_usable(head, timeout_sec=180.0, framework_log=_gcs_log):
+        msg = (
+            f"Ray GCS not usable at {head} before worker probe. "
+            "Restart head on master pod IP (ray stop --force; start.py). "
+            "See Cloudera ML distributed computing — Worker Network Communication."
+        )
+        log(framework_line("fail", msg))
+        raise RuntimeError(msg)
 
-        log(
-            framework_line(
-                "ray",
-                f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
-                f"GCS auth token synced ({project_gcs_auth_token_path().name})",
-            )
+    log(
+        framework_line(
+            "ray",
+            f"Worker probe revision {WORKER_CONNECTIVITY_PROBE_REVISION}; "
+            f"GCS auth token synced ({project_gcs_auth_token_path().name})",
         )
-        pool.launch(
-            1,
-            head,
-            code=build_worker_connectivity_probe_code(
-                head, probe_path, ray_auth_token=probe_token
-            ),
-            cpu=1.0,
-            memory_gb=4.0,
-            gpus_per_worker=0,
+    )
+    pool.launch(
+        1,
+        head,
+        code=build_worker_connectivity_probe_code(
+            head, probe_path, ray_auth_token=probe_token
+        ),
+        cpu=1.0,
+        memory_gb=4.0,
+        gpus_per_worker=0,
+    )
+    probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
+    if not worker_connectivity_probe_passed(probe):
+        detail = describe_worker_probe_failure(probe, head)
+        log(framework_line("fail", detail))
+        raise RuntimeError(detail)
+    log(
+        framework_line(
+            "ray",
+            f"Worker connectivity OK: master GCS {probe.get('head')} via "
+            f"{probe.get('head_via', '?')} (nodes={probe.get('nodes', '?')}); launching GPU workers",
         )
-        probe = poll_worker_connectivity_probe(probe_path, timeout_sec=300.0)
-        if not worker_connectivity_probe_passed(probe):
-            detail = describe_worker_probe_failure(probe, head)
-            log(framework_line("fail", detail))
-            raise RuntimeError(detail)
-        log(
-            framework_line(
-                "ray",
-                f"Worker connectivity OK: master GCS {probe.get('head')} via "
-                f"{probe.get('head_via', '?')} (nodes={probe.get('nodes', '?')}); launching GPU workers",
-            )
-        )
-        launched = pool.launch(num_workers, head)
+    )
+    launched = pool.launch(num_workers, head)
+    db = SessionLocal()
+    try:
+        job = db.get(TrainingJob, job_id)
+        if not job or not job.worker_group:
+            raise RuntimeError("Worker group missing after CDSW launch")
+        worker_group = job.worker_group
         worker_group.worker_ids_json = worker_ids_to_json(launched.worker_ids)
         worker_group.status = "running"
         db.commit()

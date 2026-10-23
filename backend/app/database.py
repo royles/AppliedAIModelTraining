@@ -1,6 +1,7 @@
 from collections.abc import Generator
+from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -10,17 +11,33 @@ class Base(DeclarativeBase):
     pass
 
 
+def _configure_sqlite_connection(dbapi_conn) -> None:
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=60000")
+    cursor.close()
+
+
 def _make_engine():
     settings = get_settings()
     url = settings.database_url
-    connect_args = {"check_same_thread": False, "timeout": 30} if url.startswith("sqlite") else {}
+    connect_args = {"check_same_thread": False, "timeout": 60} if url.startswith("sqlite") else {}
     kwargs: dict = {"connect_args": connect_args, "pool_pre_ping": True}
     if url.startswith("sqlite"):
-        # Health polls + job threads must not exhaust the pool on slow Ray checks.
-        kwargs["pool_size"] = 10
-        kwargs["max_overflow"] = 20
-        kwargs["pool_timeout"] = 60
-    return create_engine(settings.database_url, **kwargs)
+        # SQLite is single-writer; a large QueuePool + long-lived job sessions starves /api polls.
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 5
+        kwargs["pool_timeout"] = 30
+        kwargs["pool_recycle"] = 300
+    engine = create_engine(settings.database_url, **kwargs)
+    if url.startswith("sqlite"):
+
+        @event.listens_for(engine, "connect")
+        def _on_sqlite_connect(dbapi_conn, _connection_record) -> None:
+            _configure_sqlite_connection(dbapi_conn)
+
+    return engine
 
 
 engine = _make_engine()
@@ -80,6 +97,16 @@ def init_db() -> None:
 
 
 def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def session_scope() -> Generator[Session, None, None]:
+    """Short-lived session (use during long Ray waits instead of holding one open)."""
     db = SessionLocal()
     try:
         yield db

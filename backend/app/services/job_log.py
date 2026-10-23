@@ -10,6 +10,7 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
+from app.database import SessionLocal
 from app.models import TrainingJob
 from app.resource_hints import effective_ray_train_workers
 from app.services.distributed_training_status import build_distributed_training_status
@@ -41,6 +42,15 @@ def append_job_log(db: Session, job_id: int, channel: LogChannel, message: str) 
     lines.append({"ts": _now_iso(), "channel": channel, "message": message})
     job.log_json = json.dumps(lines[-_MAX_STORED_LINES:])
     db.commit()
+
+
+def append_job_log_isolated(job_id: int, channel: LogChannel, message: str) -> None:
+    """Commit a log line without holding the caller's session (long Ray / Train waits)."""
+    db = SessionLocal()
+    try:
+        append_job_log(db, job_id, channel, message)
+    finally:
+        db.close()
 
 
 def training_log_path(job_id: int) -> Path:
