@@ -78,7 +78,8 @@ def platform_ray_status() -> dict[str, Any]:
         if not gcs_tcp_reachable(host, port, timeout_sec=1.5):
             out["state"] = "deferred"
             out["detail"] = (
-                "Ray head not listening on master pod IP yet (head starts with model tasks). "
+                "Ray head not listening on master pod IP yet (restart scripts/start.py; "
+                "PLATFORM_RAY_START_AT_BOOT=0 defers head until a model task). "
                 "See docs/CAI_RAY_NETWORKING.md"
             )
             return out

@@ -25,7 +25,7 @@ This platform follows Cloudera’s distributed-computing and engine networking m
 
 | Role | Where it runs | Ray GCS / `ray.init` address | Why |
 |------|----------------|------------------------------|-----|
-| **Ray head** | Session (master) pod | `ray start --head` on port **6379** | Started at the **beginning of model task provisioning** (`ensure_ray_head_for_workers`), **before** from-scratch tokenizer prep and before Ray Train. Not started by `scripts/start.py` unless `PLATFORM_RAY_START_AT_BOOT=1`. |
+| **Ray head** | Session (master) pod | `ray start --head` on port **6379** | Started during **`scripts/start.py`** on CAI by default (Cloudera master-first). Set **`PLATFORM_RAY_START_AT_BOOT=0`** to defer until the first model task. Re-started at provisioning via `ensure_ray_head_for_workers` when needed. |
 | **Training driver** | Same session pod as head | **`CDSW_IP_ADDRESS:6379`** + **`_node_ip_address`** | Ray 2.x on Linux rewrites `127.0.0.1` to the pod IP in `ray.init` anyway (`resolve_ip_for_localhost`). The driver must match the head node IP in GCS (see `ray_driver_connect.py`). |
 | **Ray workers** | Worker engines from `launch_workers` | **`CDSW_MASTER_IP:6379`** (CAI-set on workers; session also pins **`PLATFORM_RAY_HEAD_ADDRESS`**) | Same pattern as Cloudera’s socket example: connect to **master IP**, not the worker’s **`CDSW_IP_ADDRESS`**. |
 

@@ -123,6 +123,87 @@ def ray_status_cluster_snapshot(
     }
 
 
+def ray_cluster_topology_subprocess(
+    gcs_address: str,
+    *,
+    auth_token: str | None = None,
+    timeout_sec: float = 35.0,
+) -> dict[str, Any] | None:
+    """
+    Full cluster topology inputs without ``ray.init`` in the API / job-runner process.
+
+    Returns alive ``ray.nodes()`` payloads plus cluster resource totals when GCS RPC works.
+    """
+    from app.services.ray_driver_connect import (
+        co_located_subprocess_ray_init_kwargs,
+        ensure_ray_auth_token,
+    )
+
+    token = (auth_token or ensure_ray_auth_token(gcs_address) or "").strip()
+    init_kw = co_located_subprocess_ray_init_kwargs(gcs_address)
+    init_attempts: list[dict[str, Any]] = [
+        {"address": gcs_address, "ignore_reinit_error": True},
+    ]
+    if init_kw not in init_attempts:
+        init_attempts.append(init_kw)
+    script = f"""
+import json
+import os
+import ray
+
+os.environ["RAY_ADDRESS"] = {json.dumps(gcs_address)}
+if {json.dumps(token)}:
+    os.environ["RAY_AUTH_TOKEN"] = {json.dumps(token)}
+attempts = {json.dumps(init_attempts)}
+for kwargs in attempts:
+    try:
+        ray.init(**{{**kwargs, "logging_level": "error"}})
+        break
+    except Exception:
+        if ray.is_initialized():
+            ray.shutdown()
+else:
+    raise SystemExit(1)
+nodes = []
+for n in ray.nodes():
+    if not n.get("Alive"):
+        continue
+    nodes.append({{
+        "NodeID": n.get("NodeID"),
+        "NodeManagerAddress": n.get("NodeManagerAddress"),
+        "node_ip_address": n.get("node_ip_address"),
+        "Resources": dict(n.get("Resources") or {{}}),
+        "Alive": True,
+    }})
+total = {{str(k): float(v) for k, v in ray.cluster_resources().items()}}
+avail = {{str(k): float(v) for k, v in ray.available_resources().items()}}
+print(json.dumps({{"nodes": nodes, "total_res": total, "avail_res": avail}}))
+ray.shutdown()
+"""
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    lines = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    try:
+        data = json.loads(lines[-1])
+        if not isinstance(data, dict):
+            return None
+        return data
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
 def cluster_snapshot_for_wait(
     gcs_address: str,
     *,
