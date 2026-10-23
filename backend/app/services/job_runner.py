@@ -284,6 +284,18 @@ def run_training_job(job_id: int) -> None:
         needs_cai_ray_head = bool(live_ip) and not (
             platform.ray_local_mode and not pool.is_remote
         )
+        if force_ray_head_restart and needs_cai_ray_head:
+            from app.services.ray_cluster_restart import full_ray_cluster_restart
+
+            full_ray_cluster_restart(
+                framework_log=lambda msg: append_job_log(
+                    db,
+                    job_id,
+                    "framework",
+                    msg if msg.startswith("[") else framework_line("ray", msg),
+                )
+            )
+            force_ray_head_restart = False
         from app.services.job_parallel_startup import parallel_dataset_prep_and_ray_head
 
         try:
@@ -865,7 +877,7 @@ def enqueue_training_job(
     job_id: int,
     *,
     resume: bool = False,
-    force_ray_head_restart: bool = False,
+    force_ray_head_restart: bool = True,
 ) -> None:
     with _job_thread_lock:
         existing = _job_threads.get(job_id)

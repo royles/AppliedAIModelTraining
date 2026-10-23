@@ -61,7 +61,8 @@ export function JobRestartDialog({ open, jobName, busy, onResume, onStartOver, o
           </p>
           <p className="hint">
             Resume continues from the last saved epoch/step when available. Start over runs a fresh training
-            loop but keeps prior artifacts on disk.
+            loop but keeps prior artifacts on disk. Both options stop CDSW workers and restart the Ray head
+            on the master session (ray stop --force, fresh GCS) before provisioning.
           </p>
         </div>
         <footer className="cdl-dialog-footer">

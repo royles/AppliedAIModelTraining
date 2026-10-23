@@ -14,6 +14,7 @@ from app.services.job_log import append_job_log
 from app.services.job_runner import enqueue_training_job, job_is_running
 from app.services.log_flair import framework_line
 from app.services.job_progress import read_progress
+from app.services.ray_cluster_restart import prepare_job_for_rerun
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +55,23 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
     job = db.get(TrainingJob, job_id)
     if not job:
         raise ValueError("Job not found")
-    if job_is_running(job_id):
-        raise RuntimeError("Job is already running in this framework process")
     if job.status not in _RESTARTABLE_STATUSES:
         raise ValueError(
             f"Only finished tasks can be run again (current status={job.status}). "
             "Stop an active run first, or wait for it to finish."
         )
+
+    def _framework_log(message: str) -> None:
+        append_job_log(db, job_id, "framework", message)
+
+    try:
+        prepare_job_for_rerun(
+            job,
+            framework_log=_framework_log,
+            restart_cluster=True,
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(str(exc)) from exc
 
     artifact_dir = (REPO_ROOT / "data" / "models" / f"job_{job_id}").resolve()
     progress = read_progress(artifact_dir) if resume else None
@@ -95,6 +106,6 @@ def restart_training_job(db: Session, job_id: int, *, resume: bool = True) -> Tr
             framework_line("queue", "Job restart: same parameters, fresh training run"),
         )
 
-    enqueue_training_job(job_id, resume=resume, force_ray_head_restart=True)
+    enqueue_training_job(job_id, resume=resume, force_ray_head_restart=False)
     db.refresh(job)
     return job
