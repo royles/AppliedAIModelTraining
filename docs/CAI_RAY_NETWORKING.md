@@ -1,5 +1,7 @@
 # Cloudera AI (CAI) Ray networking
 
+**Change policy:** This area is **frozen** for agents after user sign-off. Do not modify the files listed in **`.cursor/rules/ray-networking-frozen.mdc`** unless the user explicitly requests Ray/CDSW networking work.
+
 **Stability contract (do not regress):**
 
 1. **Master** — `ray start --head` on **`CDSW_IP_ADDRESS:6379`** (not loopback-only for worker joins).

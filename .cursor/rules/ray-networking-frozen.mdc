@@ -1,0 +1,37 @@
+---
+description: Do not modify CAI Ray / CDSW worker networking unless the user explicitly asks
+alwaysApply: true
+---
+
+# Ray & CDSW networking — frozen
+
+The Cloudera AI Ray stack is wired per **`docs/CAI_RAY_NETWORKING.md`** (master `CDSW_IP_ADDRESS:6379`, workers `CDSW_MASTER_IP:6379`, verified GCS auth). The user treats this as **production-stable** after manual validation.
+
+## Do not change (unless the user **explicitly** requests networking / Ray / worker / GCS work)
+
+- `docs/CAI_RAY_NETWORKING.md`
+- `backend/app/services/cai_networking.py`
+- `backend/app/services/ray_cai_networking.py`
+- `backend/app/services/ray_driver_connect.py`
+- `backend/app/services/ray_gcs_auth.py`
+- `backend/app/services/cdsw_workers.py`
+- `backend/app/services/cdsw_worker_codegen.py` (embedded worker head resolution)
+- `backend/app/services/ray_cluster_watch.py` (GCS subprocess probes used by jobs)
+- `backend/app/services/job_parallel_startup.py` (worker probe / GCS wait paths)
+- `backend/app/services/nccl_env.py` (GPU Train NCCL defaults on workers)
+- `scripts/common.py` — only **`bootstrap_cai_ray_env`**, **`start_ray_head`**, **`_sync_ray_auth_env`**
+- `scripts/start.py` — only **CAI Ray bootstrap / `PLATFORM_RAY_START_AT_BOOT` / head-deferred messaging**
+- Tests: `backend/test_ray_cai_networking.py`, `backend/test_ray_gcs_auth.py`, `backend/test_verified_gcs_auth.py`, `backend/test_platform_ray_health.py`, and other tests whose **primary purpose** is Ray GCS/worker networking
+
+## Allowed without an explicit networking request
+
+- Unrelated features (UI, datasets, SQLite, jobs API) even if they **import** networking helpers — do not refactor networking while doing so.
+- **Docs/README** outside `CAI_RAY_NETWORKING.md` unless they change networking behavior claims.
+
+## When the user explicitly asks
+
+They must clearly request changes to Ray networking, GCS auth, CDSW workers, worker probe, or CAI head startup. Then you may edit the paths above and **must** extend or run the networking tests listed in `CAI_RAY_NETWORKING.md`.
+
+## If a bug seems networking-related but the user did not ask
+
+Describe the likely ops fix (`ray stop --force`, remove `data/.ray_gcs_auth_token`, `git pull`, restart `start.py`) and ask whether to change networking code — **do not patch by default**.
