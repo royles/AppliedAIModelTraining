@@ -99,6 +99,8 @@ python3 scripts/start.py
 
 On CAI, `start.py` runs the **API on :8000** (background) and the **UX gateway in the foreground on `CDSW_APP_PORT`**. The browser only needs the Application URL; the UI proxies API calls to port 8000 inside the session.
 
+**Cloudera AI Application start command:** use `python3 scripts/start.py` (or `python3 scripts/start.py --install` on first boot). Do not paste `start.py` into notebook cells — Jupyter has no `__file__`, which breaks the old one-line path bootstrap. The script resolves the project via `CDSW_PROJECT_ROOT` or the working directory.
+
 3. Run the smoke test (creates project → trains tiny scratch GPT-2 → calls `/v1/chat/completions`):
 
 ```bash

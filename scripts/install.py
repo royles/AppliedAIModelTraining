@@ -7,10 +7,35 @@ import argparse
 import os
 import shutil
 import subprocess
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+def _ensure_scripts_on_syspath() -> None:
+    candidates: list[Path] = []
+    try:
+        candidates.append(Path(__file__).resolve().parent)
+    except NameError:
+        pass
+    for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT"):
+        root = os.environ.get(key, "").strip()
+        if root:
+            candidates.append(Path(root) / "scripts")
+            candidates.append(Path(root))
+    candidates.append(Path.cwd() / "scripts")
+    candidates.append(Path.cwd())
+    for scripts in candidates:
+        scripts = scripts.resolve()
+        if (scripts / "common.py").is_file():
+            entry = str(scripts)
+            if entry not in sys.path:
+                sys.path.insert(0, entry)
+            return
+    raise RuntimeError("Could not find scripts/common.py; set CDSW_PROJECT_ROOT or run from repo root.")
+
+
+_ensure_scripts_on_syspath()
 
 from common import (
     REPO_ROOT,

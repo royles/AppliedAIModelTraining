@@ -8,7 +8,14 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    _scripts = Path(__file__).resolve().parent
+except NameError:
+    import os
+
+    _root = os.environ.get("CDSW_PROJECT_ROOT") or os.environ.get("PROJECT_ROOT") or str(Path.cwd())
+    _scripts = Path(_root) / "scripts"
+sys.path.insert(0, str(_scripts))
 import time
 import urllib.error
 import urllib.request

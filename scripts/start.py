@@ -13,10 +13,39 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+def _ensure_scripts_on_syspath() -> None:
+    """CAI Application notebooks have no ``__file__``; resolve via env or cwd."""
+    candidates: list[Path] = []
+    try:
+        candidates.append(Path(__file__).resolve().parent)
+    except NameError:
+        pass
+    for key in ("CDSW_PROJECT_ROOT", "PROJECT_ROOT"):
+        root = os.environ.get(key, "").strip()
+        if root:
+            candidates.append(Path(root) / "scripts")
+            candidates.append(Path(root))
+    candidates.append(Path.cwd() / "scripts")
+    candidates.append(Path.cwd())
+    for scripts in candidates:
+        scripts = scripts.resolve()
+        if (scripts / "common.py").is_file():
+            entry = str(scripts)
+            if entry not in sys.path:
+                sys.path.insert(0, entry)
+            return
+    raise RuntimeError(
+        "Could not find scripts/common.py. In Applications, set the start command to "
+        "`python3 scripts/start.py` (or set CDSW_PROJECT_ROOT to the repo root)."
+    )
+
+
+_ensure_scripts_on_syspath()
 
 from common import (
     BIND_HOST,
