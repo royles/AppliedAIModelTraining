@@ -6,6 +6,7 @@ export type PlatformRayStatus = {
   gcs_address?: string | null;
   cdsw_available?: boolean;
   gcs_reachable?: boolean;
+  head_gcs_healthy?: boolean;
   alive_nodes?: number | null;
   gpu_capacity?: number | null;
   state?: string;
@@ -67,11 +68,19 @@ export function rayIndicatorFromHealth(health: Health | null, apiOk: boolean): {
       title: "Training uses an in-process Ray runtime on this machine",
     };
   }
-  if (ray.state === "provisioning") {
+  if (ray.state === "provisioning_head_live" || (ray.state === "provisioning" && ray.head_gcs_healthy)) {
     return {
-      tone: "warn",
-      label: "Ray (task)",
-      title: `A model task is starting or running Ray on ${addr ?? "session"} — see task framework log`,
+      tone: "ok",
+      label: "Ray head live",
+      title: `Ray head GCS responding at ${addr} (healthy while task provisions)`,
+    };
+  }
+  if (ray.state === "provisioning") {
+    const tcp = ray.gcs_reachable ? "GCS port open" : "starting Ray head";
+    return {
+      tone: ray.gcs_reachable ? "warn" : "warn",
+      label: ray.gcs_reachable ? "Ray (task)" : "Ray starting",
+      title: `Model task active — ${tcp} at ${addr ?? "session"}`,
     };
   }
   if (!ray.gcs_reachable) {

@@ -23,6 +23,7 @@ def test_framework_banner_rows_equal_width() -> None:
 
 def test_heartbeat_line() -> None:
     assert "still running (45s)" in heartbeat_line("BPE tokenizer", 45)
+    assert "download 5,000" in heartbeat_line("Corpus load", 30, "download 5,000/10,000 rows")
 
 
 def test_task_phase_lines() -> None:

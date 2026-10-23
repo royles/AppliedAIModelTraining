@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.services.log_flair import task_done_line, task_start_line
+from app.services.download_progress import DownloadProgressState
 from app.services.task_heartbeat import provisioning_heartbeat
 
 from app.training.dataset_sharding import load_training_corpus_staged
@@ -81,12 +82,14 @@ def prepare_from_scratch_training(
         return train_config
     t_corpus = time.monotonic()
     _log(task_start_line("train", "Corpus load (from-scratch)"))
-    with provisioning_heartbeat(log, "Corpus load"):
+    dl_progress = DownloadProgressState()
+    with provisioning_heartbeat(log, "Corpus load", download_progress=dl_progress):
         texts, _ = load_training_corpus_staged(
             artifact_dir=str(artifact_dir),
             dataset_cfg=cfg.dataset.model_dump(),
             task_type=cfg.task_type,
             shared_dirs=shared_dataset_dirs_from_config(train_config),
+            download_progress=dl_progress,
         )
     _log(
         task_done_line(

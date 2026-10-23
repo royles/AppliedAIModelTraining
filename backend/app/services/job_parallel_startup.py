@@ -12,6 +12,7 @@ from app.database import SessionLocal
 from app.models import TrainingJob, WorkerGroup
 from app.services.job_log import append_job_log
 from app.services.log_flair import framework_line, task_done_line, task_start_line
+from app.services.download_progress import DownloadProgressState
 from app.services.task_heartbeat import provisioning_heartbeat
 from app.training.from_scratch import prepare_from_scratch_training
 from app.training.transformer_config import TransformerTrainingConfig
@@ -73,13 +74,18 @@ def prepare_train_config_dataset(
             artifact_dir = str(tc.get("artifact_dir") or "")
             shared_dirs = shared_dataset_dirs_from_config(tc)
             t0 = _log_phase_start(log, "train", "Dataset load (corpus)")
+            dl_progress = DownloadProgressState()
             try:
-                sample_texts, _ = load_training_corpus_staged(
-                    artifact_dir=artifact_dir or None,
-                    dataset_cfg=cfg.dataset.model_dump(),
-                    task_type=cfg.task_type,
-                    shared_dirs=shared_dirs,
-                )
+                with provisioning_heartbeat(
+                    log, "Dataset load", download_progress=dl_progress
+                ):
+                    sample_texts, _ = load_training_corpus_staged(
+                        artifact_dir=artifact_dir or None,
+                        dataset_cfg=cfg.dataset.model_dump(),
+                        task_type=cfg.task_type,
+                        shared_dirs=shared_dirs,
+                        download_progress=dl_progress,
+                    )
                 tc["prompt_format"] = resolve_prompt_format("auto", sample_texts)
                 _log_phase_done(
                     log,
@@ -235,13 +241,17 @@ def prepare_dataset_shards_parallel(
         return patch
 
     t0 = _log_phase_start(log, "train", "Dataset download & sharding")
-    with provisioning_heartbeat(log, "Dataset download & sharding"):
+    dl_progress = DownloadProgressState()
+    with provisioning_heartbeat(
+        log, "Dataset download & sharding", download_progress=dl_progress
+    ):
         meta = prepare_dataset_shards_on_driver(
             artifact_dir=artifact_dir,
             dataset_cfg=dataset_cfg,
             task_type=task_type,
             world_size=train_workers,
             shared_dirs=shared_dirs,
+            download_progress=dl_progress,
         )
     patch["dataset_shards_prepared"] = True
     _log_phase_done(
@@ -496,7 +506,6 @@ def parallel_shards_and_worker_provision(
     provision = CdswProvisionResult()
 
     with provisioning_heartbeat(log, "Dataset sharding + worker provisioning"):
-        with provisioning_heartbeat(log, "Dataset sharding + worker provisioning"):
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="job-provision") as executor:
             f_shards = executor.submit(
                 prepare_dataset_shards_parallel,

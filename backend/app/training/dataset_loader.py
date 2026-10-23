@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+ProgressCallback = Callable[[int, int | None], None]
 
 from app.config import REPO_ROOT
 from app.training.dataset_config import TrainingDatasetConfig
@@ -88,7 +90,14 @@ def _group_user_assistant_lines(lines: list[str]) -> list[str]:
     return samples
 
 
-def _load_jsonl(path: Path, text_field: str, label_field: str | None) -> tuple[list[str], list[int] | None]:
+def _load_jsonl(
+    path: Path,
+    text_field: str,
+    label_field: str | None,
+    *,
+    progress_cb: ProgressCallback | None = None,
+    progress_every: int = 5000,
+) -> tuple[list[str], list[int] | None]:
     texts: list[str] = []
     labels: list[int] = []
     with path.open(encoding="utf-8") as fp:
@@ -107,6 +116,10 @@ def _load_jsonl(path: Path, text_field: str, label_field: str | None) -> tuple[l
                 if label_field not in row:
                     raise ValueError(f"JSONL line {line_no} missing field '{label_field}'")
                 labels.append(int(row[label_field]))
+            if progress_cb and len(texts) % progress_every == 0:
+                progress_cb(len(texts), None)
+    if progress_cb and texts:
+        progress_cb(len(texts), None)
     return texts, labels if label_field else None
 
 
@@ -152,6 +165,8 @@ def _collect_hf_rows(
     ds,
     *,
     limit: int | None,
+    progress_cb: ProgressCallback | None = None,
+    progress_every: int = 5000,
 ) -> tuple[list[str], list[int] | None]:
     texts: list[str] = []
     labels: list[int] = []
@@ -163,21 +178,42 @@ def _collect_hf_rows(
         texts.append(str(row[cfg.hf_text_column]))
         if cfg.hf_label_column:
             labels.append(int(row[cfg.hf_label_column]))
+        n = i + 1
+        if progress_cb and n % progress_every == 0:
+            progress_cb(n, limit)
+    if progress_cb and texts:
+        progress_cb(len(texts), limit)
     return texts, labels if cfg.hf_label_column else None
 
 
-def _load_huggingface(cfg: TrainingDatasetConfig) -> tuple[list[str], list[int] | None]:
+def _load_huggingface(
+    cfg: TrainingDatasetConfig,
+    *,
+    progress_cb: ProgressCallback | None = None,
+    progress_every: int = 5000,
+) -> tuple[list[str], list[int] | None]:
     limit = cfg.max_samples
     if limit is not None:
-        return _load_huggingface_capped(cfg, limit)
+        return _load_huggingface_capped(
+            cfg, limit, progress_cb=progress_cb, progress_every=progress_every
+        )
 
     ds = _open_hf_split(cfg, streaming=False)
-    return _collect_hf_rows(cfg, ds, limit=len(ds))
+    return _collect_hf_rows(
+        cfg,
+        ds,
+        limit=len(ds),
+        progress_cb=progress_cb,
+        progress_every=progress_every,
+    )
 
 
 def _load_huggingface_capped(
     cfg: TrainingDatasetConfig,
     limit: int,
+    *,
+    progress_cb: ProgressCallback | None = None,
+    progress_every: int = 5000,
 ) -> tuple[list[str], list[int] | None]:
     """
     Load at most ``limit`` rows without downloading every HF shard.
@@ -197,7 +233,9 @@ def _load_huggingface_capped(
             ds = load_dataset(repo, config_name, split=sliced_split)
         else:
             ds = load_dataset(repo, split=sliced_split)
-        return _collect_hf_rows(cfg, ds, limit=None)
+        return _collect_hf_rows(
+            cfg, ds, limit=None, progress_cb=progress_cb, progress_every=progress_every
+        )
     except Exception as exc:  # noqa: BLE001
         logger.info(
             "HF capped load via split slice failed (%s); falling back to streaming",
@@ -205,7 +243,19 @@ def _load_huggingface_capped(
         )
 
     ds = _open_hf_split(cfg, streaming=True)
-    return _collect_hf_rows(cfg, ds, limit=limit)
+    return _collect_hf_rows(
+        cfg, ds, limit=limit, progress_cb=progress_cb, progress_every=progress_every
+    )
+
+
+def _progress_every() -> int:
+    import os
+
+    raw = os.environ.get("PLATFORM_DOWNLOAD_PROGRESS_EVERY", "5000").strip()
+    try:
+        return max(500, int(raw))
+    except ValueError:
+        return 5000
 
 
 def load_training_samples(
@@ -213,6 +263,7 @@ def load_training_samples(
     *,
     task_type: str,
     for_preview: bool = False,
+    progress_cb: ProgressCallback | None = None,
 ) -> tuple[list[str], list[int] | None]:
     cfg = (
         dataset_cfg
@@ -232,9 +283,19 @@ def load_training_samples(
         texts = _load_text_file(path, task_type=task_type)
     elif cfg.source == "jsonl_file":
         path = _resolve_dataset_path(cfg.path or "")
-        texts, labels = _load_jsonl(path, cfg.text_field, cfg.label_field)
+        every = _progress_every()
+        texts, labels = _load_jsonl(
+            path,
+            cfg.text_field,
+            cfg.label_field,
+            progress_cb=progress_cb,
+            progress_every=every,
+        )
     elif cfg.source == "huggingface":
-        texts, labels = _load_huggingface(cfg)
+        every = _progress_every()
+        texts, labels = _load_huggingface(
+            cfg, progress_cb=progress_cb, progress_every=every
+        )
     elif cfg.source == "iceberg":
         from app.training.iceberg_loader import load_iceberg_samples
 

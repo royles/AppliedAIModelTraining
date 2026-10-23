@@ -7,9 +7,12 @@ import os
 import threading
 import time
 from contextlib import contextmanager
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable, Iterator
 
 from app.services.log_flair import heartbeat_line
+
+if TYPE_CHECKING:
+    from app.services.download_progress import DownloadProgressState
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +33,12 @@ def provisioning_heartbeat(
     label: str,
     *,
     interval_sec: float | None = None,
+    download_progress: DownloadProgressState | None = None,
 ) -> Iterator[None]:
     """
     Emit ``[..] {label} — still running (Ns)`` every ``interval_sec`` until the block exits.
+
+    Optional ``download_progress`` appends live row counts (HF/JSONL) — not Ray head checks.
 
     Safe when ``log`` is None (console-only jobs / tests).
     """
@@ -47,7 +53,12 @@ def provisioning_heartbeat(
     def _beat() -> None:
         while not stop.wait(every):
             elapsed = int(time.monotonic() - started)
-            line = heartbeat_line(label, elapsed)
+            detail = ""
+            if download_progress is not None:
+                snap = download_progress.snapshot()
+                if snap:
+                    detail = snap
+            line = heartbeat_line(label, elapsed, detail)
             try:
                 log(line)
             except Exception:  # noqa: BLE001

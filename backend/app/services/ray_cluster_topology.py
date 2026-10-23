@@ -539,6 +539,7 @@ def build_ray_cluster_topology(
             avail_res=avail_res,
             gcs_ok=True,
         )
+        topology["head_gcs_healthy"] = True
         _topology_cache_put(cache_key, topology, job_status=job_status)
         return topology
 
@@ -555,6 +556,7 @@ def build_ray_cluster_topology(
         topology["summary"]["alive_nodes"] = int(status_snap.get("alive", 0))
         topology["summary"]["total_cpu"] = float(status_snap.get("cpu", 0))
         topology["summary"]["total_gpu"] = float(status_snap.get("gpu", 0))
+        topology["head_gcs_healthy"] = True
         topology["note"] = (
             "Cluster counts from ray status (no in-process ray.init). "
             "Per-node map refreshes while the job is provisioning or running."
@@ -599,4 +601,5 @@ def merge_topology_into_ray_status(
             "GPU": summary.get("used_gpu", 0),
         }
     merged["gcs_reachable"] = topology.get("gcs_reachable")
+    merged["head_gcs_healthy"] = topology.get("head_gcs_healthy")
     return merged

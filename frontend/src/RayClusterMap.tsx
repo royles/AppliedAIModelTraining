@@ -320,7 +320,13 @@ export function RayClusterMap({ status, loading, cdswEngines }: Props) {
       <footer className="ray-cluster-legend">
         <span><i className="legend-line ok" /> Healthy</span>
         <span><i className="legend-line bad" /> Issue</span>
-        <span>GCS {topology.gcs_reachable ? "up" : "down"}</span>
+        {(topology?.head_gcs_healthy || status?.head_gcs_healthy) && (
+          <span className="ray-head-live-indicator" title="Ray head GCS responding (ray status OK)">
+            <span className="platform-status-dot ray-head-live-dot" aria-hidden />
+            Head live
+          </span>
+        )}
+        <span>GCS {topology?.gcs_reachable ? "up" : "down"}</span>
         {summary && (
           <>
             <span>Nodes {summary.alive_nodes ?? 0} alive</span>

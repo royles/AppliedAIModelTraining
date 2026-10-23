@@ -40,3 +40,23 @@ def test_platform_ray_status_tcp_only_no_ray_cli(monkeypatch):
                 out = platform_status.platform_ray_status()
     assert out["state"] == "reachable"
     assert out["gcs_reachable"] is True
+
+
+def test_platform_ray_active_task_uses_ray_status_when_cached(monkeypatch):
+    monkeypatch.setattr(platform_status.cdsw_workers, "cdsw_available", lambda: True)
+    with patch.dict(
+        "os.environ",
+        {"RAY_HEAD_ADDRESS": "100.100.191.17:6379"},
+        clear=False,
+    ):
+        with patch(
+            "app.services.platform_status.gcs_tcp_reachable",
+            return_value=True,
+        ):
+            with patch(
+                "app.services.platform_status._ray_head_gcs_healthy",
+                return_value=True,
+            ):
+                out = platform_status.platform_ray_status_active_task()
+    assert out["head_gcs_healthy"] is True
+    assert out["state"] == "provisioning_head_live"

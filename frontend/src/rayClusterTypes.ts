@@ -30,6 +30,7 @@ export type RayClusterTopology = {
   version?: number;
   gcs_address?: string | null;
   gcs_reachable?: boolean;
+  head_gcs_healthy?: boolean;
   components?: RayClusterComponent[];
   links?: RayClusterLink[];
   summary?: Record<string, number>;

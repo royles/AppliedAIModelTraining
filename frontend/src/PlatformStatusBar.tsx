@@ -22,17 +22,19 @@ function StatusPill({
   title,
   tone,
   onClick,
+  className,
 }: {
   label: string;
   title: string;
   tone: IndicatorTone;
   onClick?: () => void;
+  className?: string;
 }) {
   const Tag = onClick ? "button" : "span";
   return (
     <Tag
       type={onClick ? "button" : undefined}
-      className={toneClass(tone)}
+      className={[toneClass(tone), className].filter(Boolean).join(" ")}
       title={title}
       onClick={onClick}
     >
@@ -107,7 +109,14 @@ export function PlatformStatusBar({ jobs, onOpenTask }: Props) {
           title={apiTitle}
           tone={apiTone}
         />
-        <StatusPill label={ray.label} title={ray.title} tone={ray.tone} />
+        <StatusPill
+          label={ray.label}
+          title={ray.title}
+          tone={ray.tone}
+          className={
+            ray.label === "Ray head live" ? "ray-head-live-pill" : undefined
+          }
+        />
         <StatusPill
           label={tasks.label}
           title={tasks.title}

@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
-from app.training.dataset_loader import load_training_samples
+from app.services.download_progress import DownloadProgressState
+from app.training.dataset_loader import ProgressCallback, load_training_samples
 from app.training.dataset_config import is_remote_dataset
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ def load_training_corpus_staged(
     dataset_cfg: dict[str, Any],
     task_type: str,
     shared_dirs: Sequence[str] | None = None,
+    download_progress: DownloadProgressState | None = None,
 ) -> tuple[list[str], list[int] | None]:
     """
     Load training texts once per job artifact + dataset config.
@@ -117,7 +119,18 @@ def load_training_corpus_staged(
     source = str(dataset_cfg.get("source") or "unknown")
     logger.info("Dataset download/load — started (source=%s)", source)
     t0 = time.perf_counter()
-    texts, labels = load_training_samples(dataset_cfg, task_type=task_type)
+
+    progress_cb: ProgressCallback | None = None
+    if download_progress is not None:
+
+        def progress_cb(count: int, limit: int | None) -> None:
+            download_progress.update_rows(count, limit)
+
+    texts, labels = load_training_samples(
+        dataset_cfg,
+        task_type=task_type,
+        progress_cb=progress_cb,
+    )
     logger.info(
         "Dataset download/load — done (%s samples, %.0fs)",
         len(texts),
@@ -214,6 +227,7 @@ def prepare_dataset_shards_on_driver(
     task_type: str,
     world_size: int,
     shared_dirs: Sequence[str] | None = None,
+    download_progress: DownloadProgressState | None = None,
 ) -> dict[str, Any]:
     """
     Load the corpus once on the Train driver and write one JSON shard per worker.
@@ -256,6 +270,7 @@ def prepare_dataset_shards_on_driver(
         dataset_cfg=dataset_cfg,
         task_type=task_type,
         shared_dirs=shared_dirs,
+        download_progress=download_progress,
     )
     shards = split_interleaved(texts, labels, world_size)
     for rank, (shard_texts, shard_labels) in enumerate(shards):

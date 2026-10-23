@@ -38,8 +38,11 @@ def task_start_line(kind: str, label: str) -> str:
     return framework_line(kind, f"{label} — started")
 
 
-def heartbeat_line(label: str, elapsed_sec: int) -> str:
-    return framework_line("info", f"{label} — still running ({elapsed_sec}s)")
+def heartbeat_line(label: str, elapsed_sec: int, detail: str = "") -> str:
+    msg = f"{label} — still running ({elapsed_sec}s)"
+    if detail:
+        msg = f"{msg}; {detail}"
+    return framework_line("info", msg)
 
 
 def task_done_line(label: str, *, seconds: float | None = None, detail: str = "") -> str:

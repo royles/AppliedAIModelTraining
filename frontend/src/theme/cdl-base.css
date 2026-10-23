@@ -180,6 +180,23 @@ button.platform-status-pill:hover {
   background: var(--cdl-success);
 }
 
+.platform-status-pill.ray-head-live-pill .platform-status-dot {
+  animation: platform-status-pulse 1.6s ease-in-out infinite;
+}
+
+.ray-head-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #22c55e;
+  font-weight: var(--cdl-font-weight-medium);
+}
+
+.ray-head-live-dot {
+  background: #22c55e;
+  animation: platform-status-pulse 1.6s ease-in-out infinite;
+}
+
 .platform-status-pill.tone-warn .platform-status-dot {
   background: var(--cdl-warning);
 }
