@@ -166,15 +166,13 @@ def ui_build_info() -> UiBuildInfoRead:
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    import ray
-
     db = SessionLocal()
     try:
         jobs_summary = active_jobs_summary(db)
     finally:
         db.close()
 
-    runtime = "initialized" if ray.is_initialized() else "not_initialized"
+    runtime = "api_process"
     starter = (REPO_ROOT / "data" / "datasets" / "starter_corpus.txt").resolve()
     return HealthResponse(
         status="ok",

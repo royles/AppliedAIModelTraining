@@ -23,8 +23,7 @@ ACTIVE_JOB_STATUSES = frozenset({"queued", "provisioning", "running"})
 
 _ray_status_cache: dict[str, Any] = {}
 _ray_status_cache_lock = threading.Lock()
-_RAY_STATUS_CACHE_TTL_OK_SEC = 12.0
-_RAY_STATUS_CACHE_TTL_DEFERRED_SEC = 45.0
+_RAY_STATUS_CACHE_TTL_SEC = 60.0
 
 
 def active_jobs_summary(db: Session) -> dict[str, Any]:
@@ -46,12 +45,10 @@ def active_jobs_summary(db: Session) -> dict[str, Any]:
 
 def platform_ray_status() -> dict[str, Any]:
     """
-    Ray GCS reachability for /api/health without ``ray.init`` in the API process.
+    Ray GCS reachability for ``/api/health`` — **TCP only**, no subprocess Ray CLI.
 
-    Cloudera CAI: GCS listens on ``CDSW_IP_ADDRESS:6379`` after ``ray start --head``.
-    TCP can be open while RPC/auth is not ready — probing with ``ray.init`` every UI
-    poll causes log spam (``Failed to connect to GCS … within 5 seconds``). Use
-    ``ray status`` only here; full RPC waits belong in job provisioning.
+    Full RPC/auth checks belong in job provisioning, not the health poll (single
+    uvicorn worker + CAI memory).
     """
     head = ray_worker_head_address()
     gcs = ray_driver_gcs_address(head) if head else None
@@ -75,39 +72,20 @@ def platform_ray_status() -> dict[str, Any]:
             return out
 
         host, port = parse_gcs_host_port(gcs)
-        if not gcs_tcp_reachable(host, port, timeout_sec=1.5):
+        tcp_ok = gcs_tcp_reachable(host, port, timeout_sec=1.0)
+        out["gcs_reachable"] = tcp_ok
+        if not tcp_ok:
             out["state"] = "deferred"
             out["detail"] = (
-                "Ray head not listening on master pod IP yet (restart scripts/start.py; "
-                "PLATFORM_RAY_START_AT_BOOT=0 defers head until a model task). "
-                "See docs/CAI_RAY_NETWORKING.md"
+                "Ray head not listening on master pod IP yet. "
+                "Start a model task or set PLATFORM_RAY_START_AT_BOOT=1."
             )
             return out
 
-        from app.services.ray_cluster_watch import ray_status_cluster_snapshot
-        from app.services.ray_gcs_auth import verified_gcs_auth_token
-
-        token = verified_gcs_auth_token(gcs, timeout_sec=10.0)
-        out["gcs_reachable"] = token is not None
-        if not token:
-            out["state"] = "deferred"
-            out["detail"] = (
-                "GCS port open but auth/RPC not ready (stale token, head starting, or head down). "
-                "Run: ray stop --force; rm -f data/.ray_gcs_auth_token; python3 scripts/start.py. "
-                "Workers join via CDSW_MASTER_IP:6379 per Cloudera worker networking."
-            )
-            return out
-
-        snap = ray_status_cluster_snapshot(gcs, auth_token=token, timeout_sec=12.0)
-        if snap is None:
-            out["state"] = "reachable"
-            return out
-
-        alive = int(snap.get("alive", 0))
-        gpu = float(snap.get("gpu", 0.0))
-        out["alive_nodes"] = alive
-        out["gpu_capacity"] = gpu
-        out["state"] = "online" if alive >= 1 else "reachable"
+        out["state"] = "reachable"
+        out["detail"] = (
+            "GCS port open (TCP). Node counts refresh on active task logs only."
+        )
         return out
     except Exception as exc:  # noqa: BLE001
         out["state"] = "deferred"
@@ -116,7 +94,7 @@ def platform_ray_status() -> dict[str, Any]:
 
 
 def cached_platform_ray_status(*, active_job_count: int = 0) -> dict[str, Any]:
-    """TTL cache so /api/health polling does not spawn Ray clients every few seconds."""
+    """TTL cache so /api/health polling does not hammer the session."""
     if active_job_count > 0:
         gcs = (
             ray_worker_head_address()
@@ -138,12 +116,7 @@ def cached_platform_ray_status(*, active_job_count: int = 0) -> dict[str, Any]:
         if expires > now and _ray_status_cache.get("value") is not None:
             return dict(_ray_status_cache["value"])
     value = platform_ray_status()
-    ttl = (
-        _RAY_STATUS_CACHE_TTL_OK_SEC
-        if value.get("gcs_reachable")
-        else _RAY_STATUS_CACHE_TTL_DEFERRED_SEC
-    )
     with _ray_status_cache_lock:
         _ray_status_cache["value"] = value
-        _ray_status_cache["expires"] = now + ttl
+        _ray_status_cache["expires"] = now + _RAY_STATUS_CACHE_TTL_SEC
     return dict(value)

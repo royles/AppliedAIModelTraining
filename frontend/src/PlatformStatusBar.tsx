@@ -53,19 +53,9 @@ export function PlatformStatusBar({ jobs, onOpenTask }: Props) {
 
     async function poll() {
       try {
-        await api.uiBuildInfo();
-        if (!cancelled) {
-          setUxReady(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setUxReady(true);
-        }
-      }
-
-      try {
         const h = await api.health();
         if (!cancelled) {
+          setUxReady(true);
           setHealth(h);
           setApiTone("ok");
           setApiTitle("API connected · /api/health OK");

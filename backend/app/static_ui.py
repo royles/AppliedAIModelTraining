@@ -33,14 +33,24 @@ def mount_static_ui(app: FastAPI) -> bool:
     return True
 
 
+_ui_build_info_cache: dict[str, Any] | None = None
+_ui_build_info_cache_key: tuple[int, int, str] | None = None
+
+
 def read_ui_build_info() -> dict[str, Any]:
     """Asset hashes from index.html + optional stamp for debugging stale CAI bundles."""
+    global _ui_build_info_cache, _ui_build_info_cache_key
+
     dist = frontend_dist_dir()
     info: dict[str, Any] = {"status": "missing"}
     if not frontend_dist_ready():
         return info
     index_path = dist / "index.html"
     try:
+        stat = index_path.stat()
+        cache_key = (int(stat.st_mtime_ns), stat.st_size, str(index_path))
+        if _ui_build_info_cache is not None and _ui_build_info_cache_key == cache_key:
+            return dict(_ui_build_info_cache)
         html = index_path.read_text(encoding="utf-8")
     except OSError:
         return info
@@ -68,6 +78,8 @@ def read_ui_build_info() -> dict[str, Any]:
         "stamp": stamp,
         "features": features,
     }
+    _ui_build_info_cache = dict(info)
+    _ui_build_info_cache_key = cache_key
     return info
 
 

@@ -209,6 +209,20 @@ def main() -> int:
         from common import bootstrap_cai_ray_env
 
         bootstrap_cai_ray_env()
+        ip = cai_session_ip()
+        print(f"CAI session IP: {ip}")
+        print(
+            f"Single process: UX + /api on {BIND_HOST}:{ux_port} (CDSW_APP_PORT). "
+            f"Not starting a second API on :{backend_port} (saves memory and SQLite contention)."
+        )
+        print(
+            f"Smoke test: API_BASE=http://{BIND_HOST}:{ux_port} "
+            f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}"
+        )
+        if ensure_runtime_ready() != 0:
+            return 1
+        return run_ui_gateway_foreground(ux_port, backend_port)
+
     ensure_api_running(backend_port)
     if not wait_for_urls([api_health_url(backend_port)], attempts=60):
         print(
@@ -220,16 +234,6 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-
-    if is_cai_session():
-        ip = cai_session_ip()
-        print(f"CAI session IP: {ip}")
-        print(f"Application route → UX on CDSW_APP_PORT={ux_port} ({BIND_HOST})")
-        print(f"Smoke test: API_BASE=http://{BIND_HOST}:{backend_port} "
-              f"{venv_python()} {REPO_ROOT / 'scripts' / 'cai_smoke_test.py'}")
-        if ensure_runtime_ready() != 0:
-            return 1
-        return run_ui_gateway_foreground(ux_port, backend_port)
 
     start_ui_gateway_background(ux_port, backend_port)
     if wait_for_urls(
